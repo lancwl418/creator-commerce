@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800" width="400" height="800">
+  <!-- Background -->
+  <rect width="400" height="800" fill="#f5f5f5" rx="8"/>
+
+  <!-- Phone case outer shape -->
+  <rect x="60" y="40" width="280" height="720" fill="#ffffff" stroke="#cccccc" stroke-width="3" rx="40" ry="40"/>
+
+  <!-- Phone case inner edge / bezel -->
+  <rect x="72" y="52" width="256" height="696" fill="none" stroke="#e8e8e8" stroke-width="1.5" rx="34" ry="34"/>
+
+  <!-- Camera cutout (top left cluster) -->
+  <rect x="100" y="70" width="100" height="100" fill="#e8e8e8" stroke="#cccccc" stroke-width="2" rx="20" ry="20"/>
+  <circle cx="130" cy="100" r="16" fill="#d8d8d8" stroke="#cccccc" stroke-width="1.5"/>
+  <circle cx="170" cy="100" r="16" fill="#d8d8d8" stroke="#cccccc" stroke-width="1.5"/>
+  <circle cx="130" cy="140" r="16" fill="#d8d8d8" stroke="#cccccc" stroke-width="1.5"/>
+  <circle cx="170" cy="140" r="8" fill="#d8d8d8" stroke="#cccccc" stroke-width="1"/>
+
+  <!-- Side button cutouts -->
+  <rect x="56" y="200" width="6" height="40" fill="#e0e0e0" stroke="#cccccc" stroke-width="1" rx="3"/>
+  <rect x="56" y="260" width="6" height="60" fill="#e0e0e0" stroke="#cccccc" stroke-width="1" rx="3"/>
+
+  <!-- Power button -->
+  <rect x="338" y="220" width="6" height="50" fill="#e0e0e0" stroke="#cccccc" stroke-width="1" rx="3"/>
+
+</svg>
