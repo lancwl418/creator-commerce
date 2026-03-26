@@ -16,6 +16,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/portal/node_modules ./apps/portal/node_modules
 COPY . .
 WORKDIR /app/apps/portal
+# Build-time placeholders — real values injected at runtime via Render env vars
+ENV NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder
 RUN pnpm build
 
 # --- Production ---
