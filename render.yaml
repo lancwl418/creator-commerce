@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: creator-portal
+    runtime: docker
+    dockerfilePath: ./apps/portal/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_DESIGN_ENGINE_URL
+        sync: false
+
+  - type: web
+    name: design-engine
+    runtime: docker
+    dockerfilePath: ./design-engine/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: NEXT_PUBLIC_ALLOWED_ORIGINS
+        sync: false

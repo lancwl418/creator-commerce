@@ -8,6 +8,12 @@
     "dev:portal": "pnpm --filter portal dev",
     "dev:admin": "pnpm --filter admin dev",
     "build": "pnpm -r build",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "db:migrate": "node scripts/migrate.js",
+    "db:status": "node scripts/migrate.js --status",
+    "db:reset": "node scripts/migrate.js --reset"
+  },
+  "devDependencies": {
+    "pg": "^8.20.0"
   }
 }

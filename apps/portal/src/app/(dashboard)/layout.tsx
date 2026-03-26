@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { Sidebar } from '@/components/layout/Sidebar';
 
 export default async function DashboardLayout({
   children,
@@ -14,10 +15,11 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">Creator Commerce</h1>
+    <div className="min-h-screen bg-gray-50 flex">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="bg-white border-b border-gray-200 h-14 flex items-center justify-between px-6 shrink-0">
+          <div />
           <form action="/api/auth/signout" method="POST">
             <button
               type="submit"
@@ -26,11 +28,11 @@ export default async function DashboardLayout({
               Sign out
             </button>
           </form>
-        </div>
-      </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
+        </header>
+        <main className="flex-1 p-6 overflow-auto">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

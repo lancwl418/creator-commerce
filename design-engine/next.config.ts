@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   async headers() {
     const origins = process.env.NEXT_PUBLIC_ALLOWED_ORIGINS
       ?.split(',')
