@@ -14,7 +14,6 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/portal/node_modules ./apps/portal/node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY . .
 WORKDIR /app/apps/portal
 RUN pnpm build

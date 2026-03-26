@@ -14,7 +14,6 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/design-engine/node_modules ./design-engine/node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY . .
 WORKDIR /app/design-engine
 RUN pnpm build
