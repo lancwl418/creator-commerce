@@ -14,12 +14,10 @@ export function Sidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // Close drawer on route change
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
 
-  // Prevent body scroll when drawer is open
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
@@ -31,20 +29,26 @@ export function Sidebar() {
 
   const navContent = (
     <>
-      <div className="h-14 flex items-center justify-between px-4 border-b border-gray-200">
-        <Link href="/dashboard" className="text-lg font-semibold text-gray-900">
-          Creator Commerce
+      <div className="h-16 flex items-center justify-between px-5">
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+            <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
+            </svg>
+          </div>
+          <span className="text-[15px] font-semibold text-white tracking-tight">Creator Commerce</span>
         </Link>
-        {/* Close button - mobile only */}
         <button
           onClick={() => setOpen(false)}
-          className="md:hidden p-1 text-gray-500 hover:text-gray-700"
+          className="md:hidden p-1 text-white/60 hover:text-white"
           aria-label="Close menu"
         >
           <CloseIcon className="w-5 h-5" />
         </button>
       </div>
-      <nav className="flex-1 p-3 space-y-1">
+
+      <nav className="flex-1 px-3 py-2 space-y-0.5">
+        <p className="px-3 pt-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">Menu</p>
         {navItems.map((item) => {
           const isActive = item.href === '/dashboard'
             ? pathname === '/dashboard'
@@ -53,18 +57,25 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${
                 isActive
-                  ? 'bg-gray-100 text-gray-900'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-white/15 text-white shadow-sm'
+                  : 'text-white/60 hover:bg-white/8 hover:text-white/90'
               }`}
             >
-              <item.icon className="w-4 h-4" />
+              <item.icon className="w-[18px] h-[18px]" />
               {item.label}
             </Link>
           );
         })}
       </nav>
+
+      <div className="p-3 mt-auto">
+        <div className="rounded-lg bg-white/8 px-3.5 py-3">
+          <p className="text-[11px] font-medium text-white/40 uppercase tracking-wider">Phase 1</p>
+          <p className="text-[12px] text-white/70 mt-0.5">MVP - Marketplace</p>
+        </div>
+      </div>
     </>
   );
 
@@ -73,7 +84,7 @@ export function Sidebar() {
       {/* Mobile hamburger button */}
       <button
         onClick={() => setOpen(true)}
-        className="md:hidden fixed top-3 left-3 z-40 p-2 bg-white border border-gray-200 rounded-md shadow-sm"
+        className="md:hidden fixed top-4 left-4 z-40 p-2 bg-white rounded-xl shadow-md border border-border-light"
         aria-label="Open menu"
       >
         <MenuIcon className="w-5 h-5 text-gray-700" />
@@ -82,14 +93,14 @@ export function Sidebar() {
       {/* Mobile drawer overlay */}
       {open && (
         <div
-          className="md:hidden fixed inset-0 bg-black/40 z-40"
+          className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
           onClick={() => setOpen(false)}
         />
       )}
 
       {/* Mobile drawer */}
       <aside
-        className={`md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-200 ease-in-out ${
+        className={`md:hidden fixed inset-y-0 left-0 z-50 w-[260px] bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col transform transition-transform duration-200 ease-in-out ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -97,7 +108,7 @@ export function Sidebar() {
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-56 bg-white border-r border-gray-200 flex-col shrink-0">
+      <aside className="hidden md:flex w-[240px] bg-gradient-to-b from-gray-900 to-gray-800 flex-col shrink-0">
         {navContent}
       </aside>
     </>

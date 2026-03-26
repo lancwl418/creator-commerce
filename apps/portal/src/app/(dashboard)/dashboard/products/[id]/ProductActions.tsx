@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 
 interface Listing {
   id: string;
@@ -46,7 +46,6 @@ export function ProductActions({
   const hasMarketplaceListing = listings.some(l => l.channel_type === 'marketplace');
   const isListed = currentStatus === 'listed';
 
-  // Build editor embed URL
   const editorUrl = `${DESIGN_ENGINE_URL}/embed?template=${productTemplateId}&product_id=${productId}&design_id=${designId}`;
 
   async function handlePublishToMarketplace() {
@@ -60,7 +59,6 @@ export function ProductActions({
       }
 
       if (hasMarketplaceListing) {
-        // Update existing listing
         const existing = listings.find(l => l.channel_type === 'marketplace')!;
         const { error: updateError } = await supabase
           .from('channel_listings')
@@ -68,7 +66,6 @@ export function ProductActions({
           .eq('id', existing.id);
         if (updateError) throw updateError;
       } else {
-        // Create new listing
         const { error: insertError } = await supabase
           .from('channel_listings')
           .insert({
@@ -81,7 +78,6 @@ export function ProductActions({
         if (insertError) throw insertError;
       }
 
-      // Update product status to listed
       const { error: statusError } = await supabase
         .from('sellable_product_instances')
         .update({ status: 'listed' })
@@ -103,7 +99,7 @@ export function ProductActions({
       <div className="flex gap-3">
         <button
           onClick={() => setShowEditor(!showEditor)}
-          className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="rounded-xl border border-border px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
         >
           {showEditor ? 'Close Editor' : 'Open Editor'}
         </button>
@@ -111,7 +107,7 @@ export function ProductActions({
         {!isListed && (
           <button
             onClick={() => setShowPublish(!showPublish)}
-            className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-500 transition-colors shadow-md shadow-primary-600/25"
           >
             Publish to Marketplace
           </button>
@@ -120,12 +116,12 @@ export function ProductActions({
 
       {/* Editor iframe */}
       {showEditor && (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-          <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Design Editor</span>
+        <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
+          <div className="bg-surface-secondary px-5 py-3 border-b border-border-light flex items-center justify-between">
+            <span className="text-sm font-semibold text-gray-700">Design Editor</span>
             <button
               onClick={() => setShowEditor(false)}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors"
             >
               Close
             </button>
@@ -141,16 +137,16 @@ export function ProductActions({
 
       {/* Publish form */}
       {showPublish && (
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
-          <h3 className="text-sm font-medium text-gray-900 mb-4">Publish to Marketplace</h3>
+        <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+          <h3 className="text-sm font-semibold text-gray-900 mb-5">Publish to Marketplace</h3>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="price" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Selling Price (USD)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500">$</span>
+                <span className="absolute left-4 top-2.5 text-gray-400 font-medium">$</span>
                 <input
                   id="price"
                   type="number"
@@ -158,35 +154,39 @@ export function ProductActions({
                   min="0.01"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  className="w-full rounded-xl border border-border pl-8 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
                 />
               </div>
             </div>
 
             {baseCost && (
-              <div className="text-sm text-gray-500 space-y-1">
-                <p>Base cost: ${Number(baseCost).toFixed(2)}</p>
-                <p>
-                  Est. royalty (15%): <span className="font-medium text-gray-900">
+              <div className="rounded-xl bg-surface-secondary p-4 space-y-1.5">
+                <p className="text-sm text-gray-500">Base cost: <span className="font-medium text-gray-700">${Number(baseCost).toFixed(2)}</span></p>
+                <p className="text-sm text-gray-500">
+                  Est. royalty (15%): <span className="font-bold text-primary-700">
                     ${(parseFloat(price) * 0.15).toFixed(2)}
                   </span>
                 </p>
               </div>
             )}
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && (
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button
                 onClick={() => setShowPublish(false)}
-                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-xl border border-border px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePublishToMarketplace}
                 disabled={publishing}
-                className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                className="rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-50 transition-all shadow-md shadow-primary-600/25"
               >
                 {publishing ? 'Publishing...' : 'Publish'}
               </button>
