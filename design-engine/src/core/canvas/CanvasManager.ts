@@ -15,6 +15,7 @@ export type CropResult = {
 
 export type CanvasEventHandler = {
   onObjectModified?: (layerId: string, transform: DesignLayer['transform']) => void;
+  onObjectTransforming?: (layerId: string, transform: DesignLayer['transform']) => void;
   onSelectionChanged?: (layerIds: string[]) => void;
   onObjectAdded?: (layerId: string) => void;
   onObjectRemoved?: (layerId: string) => void;
@@ -113,6 +114,20 @@ export class CanvasManager {
     this.canvas.renderAll();
   }
 
+  private extractTransform(obj: fabric.FabricObject): DesignLayer['transform'] {
+    return {
+      x: obj.left ?? 0,
+      y: obj.top ?? 0,
+      width: obj.width ?? 0,
+      height: obj.height ?? 0,
+      rotation: obj.angle ?? 0,
+      scaleX: obj.scaleX ?? 1,
+      scaleY: obj.scaleY ?? 1,
+      flipX: obj.flipX ?? false,
+      flipY: obj.flipY ?? false,
+    };
+  }
+
   private bindEvents(): void {
     if (!this.canvas) return;
 
@@ -131,22 +146,35 @@ export class CanvasManager {
       }
 
       obj.setCoords();
+      this.eventHandlers.onObjectTransforming?.(
+        obj.data.layerId as string,
+        this.extractTransform(obj)
+      );
+    });
+
+    this.canvas.on('object:scaling', (e) => {
+      const obj = e.target;
+      if (!obj || !obj.data?.layerId) return;
+      this.eventHandlers.onObjectTransforming?.(
+        obj.data.layerId as string,
+        this.extractTransform(obj)
+      );
+    });
+
+    this.canvas.on('object:rotating', (e) => {
+      const obj = e.target;
+      if (!obj || !obj.data?.layerId) return;
+      this.eventHandlers.onObjectTransforming?.(
+        obj.data.layerId as string,
+        this.extractTransform(obj)
+      );
     });
 
     this.canvas.on('object:modified', (e) => {
       const obj = e.target;
       if (!obj || !obj.data?.layerId) return;
-      this.eventHandlers.onObjectModified?.(obj.data.layerId as string, {
-        x: obj.left ?? 0,
-        y: obj.top ?? 0,
-        width: obj.width ?? 0,
-        height: obj.height ?? 0,
-        rotation: obj.angle ?? 0,
-        scaleX: obj.scaleX ?? 1,
-        scaleY: obj.scaleY ?? 1,
-        flipX: obj.flipX ?? false,
-        flipY: obj.flipY ?? false,
-      });
+      this.eventHandlers.onObjectTransforming?.(obj.data.layerId as string, this.extractTransform(obj));
+      this.eventHandlers.onObjectModified?.(obj.data.layerId as string, this.extractTransform(obj));
     });
 
     this.canvas.on('selection:created', (e) => {

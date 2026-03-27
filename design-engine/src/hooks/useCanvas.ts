@@ -15,6 +15,7 @@ export function useCanvas() {
   const reinitToken = useProductStore((s) => s._reinitToken);
   const updateLayer = useDesignStore((s) => s.updateLayer);
   const setSelectedLayerIds = useEditorStore((s) => s.setSelectedLayerIds);
+  const setLiveTransform = useEditorStore((s) => s.setLiveTransform);
 
   const prevViewIdRef = useRef<string | null>(null);
 
@@ -34,7 +35,11 @@ export function useCanvas() {
     (async () => {
       await manager.initialize(canvasRef.current!, selectedTemplate, activeViewId, {
         onObjectModified: (layerId, transform) => {
+          setLiveTransform(null);
           updateLayer(activeViewId, layerId, { transform });
+        },
+        onObjectTransforming: (_layerId, transform) => {
+          setLiveTransform(transform);
         },
         onSelectionChanged: (layerIds) => {
           setSelectedLayerIds(layerIds);
@@ -75,7 +80,7 @@ export function useCanvas() {
       manager.dispose();
       managerRef.current = null;
     };
-  }, [selectedTemplate, activeViewId, reinitToken, updateLayer, setSelectedLayerIds]);
+  }, [selectedTemplate, activeViewId, reinitToken, updateLayer, setSelectedLayerIds, setLiveTransform]);
 
   const getManager = useCallback(() => managerRef.current, []);
 
