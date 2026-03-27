@@ -12,6 +12,7 @@ export function useCanvas() {
 
   const selectedTemplate = useProductStore((s) => s.selectedTemplate);
   const activeViewId = useProductStore((s) => s.activeViewId);
+  const reinitToken = useProductStore((s) => s._reinitToken);
   const updateLayer = useDesignStore((s) => s.updateLayer);
   const setSelectedLayerIds = useEditorStore((s) => s.setSelectedLayerIds);
 
@@ -74,7 +75,7 @@ export function useCanvas() {
       manager.dispose();
       managerRef.current = null;
     };
-  }, [selectedTemplate, activeViewId, updateLayer, setSelectedLayerIds]);
+  }, [selectedTemplate, activeViewId, reinitToken, updateLayer, setSelectedLayerIds]);
 
   const getManager = useCallback(() => managerRef.current, []);
 

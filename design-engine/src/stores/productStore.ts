@@ -9,6 +9,8 @@ interface ProductStoreState {
   activeViewId: string;
   status: LoadingStatus;
   error: string | null;
+  /** Increments on every selectTemplate call to force canvas re-init (handles same-template switching) */
+  _reinitToken: number;
 
   selectTemplate: (templateId: string) => void;
   setActiveView: (viewId: string) => void;
@@ -34,14 +36,16 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
   activeViewId: '',
   status: 'idle',
   error: null,
+  _reinitToken: 0,
 
   selectTemplate: (templateId) => {
     const template = get().templates.find((t) => t.id === templateId);
     if (template) {
-      set({
+      set((s) => ({
         selectedTemplate: template,
         activeViewId: template.defaultViewId,
-      });
+        _reinitToken: s._reinitToken + 1,
+      }));
     }
   },
 
@@ -123,5 +127,6 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
       activeViewId: '',
       status: 'idle',
       error: null,
+      _reinitToken: 0,
     }),
 }));

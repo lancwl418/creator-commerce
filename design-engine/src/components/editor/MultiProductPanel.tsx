@@ -16,7 +16,6 @@ export default function MultiProductPanel() {
 
   const selectTemplate = useProductStore((s) => s.selectTemplate);
   const loadDesign = useDesignStore((s) => s.loadDesign);
-  const initDesign = useDesignStore((s) => s.initDesign);
   const switchingRef = useRef(false);
 
   const handleSwitchProduct = useCallback(
@@ -56,24 +55,19 @@ export default function MultiProductPanel() {
         useProductStore.getState().appendTemplates([target.template]);
       }
 
-      // 5. Load target design into designStore
-      // Always load the saved design (even if empty) so productTemplateId is correct
+      // 5. Load target design into designStore FIRST (synchronous Zustand update)
+      // This ensures the design is ready before useCanvas effect reads it
       const targetDesign = structuredClone(target.design);
       loadDesign(targetDesign);
 
       // 6. Select template — triggers useCanvas re-init
-      // Delay to ensure designStore has settled before canvas reads it
-      setTimeout(() => {
-        // Double-check the design is still the target's (not overwritten)
-        const currentState = useDesignStore.getState().design;
-        if (currentState.productTemplateId !== target.template.id) {
-          loadDesign(structuredClone(target.design));
-        }
-        selectTemplate(target.template.id);
-        switchingRef.current = false;
-      }, 80);
+      // Called synchronously after loadDesign so the design is already in the store
+      // when the canvas effect fires. _reinitToken ensures the effect runs even
+      // when switching between products that share the same template.
+      selectTemplate(target.template.id);
+      switchingRef.current = false;
     },
-    [activeIndex, saveCurrentProduct, setActiveProduct, selectTemplate, loadDesign, initDesign]
+    [activeIndex, saveCurrentProduct, setActiveProduct, selectTemplate, loadDesign]
   );
 
   const handleRemove = useCallback(
@@ -98,9 +92,7 @@ export default function MultiProductPanel() {
           useProductStore.getState().appendTemplates([newActive.template]);
         }
         loadDesign(structuredClone(newActive.design));
-        setTimeout(() => {
-          selectTemplate(newActive.template.id);
-        }, 50);
+        selectTemplate(newActive.template.id);
       }
     },
     [products.length, activeIndex, removeProduct, selectTemplate, loadDesign, saveCurrentProduct]
