@@ -59,7 +59,7 @@ export default function ImportFromEditorPage() {
         return;
       }
 
-      // Get design version
+      // Get design version and artwork
       const { data: design } = await supabase
         .from('designs')
         .select('id, current_version_id')
@@ -71,6 +71,14 @@ export default function ImportFromEditorPage() {
         setStatus('error');
         return;
       }
+
+      // Get artwork URL as fallback preview
+      const { data: artworkAsset } = await supabase
+        .from('design_assets')
+        .select('file_url')
+        .eq('design_version_id', design.current_version_id)
+        .eq('asset_type', 'artwork')
+        .single();
 
       // Create products
       let createdCount = 0;
@@ -89,7 +97,11 @@ export default function ImportFromEditorPage() {
             title: productTitle,
             status: 'draft',
             base_price_suggestion: product.base_cost ? product.base_cost * 2.5 : null,
-            preview_urls: product.thumbnail ? [product.thumbnail] : [],
+            preview_urls: product.thumbnail
+            ? [product.thumbnail]
+            : artworkAsset?.file_url
+              ? [artworkAsset.file_url]
+              : [],
           })
           .select('id')
           .single();

@@ -158,20 +158,25 @@ function EditorPageInner() {
         multiStore.saveCurrentProduct(currentDesign);
       }
 
+      // Get artwork URL as fallback preview
+      const artworkUrl = multiStore.artworkUrl
+        || new URLSearchParams(window.location.search).get('artwork_url')
+        || null;
+
       // Collect all products with their layers
       const productsToSave = multiStore.isMultiProduct
         ? multiStore.products.map((entry) => ({
             template_id: entry.template.id,
             name: entry.template.name,
             base_cost: parseFloat(String(entry.template.metadata?.price ?? 0)) || 0,
-            thumbnail: entry.thumbnail,
+            thumbnail: entry.thumbnail || artworkUrl,
             layers: Object.values(entry.design.views).flatMap((v) => v.layers),
           }))
         : [{
             template_id: selectedTemplate?.id ?? '',
             name: selectedTemplate?.name ?? '',
             base_cost: 0,
-            thumbnail: null,
+            thumbnail: artworkUrl,
             layers: Object.values(currentDesign.views).flatMap((v) => v.layers),
           }];
 
