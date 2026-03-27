@@ -48,7 +48,9 @@ function EditorPageInner() {
   const pendingExportRef = useRef<'json' | 'png' | null>(null);
 
   const isEmbedded = editorConfig.mode === 'embedded';
+  const isPortal = editorConfig.mode === 'portal';
   const isMultiProduct = useMultiProductStore((s) => s.isMultiProduct);
+  const [saving, setSaving] = useState(false);
 
   // Initialize design on first render
   useEffect(() => {
@@ -143,6 +145,95 @@ function EditorPageInner() {
     );
   }, []);
 
+  // Save & Finish: save all products back to Portal and redirect
+  const handleSaveAndFinish = useCallback(async () => {
+    if (!isPortal || !editorConfig.designId) return;
+    setSaving(true);
+
+    try {
+      // Save current product first
+      const currentDesign = structuredClone(useDesignStore.getState().design);
+      const multiStore = useMultiProductStore.getState();
+      if (multiStore.isMultiProduct) {
+        multiStore.saveCurrentProduct(currentDesign);
+      }
+
+      // Collect all products with their layers
+      const productsToSave = multiStore.isMultiProduct
+        ? multiStore.products.map((entry) => ({
+            template_id: entry.template.id,
+            name: entry.template.name,
+            base_cost: parseFloat(String(entry.template.metadata?.price ?? 0)) || 0,
+            thumbnail: entry.thumbnail,
+            layers: Object.values(entry.design.views).flatMap((v) => v.layers),
+          }))
+        : [{
+            template_id: selectedTemplate?.id ?? '',
+            name: selectedTemplate?.name ?? '',
+            base_cost: 0,
+            thumbnail: null,
+            layers: Object.values(currentDesign.views).flatMap((v) => v.layers),
+          }];
+
+      // Parse callback_url and products_meta from URL params
+      const params = new URLSearchParams(window.location.search);
+      const callbackUrl = params.get('callback_url');
+      const productsMeta = params.get('products_meta');
+      const titlePrefix = params.get('title_prefix') || 'Design';
+
+      // Merge Portal metadata with editor layer data
+      let portalProducts: { id: string; name: string; base_cost: number; source: string; thumbnail: string | null }[] = [];
+      if (productsMeta) {
+        try {
+          portalProducts = JSON.parse(decodeURIComponent(productsMeta));
+        } catch { /* ignore */ }
+      }
+
+      const mergedProducts = productsToSave.map((p) => {
+        const portalMatch = portalProducts.find((pm) => pm.id === p.template_id);
+        return {
+          template_id: p.template_id,
+          name: portalMatch?.name || p.name,
+          base_cost: portalMatch?.base_cost || p.base_cost,
+          thumbnail: p.thumbnail || portalMatch?.thumbnail,
+          layers: p.layers,
+        };
+      });
+
+      if (callbackUrl) {
+        // Call Portal API to create records
+        const res = await fetch(callbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            design_id: editorConfig.designId,
+            products: mergedProducts,
+            title_prefix: decodeURIComponent(titlePrefix),
+          }),
+        });
+
+        if (res.ok) {
+          // Redirect back to Portal products page
+          const origin = new URL(callbackUrl).origin;
+          window.location.href = `${origin}/dashboard/products`;
+          return;
+        }
+
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        alert(`Save failed: ${err.error || 'Unknown error'}`);
+      } else {
+        // No callback — just save locally
+        ExportService.saveToLocal(currentDesign);
+        alert('Design saved locally.');
+      }
+    } catch (err) {
+      alert(`Save failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [isPortal, editorConfig, selectedTemplate]);
+
   // Loading state
   if (status === 'loading' || status === 'idle') {
     return (
@@ -223,6 +314,19 @@ function EditorPageInner() {
           </div>
         </div>
       </div>
+
+      {/* Save & Finish button for Portal mode */}
+      {isPortal && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <button
+            onClick={handleSaveAndFinish}
+            disabled={saving}
+            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl shadow-lg hover:bg-blue-700 disabled:opacity-50 transition-all"
+          >
+            {saving ? 'Saving...' : 'Save & Finish'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

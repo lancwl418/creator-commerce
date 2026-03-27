@@ -163,77 +163,34 @@ export default function NewProductPage() {
     return version?.design_assets?.find(a => a.asset_type === 'artwork')?.file_url ?? null;
   }
 
-  async function handleCreate() {
+  function handleCreate() {
     if (!selectedDesign || selectedProducts.length === 0) return;
 
-    setLoading(true);
-    setError('');
+    // Build editor URL with all context — no DB writes yet
+    const artworkUrl = getArtworkUrl(selectedDesign);
+    const templateIds = selectedProducts.map((p) => p.id).join(',');
+    const productMeta = encodeURIComponent(JSON.stringify(
+      selectedProducts.map((p) => ({
+        id: p.id,
+        name: p.product_name,
+        base_cost: p.base_cost,
+        source: p.source,
+        thumbnail: p.thumbnail,
+      }))
+    ));
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+    const callbackUrl = `${window.location.origin}/api/products/save-from-editor`;
 
-      const { data: creator } = await supabase
-        .from('creators')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
-      if (!creator) throw new Error('Creator not found');
+    const editorUrl = `${DESIGN_ENGINE_URL}/embed`
+      + `?design_id=${selectedDesign.id}`
+      + `&artwork_url=${encodeURIComponent(artworkUrl || '')}`
+      + `&templates=${encodeURIComponent(templateIds)}`
+      + `&products_meta=${productMeta}`
+      + `&title_prefix=${encodeURIComponent(title || selectedDesign.title)}`
+      + `&callback_url=${encodeURIComponent(callbackUrl)}`;
 
-      const currentVersion = selectedDesign.design_versions
-        ?.sort((a, b) => b.version_number - a.version_number)[0];
-      if (!currentVersion) throw new Error('No design version found');
-
-      let firstProductId: string | null = null;
-
-      // Create a sellable_product_instance for each selected product
-      for (const product of selectedProducts) {
-        const productTitle = title
-          ? (selectedProducts.length > 1 ? `${title} — ${product.product_name}` : title)
-          : `${selectedDesign.title} — ${product.product_name}`;
-
-        const { data: created, error: productError } = await supabase
-          .from('sellable_product_instances')
-          .insert({
-            creator_id: creator.id,
-            design_id: selectedDesign.id,
-            design_version_id: currentVersion.id,
-            product_template_id: product.id,
-            title: productTitle,
-            status: 'draft',
-            base_price_suggestion: product.base_cost * 2.5,
-            preview_urls: product.thumbnail ? [product.thumbnail] : [],
-          })
-          .select()
-          .single();
-        if (productError) throw productError;
-
-        if (!firstProductId) firstProductId = created.id;
-
-        const { error: configError } = await supabase
-          .from('product_configurations')
-          .insert({
-            sellable_product_instance_id: created.id,
-            design_version_id: currentVersion.id,
-            product_template_id: product.id,
-            layers: [],
-          });
-        if (configError) throw configError;
-      }
-
-      // Navigate to editor with the design and products
-      const artworkUrl = getArtworkUrl(selectedDesign);
-      const templateIds = selectedProducts.map((p) => p.id).join(',');
-      const editorUrl = `${DESIGN_ENGINE_URL}/embed?design_id=${selectedDesign.id}&artwork_url=${encodeURIComponent(artworkUrl || '')}&templates=${encodeURIComponent(templateIds)}`;
-
-      // Open editor in new tab, navigate to products list
-      window.open(editorUrl, '_blank');
-      router.push('/dashboard/products');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : JSON.stringify(err);
-      setError(msg || 'Something went wrong');
-      setLoading(false);
-    }
+    // Navigate to editor — no DB records until design is saved
+    window.location.href = editorUrl;
   }
 
   const steps = [

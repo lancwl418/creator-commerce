@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useMultiProductStore, type ProductEntry } from '@/stores/multiProductStore';
 import { useProductStore } from '@/stores/productStore';
 import { useDesignStore } from '@/stores/designStore';
@@ -15,64 +15,68 @@ export default function MultiProductPanel() {
   const isMultiProduct = useMultiProductStore((s) => s.isMultiProduct);
 
   const selectTemplate = useProductStore((s) => s.selectTemplate);
-  const design = useDesignStore((s) => s.design);
   const loadDesign = useDesignStore((s) => s.loadDesign);
   const initDesign = useDesignStore((s) => s.initDesign);
+  const switchingRef = useRef(false);
 
   const handleSwitchProduct = useCallback(
     (index: number) => {
-      if (index === activeIndex) return;
+      if (index === activeIndex || switchingRef.current) return;
+      switchingRef.current = true;
 
-      // 1. Save current product state — deep clone to capture all layer changes
+      // 1. Save current product — capture design state from store
       const currentDesign = structuredClone(useDesignStore.getState().design);
-      // Generate thumbnail from canvas
+
+      // Try to capture thumbnail (may fail due to CORS)
       let thumbnail: string | undefined;
-      const canvasEl = document.querySelector('.upper-canvas') as HTMLCanvasElement
-        ?? document.querySelector('canvas') as HTMLCanvasElement;
-      if (canvasEl) {
-        try {
+      try {
+        const canvasEl = document.querySelector('.lower-canvas') as HTMLCanvasElement;
+        if (canvasEl) {
           thumbnail = canvasEl.toDataURL('image/png', 0.3);
-        } catch {
-          // CORS or other error
         }
+      } catch {
+        // CORS — use mockup as fallback (already set in ProductCard)
       }
+
       saveCurrentProduct(currentDesign, thumbnail);
 
-      // 2. Switch to new product
+      // 2. Update active index
       setActiveProduct(index);
 
-      // 3. Load new product into stores
+      // 3. Read the target product AFTER saving (to get latest state)
       const target = useMultiProductStore.getState().products[index];
-      if (!target) return;
+      if (!target) {
+        switchingRef.current = false;
+        return;
+      }
 
-      // Set the template in productStore
+      // 4. Ensure template is in the product store
       const allTemplates = useProductStore.getState().templates;
       if (!allTemplates.find((t) => t.id === target.template.id)) {
         useProductStore.getState().appendTemplates([target.template]);
       }
 
-      // Check if the saved design has any layers (was previously edited)
+      // 5. Prepare the design to load
       const hasLayers = Object.values(target.design.views).some(
         (v) => v.layers && v.layers.length > 0
       );
 
+      // 6. Load design into store FIRST
       if (hasLayers) {
-        // Load saved design FIRST so layers are in the store,
-        // then selectTemplate triggers canvas re-init which reads them
         loadDesign(structuredClone(target.design));
-      }
-
-      // Select template — triggers useCanvas to re-init canvas
-      // useCanvas will read design.views[activeViewId].layers from the store
-      selectTemplate(target.template.id);
-
-      if (!hasLayers) {
-        // No previous edits — initialize fresh design for this template
+      } else {
         initDesign(
           target.template.id,
           target.template.views.map((v) => v.id)
         );
       }
+
+      // 7. Select template — triggers useCanvas re-init
+      // Use setTimeout(0) to ensure design store is settled before canvas reads it
+      setTimeout(() => {
+        selectTemplate(target.template.id);
+        switchingRef.current = false;
+      }, 50);
     },
     [activeIndex, saveCurrentProduct, setActiveProduct, selectTemplate, loadDesign, initDesign]
   );
@@ -81,28 +85,34 @@ export default function MultiProductPanel() {
     (e: React.MouseEvent, index: number) => {
       e.stopPropagation();
       if (products.length <= 1) return;
+
+      // Save current first if removing active
+      if (index === activeIndex) {
+        const currentDesign = structuredClone(useDesignStore.getState().design);
+        saveCurrentProduct(currentDesign);
+      }
+
       removeProduct(index);
 
-      // If removing active, load the new active
-      if (index === activeIndex) {
-        const newState = useMultiProductStore.getState();
-        const newActive = newState.products[newState.activeIndex];
-        if (newActive) {
-          const templates = useProductStore.getState().templates;
-          if (!templates.find((t) => t.id === newActive.template.id)) {
-            useProductStore.getState().appendTemplates([newActive.template]);
-          }
-          selectTemplate(newActive.template.id);
-          loadDesign(newActive.design);
+      // Load new active product
+      const newState = useMultiProductStore.getState();
+      const newActive = newState.products[newState.activeIndex];
+      if (newActive) {
+        const allTemplates = useProductStore.getState().templates;
+        if (!allTemplates.find((t) => t.id === newActive.template.id)) {
+          useProductStore.getState().appendTemplates([newActive.template]);
         }
+        loadDesign(structuredClone(newActive.design));
+        setTimeout(() => {
+          selectTemplate(newActive.template.id);
+        }, 50);
       }
     },
-    [products.length, activeIndex, removeProduct, selectTemplate, loadDesign]
+    [products.length, activeIndex, removeProduct, selectTemplate, loadDesign, saveCurrentProduct]
   );
 
   const handleApplyToAll = useCallback(() => {
-    // Save current first
-    const currentDesign = useDesignStore.getState().design;
+    const currentDesign = structuredClone(useDesignStore.getState().design);
     saveCurrentProduct(currentDesign);
     applyToAll(activeIndex);
   }, [activeIndex, saveCurrentProduct, applyToAll]);
@@ -149,7 +159,6 @@ export default function MultiProductPanel() {
 
 function ProductCard({
   entry,
-  index,
   isActive,
   canRemove,
   onClick,
@@ -162,6 +171,7 @@ function ProductCard({
   onClick: () => void;
   onRemove: (e: React.MouseEvent) => void;
 }) {
+  // Always show mockup image — canvas thumbnails often fail due to CORS
   const mockupUrl = entry.template.views[0]?.mockupImageUrl;
   const source = (entry.template.metadata?.source as string) || '';
 
@@ -174,22 +184,24 @@ function ProductCard({
           : 'border-gray-200 hover:border-gray-300'
       }`}
     >
-      {/* Thumbnail / Mockup */}
+      {/* Always show product mockup image */}
       <div className="aspect-square bg-gray-50 flex items-center justify-center">
-        {entry.thumbnail ? (
-          <img
-            src={entry.thumbnail}
-            alt={entry.template.name}
-            className="w-full h-full object-contain"
-          />
-        ) : mockupUrl ? (
+        {mockupUrl ? (
           <img
             src={mockupUrl}
             alt={entry.template.name}
             className="w-full h-full object-contain p-2"
+            crossOrigin="anonymous"
           />
         ) : (
-          <div className="text-gray-300 text-xs">{index + 1}</div>
+          <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+            <span className="text-gray-400 text-xs text-center px-1">{entry.template.name}</span>
+          </div>
+        )}
+
+        {/* Overlay indicator if design has layers */}
+        {Object.values(entry.design.views).some((v) => v.layers?.length > 0) && (
+          <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-white" />
         )}
       </div>
 
@@ -212,7 +224,7 @@ function ProductCard({
       {canRemove && (
         <button
           onClick={onRemove}
-          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/60 transition-opacity"
+          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-opacity"
           style={{ opacity: isActive ? 0.7 : 0 }}
           onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
           onMouseLeave={(e) => (e.currentTarget.style.opacity = isActive ? '0.7' : '0')}
