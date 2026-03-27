@@ -6,12 +6,7 @@ services:
     dockerContext: .
     plan: free
     envVars:
-      - key: NEXT_PUBLIC_SUPABASE_URL
-        sync: false
-      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
-        sync: false
-      - key: NEXT_PUBLIC_DESIGN_ENGINE_URL
-        sync: false
+      - fromGroup: creator commerce
 
   - type: web
     name: design-engine
@@ -20,5 +15,4 @@ services:
     dockerContext: .
     plan: free
     envVars:
-      - key: NEXT_PUBLIC_ALLOWED_ORIGINS
-        sync: false
+      - fromGroup: creator commerce
