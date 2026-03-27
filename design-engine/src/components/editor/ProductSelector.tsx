@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useProductStore } from '@/stores/productStore';
 import { useDesignStore } from '@/stores/designStore';
+import { useMultiProductStore } from '@/stores/multiProductStore';
 import { Shirt, Coffee, Smartphone, Package, ShoppingBag, ChevronDown, ChevronRight, Settings } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import PrintableAreaEditor from './PrintableAreaEditor';
@@ -111,6 +112,21 @@ export default function ProductSelector() {
   const erpTemplates = templates.filter((t) => t.metadata?.source === 'erp');
 
   const updateTemplateMetadata = useProductStore((s) => s.updateTemplateMetadata);
+  const addProduct = useMultiProductStore((s) => s.addProduct);
+  const multiProducts = useMultiProductStore((s) => s.products);
+  const isMultiProduct = useMultiProductStore((s) => s.isMultiProduct);
+
+  const handleAddToProducts = useCallback(
+    (template: ProductTemplate) => {
+      addProduct(template);
+    },
+    [addProduct]
+  );
+
+  const isInMultiProduct = useCallback(
+    (templateId: string) => multiProducts.some((p) => p.template.id === templateId),
+    [multiProducts]
+  );
 
   const handleSavePrintableArea = (
     templateId: string,
@@ -191,6 +207,24 @@ export default function ProductSelector() {
             })}
           </div>
         </>
+      )}
+
+      {/* Add to multi-product button */}
+      {selectedTemplate && (
+        <div className="p-2 border-t border-gray-200">
+          <button
+            onClick={() => handleAddToProducts(selectedTemplate)}
+            disabled={isInMultiProduct(selectedTemplate.id)}
+            className={cn(
+              'w-full px-3 py-2 rounded-md text-sm font-medium transition-colors',
+              isInMultiProduct(selectedTemplate.id)
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            )}
+          >
+            {isInMultiProduct(selectedTemplate.id) ? 'Added' : '+ Add to Products'}
+          </button>
+        </div>
       )}
 
       {/* Printable area editor modal */}

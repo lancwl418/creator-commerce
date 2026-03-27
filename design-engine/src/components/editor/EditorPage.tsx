@@ -4,6 +4,7 @@ import { useCallback, useRef, useEffect, useState } from 'react';
 import EditorShell from './EditorShell';
 import Toolbar from './Toolbar';
 import ProductSelector from './ProductSelector';
+import MultiProductPanel from './MultiProductPanel';
 import DesignUploader from './DesignUploader';
 import LayerPanel from './LayerPanel';
 import PropertiesPanel from './PropertiesPanel';
@@ -11,6 +12,7 @@ import ValidationDialog from './ValidationDialog';
 import { EditorConfigContext, useEditorConfig } from './EditorConfigContext';
 import { useDesignStore } from '@/stores/designStore';
 import { useProductStore } from '@/stores/productStore';
+import { useMultiProductStore } from '@/stores/multiProductStore';
 import { useTemplateLoader } from '@/hooks/useTemplateLoader';
 import { ExportService } from '@/core/design/ExportService';
 import { validateDesign } from '@/core/design/DesignValidator';
@@ -46,6 +48,7 @@ function EditorPageInner() {
   const pendingExportRef = useRef<'json' | 'png' | null>(null);
 
   const isEmbedded = editorConfig.mode === 'embedded';
+  const isMultiProduct = useMultiProductStore((s) => s.isMultiProduct);
 
   // Initialize design on first render
   useEffect(() => {
@@ -185,6 +188,9 @@ function EditorPageInner() {
       />
 
       <div className="flex-1 flex overflow-hidden">
+        {/* Multi-product panel (left of everything when active) */}
+        {isMultiProduct && <MultiProductPanel />}
+
         {/* Left sidebar */}
         <div className="w-56 flex flex-col border-r border-gray-200 bg-white overflow-y-auto">
           {!isEmbedded && <ProductSelector />}
