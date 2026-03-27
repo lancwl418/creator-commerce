@@ -30,16 +30,20 @@ export default function DesignUploader({ onLayerAdded }: DesignUploaderProps) {
           const src = reader.result as string;
           const img = new Image();
           img.onload = () => {
-            // Calculate initial size to fit within printable area
+            // Calculate scale ratio to fit within printable area
             const maxW = view.printableArea.width * 0.8;
             const maxH = view.printableArea.height * 0.8;
             const ratio = Math.min(maxW / img.width, maxH / img.height, 1);
-            const width = img.width * ratio;
-            const height = img.height * ratio;
+
+            // Store source dimensions + scale ratio (not baked display size).
+            // This keeps semantics consistent with what onObjectModified saves
+            // after user edits: width = fabric unscaled, scaleX = actual scale.
+            const displayW = img.width * ratio;
+            const displayH = img.height * ratio;
 
             // Center in printable area
-            const x = view.printableArea.x + (view.printableArea.width - width) / 2;
-            const y = view.printableArea.y + (view.printableArea.height - height) / 2;
+            const x = view.printableArea.x + (view.printableArea.width - displayW) / 2;
+            const y = view.printableArea.y + (view.printableArea.height - displayH) / 2;
 
             const layer: DesignLayer = {
               id: generateId(),
@@ -51,11 +55,11 @@ export default function DesignUploader({ onLayerAdded }: DesignUploaderProps) {
               transform: {
                 x,
                 y,
-                width,
-                height,
+                width: img.width,
+                height: img.height,
                 rotation: 0,
-                scaleX: 1,
-                scaleY: 1,
+                scaleX: ratio,
+                scaleY: ratio,
                 flipX: false,
                 flipY: false,
               },

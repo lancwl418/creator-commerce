@@ -45,19 +45,16 @@ export class ObjectFactory {
       if (imageData.cropWidth != null) img.width = imageData.cropWidth;
       if (imageData.cropHeight != null) img.height = imageData.cropHeight;
 
-      // Scale image to fit the specified dimensions
-      const imgWidth = img.width ?? 1;
-      const imgHeight = img.height ?? 1;
-      const targetWidth = layer.transform.width;
-      const targetHeight = layer.transform.height;
-
+      // Restore saved transform — use scaleX/scaleY directly instead of
+      // recalculating from width/height, because transform.width is the unscaled
+      // fabric dimension which differs from the fresh image source dimensions.
       img.set({
         left: layer.transform.x,
         top: layer.transform.y,
         originX: 'left',
         originY: 'top',
-        scaleX: targetWidth / imgWidth,
-        scaleY: targetHeight / imgHeight,
+        scaleX: layer.transform.scaleX,
+        scaleY: layer.transform.scaleY,
         angle: layer.transform.rotation,
         flipX: layer.transform.flipX,
         flipY: layer.transform.flipY,
