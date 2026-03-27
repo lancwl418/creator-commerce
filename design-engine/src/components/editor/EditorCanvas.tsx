@@ -31,17 +31,11 @@ export default function EditorCanvas() {
 
   // Listen for PNG export requests
   useEffect(() => {
-    const handler = (e: Event) => {
+    const handler = () => {
       const manager = getManager();
       if (!manager) return;
       const dataURL = manager.exportToDataURL('png', 2);
-      if (!dataURL) return;
-
-      // If the event carries a callback, return data via callback (for postMessage / embedded use)
-      const callback = (e as CustomEvent<{ callback?: (dataUrl: string) => void }>).detail?.callback;
-      if (callback) {
-        callback(dataURL);
-      } else {
+      if (dataURL) {
         const a = document.createElement('a');
         a.href = dataURL;
         a.download = 'design.png';

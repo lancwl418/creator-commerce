@@ -1,0 +1,1 @@
+- [feedback_supabase_pitfalls.md](feedback_supabase_pitfalls.md) — Supabase 触发器 search_path 等常见坑

@@ -16,6 +16,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/design-engine/node_modules ./design-engine/node_modules
 COPY . .
 WORKDIR /app/design-engine
+ARG NEXT_PUBLIC_ALLOWED_ORIGINS
+ENV NEXT_PUBLIC_ALLOWED_ORIGINS=$NEXT_PUBLIC_ALLOWED_ORIGINS
 RUN pnpm build
 
 # --- Production ---

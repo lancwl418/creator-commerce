@@ -5,6 +5,10 @@ import { useProductStore } from '@/stores/productStore';
 import { useEditorConfig } from '@/components/editor/EditorConfigContext';
 import { templateRegistry } from '@/core/templates/ProductTemplateRegistry';
 import { validateTemplate, validateTemplates } from '@/core/templates/TemplateValidator';
+import { convertShopifyProducts } from '@/core/templates/converters/shopifyProductConverter';
+import { convertErpProducts } from '@/core/templates/converters/erpProductConverter';
+import type { ShopifyProduct } from '@/types/shopify-product';
+import type { ErpProductListResponse } from '@/types/erp-product';
 
 /**
  * Loads templates into productStore based on EditorConfig mode.
@@ -19,12 +23,13 @@ export function useTemplateLoader() {
     if (loadedRef.current) return;
     loadedRef.current = true;
 
-    const { setTemplates, setEmbeddedTemplate, setLoading, setError } =
+    const { setTemplates, appendTemplates, setEmbeddedTemplate, setLoading, setError } =
       useProductStore.getState();
 
     switch (config.mode) {
       case 'demo': {
         setTemplates(templateRegistry.getAll());
+        fetchExternalProducts(appendTemplates);
         break;
       }
 
@@ -75,4 +80,38 @@ export function useTemplateLoader() {
   }, [config]);
 
   return status;
+}
+
+/**
+ * Fetches Shopify and ERP products in parallel, converts them to
+ * ProductTemplates, and appends them to the store.
+ * Failures are non-fatal — the editor continues with demo templates.
+ */
+async function fetchExternalProducts(
+  appendTemplates: (templates: import('@/types/product').ProductTemplate[]) => void
+) {
+  const [shopifyResult, erpResult] = await Promise.allSettled([
+    fetch('/api/shopify-products?limit=20').then((res) => {
+      if (!res.ok) throw new Error(`Shopify API ${res.status}`);
+      return res.json() as Promise<{ products: ShopifyProduct[] }>;
+    }),
+    fetch('/api/erp-products?pageNo=1&pageSize=20').then((res) => {
+      if (!res.ok) throw new Error(`ERP API ${res.status}`);
+      return res.json() as Promise<ErpProductListResponse>;
+    }),
+  ]);
+
+  if (shopifyResult.status === 'fulfilled' && shopifyResult.value.products) {
+    const templates = convertShopifyProducts(shopifyResult.value.products);
+    if (templates.length > 0) appendTemplates(templates);
+  } else if (shopifyResult.status === 'rejected') {
+    console.warn('[TemplateLoader] Failed to load Shopify products:', shopifyResult.reason);
+  }
+
+  if (erpResult.status === 'fulfilled' && erpResult.value.success) {
+    const templates = convertErpProducts(erpResult.value.result.records);
+    if (templates.length > 0) appendTemplates(templates);
+  } else if (erpResult.status === 'rejected') {
+    console.warn('[TemplateLoader] Failed to load ERP products:', erpResult.reason);
+  }
 }

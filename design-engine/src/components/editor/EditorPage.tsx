@@ -73,19 +73,7 @@ function EditorPageInner() {
       } else {
         ExportService.downloadJSON(design);
       }
-    } else if (editorConfig.onExport) {
-      // PNG with callback: pass PNG dataUrl back via onExport
-      window.dispatchEvent(
-        new CustomEvent('ideamizer:export-png', {
-          detail: {
-            callback: (pngDataUrl: string) => {
-              editorConfig.onExport!(ExportService.exportJSON(design), pngDataUrl);
-            },
-          },
-        })
-      );
     } else {
-      // PNG without callback: trigger browser download
       window.dispatchEvent(new CustomEvent('ideamizer:export-png'));
     }
   }, [design, editorConfig]);
@@ -198,7 +186,7 @@ function EditorPageInner() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar */}
-        <div className="w-56 flex flex-col border-r border-gray-200 bg-white">
+        <div className="w-56 flex flex-col border-r border-gray-200 bg-white overflow-y-auto">
           {!isEmbedded && <ProductSelector />}
           <div className="p-3 border-t border-gray-200">
             <DesignUploader onLayerAdded={handleLayerAdded} />
