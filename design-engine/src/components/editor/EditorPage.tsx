@@ -201,27 +201,28 @@ function EditorPageInner() {
       });
 
       if (callbackUrl) {
-        // Call Portal API to create records
-        const res = await fetch(callbackUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            design_id: editorConfig.designId,
-            products: mergedProducts,
-            title_prefix: decodeURIComponent(titlePrefix),
-          }),
+        // Use form POST to avoid CORS issues (editor and portal are on different domains)
+        // Form submissions include target domain cookies, so auth works
+        const payload = JSON.stringify({
+          design_id: editorConfig.designId,
+          products: mergedProducts,
+          title_prefix: decodeURIComponent(titlePrefix),
         });
 
-        if (res.ok) {
-          // Redirect back to Portal products page
-          const origin = new URL(callbackUrl).origin;
-          window.location.href = `${origin}/dashboard/products`;
-          return;
-        }
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = callbackUrl;
+        form.style.display = 'none';
 
-        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-        alert(`Save failed: ${err.error || 'Unknown error'}`);
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'payload';
+        input.value = payload;
+        form.appendChild(input);
+
+        document.body.appendChild(form);
+        form.submit();
+        return;
       } else {
         // No callback — just save locally
         ExportService.saveToLocal(currentDesign);

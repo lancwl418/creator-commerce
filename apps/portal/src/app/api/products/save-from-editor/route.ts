@@ -5,19 +5,9 @@ import { createClient } from '@/lib/supabase/server';
  * POST /api/products/save-from-editor
  *
  * Called by Design Engine after designer saves their work.
+ * Accepts both JSON body (fetch) and form data (cross-origin form POST).
  * Creates sellable_product_instances + product_configurations in the database.
- *
- * Body: {
- *   design_id: string,
- *   products: Array<{
- *     template_id: string,
- *     name: string,
- *     base_cost: number,
- *     thumbnail: string | null,
- *     layers: object[],  // design layers for this product
- *   }>,
- *   title_prefix: string,
- * }
+ * On success, redirects to /dashboard/products.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -37,8 +27,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
     }
 
-    const body = await request.json();
-    const { design_id, products, title_prefix } = body;
+    // Parse body — support both JSON and form data
+    let design_id: string;
+    let products: { template_id: string; name: string; base_cost: number; thumbnail: string | null; layers: object[] }[];
+    let title_prefix: string;
+
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      const payload = formData.get('payload') as string;
+      if (!payload) {
+        return NextResponse.json({ error: 'Missing payload' }, { status: 400 });
+      }
+      const parsed = JSON.parse(payload);
+      design_id = parsed.design_id;
+      products = parsed.products;
+      title_prefix = parsed.title_prefix;
+    } else {
+      const body = await request.json();
+      design_id = body.design_id;
+      products = body.products;
+      title_prefix = body.title_prefix;
+    }
 
     if (!design_id || !products || !Array.isArray(products) || products.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -94,6 +104,12 @@ export async function POST(request: NextRequest) {
           product_template_id: product.template_id,
           layers: product.layers || [],
         });
+    }
+
+    // For form submissions (cross-origin), redirect to products page
+    if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+      const origin = request.nextUrl.origin;
+      return NextResponse.redirect(`${origin}/dashboard/products`, { status: 303 });
     }
 
     return NextResponse.json({
