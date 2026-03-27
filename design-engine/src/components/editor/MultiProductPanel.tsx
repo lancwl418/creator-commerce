@@ -23,14 +23,15 @@ export default function MultiProductPanel() {
     (index: number) => {
       if (index === activeIndex) return;
 
-      // 1. Save current product state
-      const currentDesign = useDesignStore.getState().design;
+      // 1. Save current product state — deep clone to capture all layer changes
+      const currentDesign = structuredClone(useDesignStore.getState().design);
       // Generate thumbnail from canvas
       let thumbnail: string | undefined;
-      const canvas = document.querySelector('canvas.upper-canvas, canvas') as HTMLCanvasElement;
-      if (canvas) {
+      const canvasEl = document.querySelector('.upper-canvas') as HTMLCanvasElement
+        ?? document.querySelector('canvas') as HTMLCanvasElement;
+      if (canvasEl) {
         try {
-          thumbnail = canvas.toDataURL('image/png', 0.3);
+          thumbnail = canvasEl.toDataURL('image/png', 0.3);
         } catch {
           // CORS or other error
         }
@@ -45,16 +46,28 @@ export default function MultiProductPanel() {
       if (!target) return;
 
       // Set the template in productStore
-      const templates = useProductStore.getState().templates;
-      if (!templates.find((t) => t.id === target.template.id)) {
+      const allTemplates = useProductStore.getState().templates;
+      if (!allTemplates.find((t) => t.id === target.template.id)) {
         useProductStore.getState().appendTemplates([target.template]);
       }
+
+      // Check if the saved design has any layers (was previously edited)
+      const hasLayers = Object.values(target.design.views).some(
+        (v) => v.layers && v.layers.length > 0
+      );
+
+      if (hasLayers) {
+        // Load saved design FIRST so layers are in the store,
+        // then selectTemplate triggers canvas re-init which reads them
+        loadDesign(structuredClone(target.design));
+      }
+
+      // Select template — triggers useCanvas to re-init canvas
+      // useCanvas will read design.views[activeViewId].layers from the store
       selectTemplate(target.template.id);
 
-      // Load the design
-      if (target.design.views && Object.keys(target.design.views).length > 0) {
-        loadDesign(target.design);
-      } else {
+      if (!hasLayers) {
+        // No previous edits — initialize fresh design for this template
         initDesign(
           target.template.id,
           target.template.views.map((v) => v.id)
