@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleCorsOptions, jsonWithCors } from '@/lib/cors';
 
 const SHOPIFY_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
 const SHOPIFY_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
@@ -18,10 +19,15 @@ function parseLinkHeader(linkHeader: string | null): { next: string | null; prev
   return result;
 }
 
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsOptions(request);
+}
+
 export async function GET(request: NextRequest) {
   if (!SHOPIFY_DOMAIN || !SHOPIFY_TOKEN) {
-    return NextResponse.json(
-      { error: 'Shopify credentials not configured. Set SHOPIFY_STORE_DOMAIN and SHOPIFY_ACCESS_TOKEN in .env.local' },
+    return jsonWithCors(
+      { error: 'Shopify credentials not configured' },
+      request,
       { status: 500 }
     );
   }
@@ -58,14 +64,15 @@ export async function GET(request: NextRequest) {
     const data = await res.json();
     const links = parseLinkHeader(res.headers.get('link'));
 
-    return NextResponse.json({
+    return jsonWithCors({
       products: data.products,
       nextPageInfo: links.next,
       prevPageInfo: links.prev,
-    });
+    }, request);
   } catch (err) {
-    return NextResponse.json(
+    return jsonWithCors(
       { error: err instanceof Error ? err.message : 'Unknown error' },
+      request,
       { status: 500 }
     );
   }

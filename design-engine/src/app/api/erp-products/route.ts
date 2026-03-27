@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { handleCorsOptions, jsonWithCors } from '@/lib/cors';
 
 const ERP_BASE_URL = process.env.ERP_API_BASE_URL ?? 'http://118.195.245.201:8081/ideamax';
 const ERP_API_URL = `${ERP_BASE_URL}/openapi/call/K5iOWd6y`;
 const APP_KEY = process.env.ERP_APP_KEY ?? 'ak-OwVVN4U4gJINJ4nK';
 const SECRET_KEY = process.env.ERP_SECRET_KEY ?? 'QSd7yhGrQ1YyPIFJ9LJXHAbOU67C1A7K';
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsOptions(request);
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -32,17 +37,19 @@ export async function GET(request: NextRequest) {
     });
 
     if (!res.ok) {
-      return NextResponse.json(
+      return jsonWithCors(
         { success: false, error: `ERP API returned ${res.status}` },
+        request,
         { status: res.status }
       );
     }
 
     const data = await res.json();
-    return NextResponse.json(data);
+    return jsonWithCors(data, request);
   } catch (err) {
-    return NextResponse.json(
+    return jsonWithCors(
       { success: false, error: err instanceof Error ? err.message : 'Unknown error' },
+      request,
       { status: 500 }
     );
   }
