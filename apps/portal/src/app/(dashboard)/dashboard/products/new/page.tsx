@@ -221,9 +221,17 @@ export default function NewProductPage() {
         if (configError) throw configError;
       }
 
-      router.push(`/dashboard/products/${firstProductId}`);
+      // Navigate to editor with the design and products
+      const artworkUrl = getArtworkUrl(selectedDesign);
+      const templateIds = selectedProducts.map((p) => p.id).join(',');
+      const editorUrl = `${DESIGN_ENGINE_URL}/embed?design_id=${selectedDesign.id}&artwork_url=${encodeURIComponent(artworkUrl || '')}&templates=${encodeURIComponent(templateIds)}`;
+
+      // Open editor in new tab, navigate to products list
+      window.open(editorUrl, '_blank');
+      router.push('/dashboard/products');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      const msg = err instanceof Error ? err.message : JSON.stringify(err);
+      setError(msg || 'Something went wrong');
       setLoading(false);
     }
   }
