@@ -85,7 +85,7 @@ export default function NewProductPage() {
       .from('designs')
       .select(`
         id, title, current_version_id,
-        design_versions (
+        design_versions!design_versions_design_id_fkey (
           id, version_number,
           design_assets (id, asset_type, file_url)
         )

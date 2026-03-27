@@ -16,7 +16,7 @@ export default async function DesignsPage() {
     .from('designs')
     .select(`
       *,
-      design_versions (
+      design_versions!design_versions_design_id_fkey (
         id,
         version_number,
         design_assets (

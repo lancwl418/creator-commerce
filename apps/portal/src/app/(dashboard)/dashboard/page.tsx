@@ -36,7 +36,7 @@ export default async function DashboardPage() {
     .from('designs')
     .select(`
       id, title, status, created_at,
-      design_versions (
+      design_versions!design_versions_design_id_fkey (
         id, version_number,
         design_assets (id, asset_type, file_url)
       )

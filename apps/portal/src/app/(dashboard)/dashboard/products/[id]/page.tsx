@@ -16,7 +16,7 @@ export default async function ProductDetailPage({
     .select(`
       *,
       designs (id, title, status),
-      design_versions (id, version_number),
+      design_versions!design_versions_design_id_fkey (id, version_number),
       product_configurations (id, layers, finalized_at),
       channel_listings (id, channel_type, price, currency, status, published_at, error_message)
     `)
