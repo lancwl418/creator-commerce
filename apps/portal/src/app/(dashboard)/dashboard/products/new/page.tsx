@@ -38,7 +38,7 @@ export default function NewProductPage() {
 
   const preselectedDesignId = searchParams.get('design_id');
 
-  const [step, setStep] = useState<'design' | 'template' | 'confirm'>(
+  const [step, setStep] = useState<'design' | 'template'>(
     preselectedDesignId ? 'template' : 'design'
   );
   const [designs, setDesigns] = useState<Design[]>([]);
@@ -46,8 +46,6 @@ export default function NewProductPage() {
   const [products, setProducts] = useState<ExternalProduct[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<ExternalProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
-  const [title, setTitle] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'shopify' | 'erp'>('all');
 
@@ -163,10 +161,9 @@ export default function NewProductPage() {
     return version?.design_assets?.find(a => a.asset_type === 'artwork')?.file_url ?? null;
   }
 
-  function handleCreate() {
+  function handleOpenEditor() {
     if (!selectedDesign || selectedProducts.length === 0) return;
 
-    // Build editor URL with all context — no DB writes yet
     const artworkUrl = getArtworkUrl(selectedDesign);
     const templateIds = selectedProducts.map((p) => p.id).join(',');
     const productMeta = encodeURIComponent(JSON.stringify(
@@ -180,31 +177,31 @@ export default function NewProductPage() {
     ));
 
     const callbackUrl = `${window.location.origin}/api/products/save-from-editor`;
+    const titlePrefix = selectedDesign.title;
 
     const editorUrl = `${DESIGN_ENGINE_URL}/embed`
       + `?design_id=${selectedDesign.id}`
       + `&artwork_url=${encodeURIComponent(artworkUrl || '')}`
       + `&templates=${encodeURIComponent(templateIds)}`
       + `&products_meta=${productMeta}`
-      + `&title_prefix=${encodeURIComponent(title || selectedDesign.title)}`
+      + `&title_prefix=${encodeURIComponent(titlePrefix)}`
       + `&callback_url=${encodeURIComponent(callbackUrl)}`;
 
-    // Navigate to editor — no DB records until design is saved
+    // Navigate to editor — products are created only when designer saves
     window.location.href = editorUrl;
   }
 
   const steps = [
     { key: 'design', label: 'Design' },
-    { key: 'template', label: 'Template' },
-    { key: 'confirm', label: 'Confirm' },
+    { key: 'template', label: 'Products' },
   ];
   const currentStepIndex = steps.findIndex(s => s.key === step);
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-4xl">
       <h2 className="text-2xl font-bold text-gray-900 mb-1">Create Product</h2>
       <p className="text-gray-500 text-sm mb-8">
-        Select a design and product template to create a sellable product
+        Select a design and products, then configure in the editor
       </p>
 
       {/* Steps indicator */}
@@ -288,7 +285,7 @@ export default function NewProductPage() {
         </div>
       )}
 
-      {/* Step 2: Select Products */}
+      {/* Step 2: Select Products → then go to editor */}
       {step === 'template' && (
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -393,100 +390,12 @@ export default function NewProductPage() {
             </button>
             {selectedProducts.length > 0 && (
               <button
-                onClick={() => {
-                  if (selectedProducts.length === 1) {
-                    setTitle(`${selectedDesign?.title ?? 'Design'} — ${selectedProducts[0].product_name}`);
-                  } else {
-                    setTitle(selectedDesign?.title ?? 'Design');
-                  }
-                  setStep('confirm');
-                }}
+                onClick={handleOpenEditor}
                 className="rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-500 transition-colors shadow-md shadow-primary-600/25"
               >
-                Continue ({selectedProducts.length} products)
+                Open Editor ({selectedProducts.length} product{selectedProducts.length > 1 ? 's' : ''})
               </button>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Confirm */}
-      {step === 'confirm' && selectedDesign && selectedProducts.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirm</h3>
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-5 shadow-sm">
-            <div className="flex gap-5">
-              <div className="w-20 h-20 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
-                {getArtworkUrl(selectedDesign) && (
-                  <img src={getArtworkUrl(selectedDesign)!} alt="" className="max-w-full max-h-full object-contain p-2" />
-                )}
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Design</p>
-                <p className="font-semibold text-gray-900">{selectedDesign.title}</p>
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mt-3">Products</p>
-                <p className="font-semibold text-gray-900">{selectedProducts.length} selected</p>
-              </div>
-            </div>
-
-            {/* Selected products list */}
-            <div className="space-y-2">
-              {selectedProducts.map((p) => (
-                <div key={p.id} className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
-                  <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shrink-0">
-                    {p.thumbnail ? (
-                      <img src={p.thumbnail} alt="" className="w-full h-full object-contain rounded-lg" />
-                    ) : (
-                      <span className="text-gray-300 text-[10px]">N/A</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
-                    <p className="text-xs text-gray-400">{p.source} · ${p.base_cost.toFixed(2)}</p>
-                  </div>
-                  <button
-                    onClick={() => toggleProduct(p)}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div>
-              <label htmlFor="product-title" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                {selectedProducts.length > 1 ? 'Product Title Prefix' : 'Product Title'}
-              </label>
-              <input
-                id="product-title"
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-              />
-              {selectedProducts.length > 1 && (
-                <p className="text-xs text-gray-400 mt-1">Each product will be named: {title || selectedDesign.title} — [product name]</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-3 mt-5">
-            <button
-              onClick={() => setStep('template')}
-              className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              ← Back
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={loading}
-              className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50 transition-all shadow-md shadow-blue-600/25"
-            >
-              {loading ? 'Creating...' : `Create ${selectedProducts.length} Product${selectedProducts.length > 1 ? 's' : ''}`}
-            </button>
           </div>
         </div>
       )}
