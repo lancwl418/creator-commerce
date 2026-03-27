@@ -2,13 +2,17 @@
 
 import { useEffect, useRef } from 'react';
 import { useProductStore } from '@/stores/productStore';
+import { useMultiProductStore } from '@/stores/multiProductStore';
+import { useDesignStore } from '@/stores/designStore';
 import { useEditorConfig } from '@/components/editor/EditorConfigContext';
 import { templateRegistry } from '@/core/templates/ProductTemplateRegistry';
 import { validateTemplate, validateTemplates } from '@/core/templates/TemplateValidator';
 import { convertShopifyProducts } from '@/core/templates/converters/shopifyProductConverter';
 import { convertErpProducts } from '@/core/templates/converters/erpProductConverter';
+import type { ProductTemplate } from '@/types/product';
 import type { ShopifyProduct } from '@/types/shopify-product';
 import type { ErpProductListResponse } from '@/types/erp-product';
+import type { EditorConfig } from '@/types/editor-config';
 
 /**
  * Loads templates into productStore based on EditorConfig mode.
@@ -30,6 +34,14 @@ export function useTemplateLoader() {
       case 'demo': {
         setTemplates(templateRegistry.getAll());
         fetchExternalProducts(appendTemplates);
+        break;
+      }
+
+      case 'portal': {
+        // Portal mode: load all products, then match Portal-selected ones
+        setLoading();
+        setTemplates(templateRegistry.getAll());
+        handlePortalMode(config, appendTemplates);
         break;
       }
 
@@ -83,12 +95,141 @@ export function useTemplateLoader() {
 }
 
 /**
+ * Portal mode handler:
+ * 1. Fetch all Shopify & ERP products
+ * 2. Match the Portal-selected template IDs
+ * 3. Add matched products to multi-product store
+ * 4. Auto-add artwork layer to the first product
+ */
+async function handlePortalMode(
+  config: EditorConfig,
+  appendTemplates: (templates: ProductTemplate[]) => void
+) {
+  const portalIds = config.portalTemplateIds ?? [];
+  const artworkUrl = config.artworkUrl;
+
+  // Fetch all external products
+  await fetchExternalProducts(appendTemplates);
+
+  // Now find the matching templates from the store
+  const allTemplates = useProductStore.getState().templates;
+  const matched: ProductTemplate[] = [];
+
+  for (const id of portalIds) {
+    // Try exact match first
+    let found = allTemplates.find((t) => t.id === id);
+
+    // Try matching by Shopify product ID in metadata
+    if (!found && id.startsWith('shopify-')) {
+      const shopifyId = id.replace('shopify-', '');
+      found = allTemplates.find(
+        (t) => t.metadata?.shopifyProductId?.toString() === shopifyId
+      );
+    }
+
+    // Try matching by ERP product ID in metadata
+    if (!found && id.startsWith('erp-')) {
+      const erpId = id.replace('erp-', '');
+      found = allTemplates.find(
+        (t) => t.metadata?.erpProductId?.toString() === erpId ||
+               t.metadata?.itemNo === erpId
+      );
+    }
+
+    if (found) matched.push(found);
+  }
+
+  if (matched.length === 0) {
+    console.warn('[TemplateLoader] No matching templates found for Portal IDs:', portalIds);
+    // Fall through — editor will show all products for manual selection
+    return;
+  }
+
+  // Add matched products to multi-product store
+  const multiStore = useMultiProductStore.getState();
+  for (const template of matched) {
+    multiStore.addProduct(template);
+  }
+
+  // Select the first matched template in the editor
+  const { selectTemplate } = useProductStore.getState();
+  selectTemplate(matched[0].id);
+
+  // Initialize design for the first template
+  const { initDesign } = useDesignStore.getState();
+  initDesign(matched[0].id, matched[0].views.map((v) => v.id));
+
+  // Auto-add artwork as a layer if provided
+  if (artworkUrl) {
+    multiStore.setArtworkUrl(artworkUrl);
+
+    // Wait a tick for the canvas to initialize, then add the artwork
+    setTimeout(() => {
+      addArtworkLayer(artworkUrl);
+    }, 1500);
+  }
+}
+
+/**
+ * Adds the designer's artwork as an image layer on the current canvas.
+ */
+function addArtworkLayer(artworkUrl: string) {
+  const { design, addLayer } = useDesignStore.getState();
+  const { activeViewId } = useProductStore.getState();
+
+  if (!activeViewId || !design.views[activeViewId]) return;
+
+  // Load image to get dimensions
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    const layer = {
+      id: `artwork-${Date.now()}`,
+      type: 'image' as const,
+      name: 'Artwork',
+      visible: true,
+      locked: false,
+      opacity: 1,
+      transform: {
+        x: 50,
+        y: 50,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        rotation: 0,
+        scaleX: 0.5,
+        scaleY: 0.5,
+        flipX: false,
+        flipY: false,
+      },
+      data: {
+        type: 'image' as const,
+        src: artworkUrl,
+        originalWidth: img.naturalWidth,
+        originalHeight: img.naturalHeight,
+        filters: [],
+      },
+    };
+
+    addLayer(activeViewId, layer);
+
+    // Dispatch event so canvas picks up the new layer
+    window.dispatchEvent(
+      new CustomEvent('ideamizer:layer-added', { detail: layer })
+    );
+  };
+  img.onerror = () => {
+    console.warn('[TemplateLoader] Failed to load artwork image:', artworkUrl);
+  };
+  img.src = artworkUrl;
+}
+
+/**
  * Fetches Shopify and ERP products in parallel, converts them to
  * ProductTemplates, and appends them to the store.
  * Failures are non-fatal — the editor continues with demo templates.
  */
 async function fetchExternalProducts(
-  appendTemplates: (templates: import('@/types/product').ProductTemplate[]) => void
+  appendTemplates: (templates: ProductTemplate[]) => void
 ) {
   const [shopifyResult, erpResult] = await Promise.allSettled([
     fetch('/api/shopify-products?limit=20').then((res) => {

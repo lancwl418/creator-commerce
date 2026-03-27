@@ -1,6 +1,6 @@
 import type { ProductTemplate } from '@/types/product';
 
-export type EditorMode = 'embedded' | 'standalone' | 'demo';
+export type EditorMode = 'embedded' | 'standalone' | 'demo' | 'portal';
 
 export interface EditorConfig {
   mode: EditorMode;
@@ -10,6 +10,12 @@ export interface EditorConfig {
   apiEndpoint?: string;
   /** Standalone mode: optional auth headers for API requests */
   apiHeaders?: Record<string, string>;
+  /** Portal mode: pre-selected product IDs from Portal (comma-separated) */
+  portalTemplateIds?: string[];
+  /** Portal mode: artwork URL to auto-add as layer */
+  artworkUrl?: string;
+  /** Portal mode: design ID from Portal */
+  designId?: string;
   /** Callback when user saves the design */
   onSave?: (designJson: string) => void;
   /** Callback when user exports the design */

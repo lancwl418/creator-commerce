@@ -9,6 +9,19 @@ function EmbedPageInner() {
   const params = useSearchParams();
 
   const config = useMemo<EditorConfig>(() => {
+    // Portal mode: ?templates=id1,id2&artwork_url=...&design_id=...
+    const templates = params.get('templates');
+    const artworkUrl = params.get('artwork_url');
+    if (templates) {
+      const templateIds = decodeURIComponent(templates).split(',').filter(Boolean);
+      return {
+        mode: 'portal' as const,
+        portalTemplateIds: templateIds,
+        artworkUrl: artworkUrl ? decodeURIComponent(artworkUrl) : undefined,
+        designId: params.get('design_id') || undefined,
+      };
+    }
+
     // Embedded mode: ?template=<encodedJSON>
     const templateJson = params.get('template');
     if (templateJson) {
