@@ -44,16 +44,21 @@ export function useCanvas() {
       if (disposed) return;
 
       // Initialize design for this template if needed
+      // Only init if the design store has no views for the current template
+      // (i.e. it's truly uninitialized, not just loaded from multi-product store)
       const design = useDesignStore.getState().design;
-      if (design.productTemplateId !== selectedTemplate.id) {
+      const hasViewsForTemplate = design.productTemplateId === selectedTemplate.id
+        && design.views[activeViewId] !== undefined;
+      if (!hasViewsForTemplate) {
         useDesignStore.getState().initDesign(
           selectedTemplate.id,
           selectedTemplate.views.map((v) => v.id)
         );
       }
 
-      // Load existing design view
-      const view = useDesignStore.getState().design.views[activeViewId];
+      // Load existing design view — re-read state in case initDesign was called
+      const currentDesign = useDesignStore.getState().design;
+      const view = currentDesign.views[activeViewId];
       if (view && view.layers.length > 0) {
         manager.loadDesignView(view);
       }

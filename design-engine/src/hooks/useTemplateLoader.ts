@@ -159,13 +159,21 @@ async function handlePortalMode(
   const { initDesign } = useDesignStore.getState();
   initDesign(matched[0].id, matched[0].views.map((v) => v.id));
 
-  // Auto-add artwork as a layer if provided
+  // Auto-add artwork as a layer to ALL products if provided
   if (artworkUrl) {
     multiStore.setArtworkUrl(artworkUrl);
 
-    // Wait a tick for the canvas to initialize, then add the artwork
+    // Wait for the canvas to initialize, then add artwork to active product
     setTimeout(() => {
       addArtworkLayer(artworkUrl);
+
+      // After artwork is added to the first product, save it and apply to all
+      // Need another delay to let the image load and layer be added
+      setTimeout(() => {
+        const currentDesign = structuredClone(useDesignStore.getState().design);
+        multiStore.saveCurrentProduct(currentDesign);
+        multiStore.applyToAll(0);
+      }, 1000);
     }, 1500);
   }
 }

@@ -56,27 +56,22 @@ export default function MultiProductPanel() {
         useProductStore.getState().appendTemplates([target.template]);
       }
 
-      // 5. Prepare the design to load
-      const hasLayers = Object.values(target.design.views).some(
-        (v) => v.layers && v.layers.length > 0
-      );
+      // 5. Load target design into designStore
+      // Always load the saved design (even if empty) so productTemplateId is correct
+      const targetDesign = structuredClone(target.design);
+      loadDesign(targetDesign);
 
-      // 6. Load design into store FIRST
-      if (hasLayers) {
-        loadDesign(structuredClone(target.design));
-      } else {
-        initDesign(
-          target.template.id,
-          target.template.views.map((v) => v.id)
-        );
-      }
-
-      // 7. Select template — triggers useCanvas re-init
-      // Use setTimeout(0) to ensure design store is settled before canvas reads it
+      // 6. Select template — triggers useCanvas re-init
+      // Delay to ensure designStore has settled before canvas reads it
       setTimeout(() => {
+        // Double-check the design is still the target's (not overwritten)
+        const currentState = useDesignStore.getState().design;
+        if (currentState.productTemplateId !== target.template.id) {
+          loadDesign(structuredClone(target.design));
+        }
         selectTemplate(target.template.id);
         switchingRef.current = false;
-      }, 50);
+      }, 80);
     },
     [activeIndex, saveCurrentProduct, setActiveProduct, selectTemplate, loadDesign, initDesign]
   );
