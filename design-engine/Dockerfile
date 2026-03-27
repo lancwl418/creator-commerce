@@ -35,8 +35,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/design-engine/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/design-engine/.next/static ./design-engine/.next/static
 
 USER nextjs
-EXPOSE 3001
-ENV PORT=3001
+EXPOSE 10000
+ENV PORT=10000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "design-engine/server.js"]
