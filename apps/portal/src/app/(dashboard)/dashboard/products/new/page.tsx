@@ -176,7 +176,7 @@ export default function NewProductPage() {
       }))
     ));
 
-    const callbackUrl = `${window.location.origin}/api/products/save-from-editor`;
+    const callbackUrl = `${window.location.origin}/dashboard/products/import`;
     const titlePrefix = selectedDesign.title;
 
     const editorUrl = `${DESIGN_ENGINE_URL}/embed`

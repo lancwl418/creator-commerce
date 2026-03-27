@@ -201,27 +201,17 @@ function EditorPageInner() {
       });
 
       if (callbackUrl) {
-        // Use form POST to avoid CORS issues (editor and portal are on different domains)
-        // Form submissions include target domain cookies, so auth works
-        const payload = JSON.stringify({
+        // Redirect to Portal's import page with data in URL hash
+        // This avoids CORS issues — the Portal page runs client-side
+        // with auth cookies and saves to DB directly
+        const payload = encodeURIComponent(JSON.stringify({
           design_id: editorConfig.designId,
           products: mergedProducts,
           title_prefix: decodeURIComponent(titlePrefix),
-        });
+        }));
 
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = callbackUrl;
-        form.style.display = 'none';
-
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'payload';
-        input.value = payload;
-        form.appendChild(input);
-
-        document.body.appendChild(form);
-        form.submit();
+        const portalOrigin = new URL(callbackUrl).origin;
+        window.location.href = `${portalOrigin}/dashboard/products/import#${payload}`;
         return;
       } else {
         // No callback — just save locally
