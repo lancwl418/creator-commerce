@@ -189,21 +189,65 @@ export default function EditorCanvas() {
     const view = selectedTemplate.views.find((v) => v.id === activeViewId);
     if (!view) return;
 
-    // Calculate zoom to fit canvas in available space
-    // Available height = viewport - toolbar(~40px) - bottom tabs(~56px) - padding
-    const availW = window.innerWidth - 16; // 8px padding each side
-    const availH = window.innerHeight - 40 - 56 - 24;
-    const fitZoom = Math.min(availW / view.mockupWidth, availH / view.mockupHeight, 1);
+    const fitToScreen = () => {
+      const availW = window.innerWidth - 16;
+      const availH = window.innerHeight - 100; // toolbar + tab bar
+      const fitZoom = Math.min(availW / view.mockupWidth, availH / view.mockupHeight, 0.9);
+      useEditorStore.getState().setZoom(Math.round(fitZoom * 100) / 100);
+    };
 
-    const { setZoom } = useEditorStore.getState();
-    setZoom(Math.round(fitZoom * 100) / 100);
+    fitToScreen();
   }, [selectedTemplate, activeViewId]);
 
+  // Pinch-to-zoom on mobile
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof window === 'undefined') return;
+    if (window.innerWidth >= 768) return;
+
+    let lastDistance = 0;
+    let startZoom = 1;
+
+    const getDistance = (touches: TouchList) => {
+      if (touches.length < 2) return 0;
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        lastDistance = getDistance(e.touches);
+        startZoom = useEditorStore.getState().zoom;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dist = getDistance(e.touches);
+        if (lastDistance > 0) {
+          const scale = dist / lastDistance;
+          const newZoom = Math.max(0.1, Math.min(3, startZoom * scale));
+          useEditorStore.getState().setZoom(Math.round(newZoom * 100) / 100);
+        }
+      }
+    };
+
+    container.addEventListener('touchstart', onTouchStart, { passive: false });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+    };
+  }, []);
+
   return (
-    <div ref={containerRef} className="relative flex-1 overflow-auto bg-gray-100 flex items-center justify-center p-2 md:p-8">
+    <div ref={containerRef} className="relative flex-1 min-h-0 overflow-hidden bg-gray-100 flex items-center justify-center p-1 md:p-8 touch-none">
       {showDpiWarning && (
-        <div className="absolute top-3 right-3 z-10 bg-red-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <div className="absolute top-2 right-2 z-10 bg-red-500 text-white text-[10px] md:text-xs font-semibold px-2 md:px-3 py-1 md:py-1.5 rounded-full shadow-lg flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" />
             <line x1="12" y1="17" x2="12.01" y2="17" />

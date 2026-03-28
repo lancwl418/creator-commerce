@@ -267,7 +267,7 @@ function EditorPageInner() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-[100dvh] flex flex-col overflow-hidden">
       {validationResult && (
         <ValidationDialog
           result={validationResult}
@@ -296,7 +296,7 @@ function EditorPageInner() {
       {/* Mobile compact toolbar */}
       <MobileToolbar onSave={handleSave} />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Multi-product panel — desktop only */}
         <div className="hidden md:block">
           {isMultiProduct && <MultiProductPanel />}
