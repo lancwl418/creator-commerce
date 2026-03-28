@@ -199,14 +199,15 @@ export default function EditorCanvas() {
     fitToScreen();
   }, [selectedTemplate, activeViewId]);
 
-  // Pinch-to-zoom on mobile
+  // Pinch-to-scale selected object on mobile
   useEffect(() => {
     const container = containerRef.current;
     if (!container || typeof window === 'undefined') return;
     if (window.innerWidth >= 768) return;
 
     let lastDistance = 0;
-    let startZoom = 1;
+    let startScaleX = 1;
+    let startScaleY = 1;
 
     const getDistance = (touches: TouchList) => {
       if (touches.length < 2) return 0;
@@ -219,7 +220,15 @@ export default function EditorCanvas() {
       if (e.touches.length === 2) {
         e.preventDefault();
         lastDistance = getDistance(e.touches);
-        startZoom = useEditorStore.getState().zoom;
+
+        // Get selected object's current scale
+        const manager = getManager();
+        const canvas = manager?.getCanvas?.();
+        const activeObj = canvas?.getActiveObject?.();
+        if (activeObj) {
+          startScaleX = activeObj.scaleX ?? 1;
+          startScaleY = activeObj.scaleY ?? 1;
+        }
       }
     };
 
@@ -228,20 +237,62 @@ export default function EditorCanvas() {
         e.preventDefault();
         const dist = getDistance(e.touches);
         if (lastDistance > 0) {
-          const scale = dist / lastDistance;
-          const newZoom = Math.max(0.1, Math.min(3, startZoom * scale));
-          useEditorStore.getState().setZoom(Math.round(newZoom * 100) / 100);
+          const ratio = dist / lastDistance;
+
+          const manager = getManager();
+          const canvas = manager?.getCanvas?.();
+          const activeObj = canvas?.getActiveObject?.();
+
+          if (activeObj) {
+            // Scale the selected design element
+            activeObj.set({
+              scaleX: startScaleX * ratio,
+              scaleY: startScaleY * ratio,
+            });
+            activeObj.setCoords();
+            canvas?.renderAll();
+          }
+        }
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2 && lastDistance > 0) {
+        lastDistance = 0;
+
+        // Sync final transform to design store
+        const manager = getManager();
+        const canvas = manager?.getCanvas?.();
+        const activeObj = canvas?.getActiveObject?.();
+        const layerId = (activeObj?.data as { layerId?: string })?.layerId;
+        if (activeObj && layerId) {
+          const viewId = useProductStore.getState().activeViewId;
+          useDesignStore.getState().updateLayer(viewId, layerId, {
+            transform: {
+              x: activeObj.left ?? 0,
+              y: activeObj.top ?? 0,
+              width: activeObj.width ?? 0,
+              height: activeObj.height ?? 0,
+              rotation: activeObj.angle ?? 0,
+              scaleX: activeObj.scaleX ?? 1,
+              scaleY: activeObj.scaleY ?? 1,
+              flipX: activeObj.flipX ?? false,
+              flipY: activeObj.flipY ?? false,
+            },
+          });
         }
       }
     };
 
     container.addEventListener('touchstart', onTouchStart, { passive: false });
     container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd, { passive: false });
     return () => {
       container.removeEventListener('touchstart', onTouchStart);
       container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
     };
-  }, []);
+  }, [getManager]);
 
   return (
     <div ref={containerRef} className="relative flex-1 min-h-0 overflow-hidden bg-gray-100 flex items-center justify-center p-1 md:p-8 touch-none">
