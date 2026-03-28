@@ -187,6 +187,11 @@ function addArtworkLayer(artworkUrl: string) {
 
   if (!activeViewId || !design.views[activeViewId]) return;
 
+  // Proxy external URLs to avoid CORS canvas tainting
+  const proxiedUrl = artworkUrl.startsWith('/') || artworkUrl.startsWith('data:')
+    ? artworkUrl
+    : `/api/image-proxy?url=${encodeURIComponent(artworkUrl)}`;
+
   // Load image to get dimensions
   const img = new Image();
   img.crossOrigin = 'anonymous';
@@ -211,7 +216,7 @@ function addArtworkLayer(artworkUrl: string) {
       },
       data: {
         type: 'image' as const,
-        src: artworkUrl,
+        src: proxiedUrl,
         originalWidth: img.naturalWidth,
         originalHeight: img.naturalHeight,
         filters: [],
@@ -228,7 +233,7 @@ function addArtworkLayer(artworkUrl: string) {
   img.onerror = () => {
     console.warn('[TemplateLoader] Failed to load artwork image:', artworkUrl);
   };
-  img.src = artworkUrl;
+  img.src = proxiedUrl;
 }
 
 /**
