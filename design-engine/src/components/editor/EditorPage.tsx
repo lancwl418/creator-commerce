@@ -56,6 +56,7 @@ function EditorPageInner() {
   const isPortal = editorConfig.mode === 'portal';
   const isMultiProduct = useMultiProductStore((s) => s.isMultiProduct);
   const [saving, setSaving] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<'none' | 'products' | 'layers' | 'upload'>('none');
 
   // Initialize design on first render
   useEffect(() => {
@@ -264,9 +265,6 @@ function EditorPageInner() {
       </div>
     );
   }
-
-  // Mobile bottom sheet state
-  const [mobilePanel, setMobilePanel] = useState<'none' | 'products' | 'layers' | 'upload'>('none');
 
   return (
     <div className="h-screen flex flex-col">
