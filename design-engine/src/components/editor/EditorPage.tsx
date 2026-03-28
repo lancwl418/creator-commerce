@@ -23,6 +23,8 @@ import type { DesignLayer } from '@/types/design';
 import type { EditorConfig } from '@/types/editor-config';
 import {
   Layers, Package, Upload, X, Undo2, Redo2, ZoomIn, ZoomOut, Save,
+  AlignCenterVertical, AlignCenterHorizontal,
+  FlipHorizontal2, FlipVertical2, Crop, Check, Trash2,
 } from 'lucide-react';
 
 interface EditorPageProps {
@@ -445,25 +447,132 @@ function MobileToolbar({ onSave }: { onSave?: () => void }) {
   const { undo, redo, canUndo, canRedo } = useHistory();
   const zoom = useEditorStore((s) => s.zoom);
   const setZoom = useEditorStore((s) => s.setZoom);
+  const selectedLayerIds = useEditorStore((s) => s.selectedLayerIds);
+  const activeTool = useEditorStore((s) => s.activeTool);
+  const setActiveTool = useEditorStore((s) => s.setActiveTool);
+  const hasSelection = selectedLayerIds.length === 1;
+  const isCropping = activeTool === 'crop';
+
+  const handleAlign = (action: string) => {
+    if (!hasSelection) return;
+    const viewId = useProductStore.getState().activeViewId;
+    const template = useProductStore.getState().selectedTemplate;
+    const design = useDesignStore.getState().design;
+    const view = design.views[viewId];
+    const productView = template?.views.find((v: { id: string }) => v.id === viewId);
+    if (!view || !productView) return;
+
+    const layer = view.layers.find((l: { id: string }) => l.id === selectedLayerIds[0]);
+    if (!layer) return;
+
+    // Dynamic import to avoid circular deps
+    import('@/core/canvas/AlignmentService').then(({ calculateAlignment }) => {
+      const { x, y } = calculateAlignment(action as Parameters<typeof calculateAlignment>[0], layer.transform, productView.printableArea);
+      useDesignStore.getState().updateLayer(viewId, layer.id, {
+        transform: { ...layer.transform, x, y },
+      });
+      window.dispatchEvent(new CustomEvent('ideamizer:layer-transform', { detail: { layerId: layer.id, x, y } }));
+    });
+  };
+
+  const handleFlip = (direction: 'horizontal' | 'vertical') => {
+    if (!hasSelection) return;
+    const viewId = useProductStore.getState().activeViewId;
+    const design = useDesignStore.getState().design;
+    const view = design.views[viewId];
+    const layer = view?.layers.find((l: { id: string }) => l.id === selectedLayerIds[0]);
+    if (!layer) return;
+
+    const key = direction === 'horizontal' ? 'flipX' : 'flipY';
+    useDesignStore.getState().updateLayer(viewId, layer.id, {
+      transform: { ...layer.transform, [key]: !layer.transform[key] },
+    });
+    window.dispatchEvent(new CustomEvent('ideamizer:layer-flip', { detail: { layerId: layer.id, direction } }));
+  };
+
+  const handleDelete = () => {
+    if (!hasSelection) return;
+    const viewId = useProductStore.getState().activeViewId;
+    useDesignStore.getState().removeLayer(viewId, selectedLayerIds[0]);
+    useEditorStore.getState().setSelectedLayerIds([]);
+  };
+
+  const btnClass = "p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200";
 
   return (
-    <div className="md:hidden flex items-center gap-0.5 bg-white border-b border-gray-200 px-2 py-1">
-      <button onClick={undo} disabled={!canUndo()} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30">
+    <div className="md:hidden flex items-center gap-0.5 bg-white border-b border-gray-200 px-1 py-1 overflow-x-auto">
+      {/* Undo/Redo */}
+      <button onClick={undo} disabled={!canUndo()} className={`${btnClass} disabled:opacity-30`}>
         <Undo2 className="w-4 h-4 text-gray-700" />
       </button>
-      <button onClick={redo} disabled={!canRedo()} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30">
+      <button onClick={redo} disabled={!canRedo()} className={`${btnClass} disabled:opacity-30`}>
         <Redo2 className="w-4 h-4 text-gray-700" />
       </button>
-      <div className="w-px h-5 bg-gray-200 mx-1" />
-      <button onClick={() => setZoom(Math.max(0.2, zoom - 0.15))} className="p-2 rounded-lg hover:bg-gray-100">
+
+      <div className="w-px h-5 bg-gray-200 mx-0.5 shrink-0" />
+
+      {/* Zoom */}
+      <button onClick={() => setZoom(Math.max(0.1, zoom - 0.15))} className={btnClass}>
         <ZoomOut className="w-4 h-4 text-gray-700" />
       </button>
-      <span className="text-[11px] text-gray-500 w-9 text-center">{Math.round(zoom * 100)}%</span>
-      <button onClick={() => setZoom(Math.min(3, zoom + 0.15))} className="p-2 rounded-lg hover:bg-gray-100">
+      <span className="text-[10px] text-gray-500 w-8 text-center shrink-0">{Math.round(zoom * 100)}%</span>
+      <button onClick={() => setZoom(Math.min(3, zoom + 0.15))} className={btnClass}>
         <ZoomIn className="w-4 h-4 text-gray-700" />
       </button>
+
+      {/* Selection tools — shown when a layer is selected */}
+      {hasSelection && !isCropping && (
+        <>
+          <div className="w-px h-5 bg-gray-200 mx-0.5 shrink-0" />
+          <button onClick={() => handleAlign('center-h')} className={btnClass} title="Center H">
+            <AlignCenterVertical className="w-4 h-4 text-gray-700" />
+          </button>
+          <button onClick={() => handleAlign('center-v')} className={btnClass} title="Center V">
+            <AlignCenterHorizontal className="w-4 h-4 text-gray-700" />
+          </button>
+          <button onClick={() => handleFlip('horizontal')} className={btnClass} title="Flip H">
+            <FlipHorizontal2 className="w-4 h-4 text-gray-700" />
+          </button>
+          <button onClick={() => handleFlip('vertical')} className={btnClass} title="Flip V">
+            <FlipVertical2 className="w-4 h-4 text-gray-700" />
+          </button>
+          <button
+            onClick={() => {
+              setActiveTool('crop');
+              window.dispatchEvent(new CustomEvent('ideamizer:enter-crop', { detail: selectedLayerIds[0] }));
+            }}
+            className={btnClass}
+            title="Crop"
+          >
+            <Crop className="w-4 h-4 text-gray-700" />
+          </button>
+          <button onClick={handleDelete} className={btnClass} title="Delete">
+            <Trash2 className="w-4 h-4 text-red-500" />
+          </button>
+        </>
+      )}
+
+      {/* Crop mode actions */}
+      {isCropping && (
+        <>
+          <div className="w-px h-5 bg-gray-200 mx-0.5 shrink-0" />
+          <button
+            onClick={() => { setActiveTool('select'); window.dispatchEvent(new CustomEvent('ideamizer:apply-crop')); }}
+            className={btnClass}
+          >
+            <Check className="w-4 h-4 text-green-600" />
+          </button>
+          <button
+            onClick={() => { setActiveTool('select'); window.dispatchEvent(new CustomEvent('ideamizer:cancel-crop')); }}
+            className={btnClass}
+          >
+            <X className="w-4 h-4 text-red-500" />
+          </button>
+        </>
+      )}
+
       <div className="flex-1" />
-      <button onClick={onSave} className="p-2 rounded-lg hover:bg-gray-100" title="Save">
+      <button onClick={onSave} className={btnClass} title="Save">
         <Save className="w-4 h-4 text-gray-700" />
       </button>
     </div>
