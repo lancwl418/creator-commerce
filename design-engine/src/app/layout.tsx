@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Ideamizer - POD Design Editor",
   description: "2D canvas editor for Print on Demand products",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover",
 };
 
 export default function RootLayout({

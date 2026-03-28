@@ -11,14 +11,19 @@ import PropertiesPanel from './PropertiesPanel';
 import ValidationDialog from './ValidationDialog';
 import { EditorConfigContext, useEditorConfig } from './EditorConfigContext';
 import { useDesignStore } from '@/stores/designStore';
+import { useEditorStore } from '@/stores/editorStore';
 import { useProductStore } from '@/stores/productStore';
 import { useMultiProductStore } from '@/stores/multiProductStore';
 import { useTemplateLoader } from '@/hooks/useTemplateLoader';
 import { ExportService } from '@/core/design/ExportService';
 import { validateDesign } from '@/core/design/DesignValidator';
+import { useHistory } from '@/hooks/useHistory';
 import type { ValidationResult } from '@/core/design/DesignValidator';
 import type { DesignLayer } from '@/types/design';
 import type { EditorConfig } from '@/types/editor-config';
+import {
+  Layers, Package, Upload, X, Undo2, Redo2, ZoomIn, ZoomOut, Save,
+} from 'lucide-react';
 
 interface EditorPageProps {
   config?: EditorConfig;
@@ -260,6 +265,9 @@ function EditorPageInner() {
     );
   }
 
+  // Mobile bottom sheet state
+  const [mobilePanel, setMobilePanel] = useState<'none' | 'products' | 'layers' | 'upload'>('none');
+
   return (
     <div className="h-screen flex flex-col">
       {validationResult && (
@@ -277,18 +285,27 @@ function EditorPageInner() {
           }}
         />
       )}
-      <Toolbar
-        onExportJSON={handleExportJSON}
-        onExportPNG={handleExportPNG}
-        onSave={handleSave}
-      />
+
+      {/* Desktop toolbar */}
+      <div className="hidden md:block">
+        <Toolbar
+          onExportJSON={handleExportJSON}
+          onExportPNG={handleExportPNG}
+          onSave={handleSave}
+        />
+      </div>
+
+      {/* Mobile compact toolbar */}
+      <MobileToolbar onSave={handleSave} />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Multi-product panel (left of everything when active) */}
-        {isMultiProduct && <MultiProductPanel />}
+        {/* Multi-product panel — desktop only */}
+        <div className="hidden md:block">
+          {isMultiProduct && <MultiProductPanel />}
+        </div>
 
-        {/* Left sidebar */}
-        <div className="w-56 flex flex-col border-r border-gray-200 bg-white overflow-y-auto">
+        {/* Left sidebar — desktop only */}
+        <div className="hidden md:flex w-56 flex-col border-r border-gray-200 bg-white overflow-y-auto">
           {!isEmbedded && <ProductSelector />}
           <div className="p-3 border-t border-gray-200">
             <DesignUploader onLayerAdded={handleLayerAdded} />
@@ -308,11 +325,11 @@ function EditorPageInner() {
           </div>
         </div>
 
-        {/* Canvas area */}
+        {/* Canvas area — full width on mobile */}
         <EditorShell />
 
-        {/* Right sidebar: Layers + Properties */}
-        <div className="w-64 bg-white border-l border-gray-200 flex flex-col overflow-y-auto">
+        {/* Right sidebar — desktop only */}
+        <div className="hidden md:flex w-64 bg-white border-l border-gray-200 flex-col overflow-y-auto">
           <LayerPanel onReorderLayers={handleReorderLayers} onDuplicateLayer={handleLayerAdded} />
           <div className="border-t border-gray-200">
             <PropertiesPanel onReorderLayers={handleReorderLayers} />
@@ -320,9 +337,81 @@ function EditorPageInner() {
         </div>
       </div>
 
-      {/* Save & Finish button for Portal mode */}
+      {/* Mobile bottom tab bar */}
+      <div className="md:hidden bg-white border-t border-gray-200 flex items-center safe-pb">
+        <MobileTabBtn
+          icon={<Package className="w-5 h-5" />}
+          label="Products"
+          active={mobilePanel === 'products'}
+          onClick={() => setMobilePanel(mobilePanel === 'products' ? 'none' : 'products')}
+        />
+        <MobileTabBtn
+          icon={<Upload className="w-5 h-5" />}
+          label="Upload"
+          active={mobilePanel === 'upload'}
+          onClick={() => setMobilePanel(mobilePanel === 'upload' ? 'none' : 'upload')}
+        />
+        <MobileTabBtn
+          icon={<Layers className="w-5 h-5" />}
+          label="Layers"
+          active={mobilePanel === 'layers'}
+          onClick={() => setMobilePanel(mobilePanel === 'layers' ? 'none' : 'layers')}
+        />
+        {isPortal && (
+          <button
+            onClick={handleSaveAndFinish}
+            disabled={saving}
+            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-blue-600"
+          >
+            <Save className="w-5 h-5" />
+            <span className="text-[10px] font-semibold">{saving ? 'Saving...' : 'Finish'}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Mobile bottom sheet */}
+      {mobilePanel !== 'none' && (
+        <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobilePanel('none')} />
+          <div className="relative bg-white rounded-t-2xl max-h-[65vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+              <h3 className="text-sm font-semibold text-gray-900">
+                {mobilePanel === 'products' && 'Products'}
+                {mobilePanel === 'upload' && 'Upload Design'}
+                {mobilePanel === 'layers' && 'Layers & Properties'}
+              </h3>
+              <button onClick={() => setMobilePanel('none')} className="p-1 rounded-full hover:bg-gray-100">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {mobilePanel === 'products' && (
+                <div>
+                  {isMultiProduct && <MultiProductPanel />}
+                  {!isEmbedded && <ProductSelector />}
+                </div>
+              )}
+              {mobilePanel === 'upload' && (
+                <div className="p-4">
+                  <DesignUploader onLayerAdded={(layer) => { handleLayerAdded(layer); setMobilePanel('none'); }} />
+                </div>
+              )}
+              {mobilePanel === 'layers' && (
+                <div>
+                  <LayerPanel onReorderLayers={handleReorderLayers} onDuplicateLayer={handleLayerAdded} />
+                  <div className="border-t border-gray-200">
+                    <PropertiesPanel onReorderLayers={handleReorderLayers} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save & Finish — desktop only (mobile has it in tab bar) */}
       {isPortal && (
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="hidden md:block fixed bottom-6 right-6 z-50">
           <button
             onClick={handleSaveAndFinish}
             disabled={saving}
@@ -332,6 +421,53 @@ function EditorPageInner() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Mobile helper components ── */
+
+function MobileTabBtn({ icon, label, active, onClick }: {
+  icon: React.ReactNode; label: string; active: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-colors ${
+        active ? 'text-blue-600' : 'text-gray-500'
+      }`}
+    >
+      {icon}
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
+  );
+}
+
+function MobileToolbar({ onSave }: { onSave?: () => void }) {
+  const { undo, redo, canUndo, canRedo } = useHistory();
+  const zoom = useEditorStore((s) => s.zoom);
+  const setZoom = useEditorStore((s) => s.setZoom);
+
+  return (
+    <div className="md:hidden flex items-center gap-0.5 bg-white border-b border-gray-200 px-2 py-1">
+      <button onClick={undo} disabled={!canUndo()} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30">
+        <Undo2 className="w-4 h-4 text-gray-700" />
+      </button>
+      <button onClick={redo} disabled={!canRedo()} className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30">
+        <Redo2 className="w-4 h-4 text-gray-700" />
+      </button>
+      <div className="w-px h-5 bg-gray-200 mx-1" />
+      <button onClick={() => setZoom(Math.max(0.2, zoom - 0.15))} className="p-2 rounded-lg hover:bg-gray-100">
+        <ZoomOut className="w-4 h-4 text-gray-700" />
+      </button>
+      <span className="text-[11px] text-gray-500 w-9 text-center">{Math.round(zoom * 100)}%</span>
+      <button onClick={() => setZoom(Math.min(3, zoom + 0.15))} className="p-2 rounded-lg hover:bg-gray-100">
+        <ZoomIn className="w-4 h-4 text-gray-700" />
+      </button>
+      <div className="flex-1" />
+      <button onClick={onSave} className="p-2 rounded-lg hover:bg-gray-100" title="Save">
+        <Save className="w-4 h-4 text-gray-700" />
+      </button>
     </div>
   );
 }
