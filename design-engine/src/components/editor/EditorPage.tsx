@@ -168,18 +168,18 @@ function EditorPageInner() {
         window.dispatchEvent(new CustomEvent('ideamizer:capture-mockup', { detail: handler }));
         setTimeout(() => { if (!resolved) resolve(''); }, 500);
       });
-      // Fallback: try direct canvas element capture
+      // Fallback: try direct canvas element capture (.lower-canvas is the render layer)
       if (!currentMockup) {
         try {
-          const canvasEl = document.querySelector('.upper-canvas') as HTMLCanvasElement
-            ?? document.querySelector('canvas') as HTMLCanvasElement;
+          const canvasEl = document.querySelector('.lower-canvas') as HTMLCanvasElement;
           if (canvasEl) {
             currentMockup = canvasEl.toDataURL('image/jpeg', 0.8);
           }
-        } catch {
-          // Canvas tainted — will fall back to artwork URL
+        } catch (err) {
+          console.warn('[Save] Canvas capture failed (CORS tainted):', err);
         }
       }
+      console.log('[Save] Mockup captured:', currentMockup ? `${currentMockup.length} chars` : 'FAILED - using artwork fallback');
 
       // Save current product first
       const currentDesign = structuredClone(useDesignStore.getState().design);
