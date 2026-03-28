@@ -160,13 +160,26 @@ function EditorPageInner() {
 
     try {
       // Capture mockup preview of the current canvas
-      const currentMockup = await new Promise<string>((resolve) => {
+      let currentMockup = '';
+      // Try event-based capture first
+      currentMockup = await new Promise<string>((resolve) => {
         let resolved = false;
         const handler = (dataUrl: string) => { resolved = true; resolve(dataUrl); };
         window.dispatchEvent(new CustomEvent('ideamizer:capture-mockup', { detail: handler }));
-        // Fallback if event not handled
-        setTimeout(() => { if (!resolved) resolve(''); }, 200);
+        setTimeout(() => { if (!resolved) resolve(''); }, 500);
       });
+      // Fallback: try direct canvas element capture
+      if (!currentMockup) {
+        try {
+          const canvasEl = document.querySelector('.upper-canvas') as HTMLCanvasElement
+            ?? document.querySelector('canvas') as HTMLCanvasElement;
+          if (canvasEl) {
+            currentMockup = canvasEl.toDataURL('image/jpeg', 0.8);
+          }
+        } catch {
+          // Canvas tainted — will fall back to artwork URL
+        }
+      }
 
       // Save current product first
       const currentDesign = structuredClone(useDesignStore.getState().design);
