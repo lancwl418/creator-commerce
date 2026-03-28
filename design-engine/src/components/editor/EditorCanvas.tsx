@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useCanvas } from '@/hooks/useCanvas';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useEditorStore } from '@/stores/editorStore';
@@ -177,8 +177,30 @@ export default function EditorCanvas() {
 
   const showDpiWarning = dpiInfo && dpiInfo.status === 'low';
 
+  // Auto-fit canvas to container on mobile
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const isMobile = window.innerWidth < 768;
+    if (!isMobile || !selectedTemplate) return;
+
+    const view = selectedTemplate.views.find((v) => v.id === activeViewId);
+    if (!view) return;
+
+    // Calculate zoom to fit canvas in available space
+    // Available height = viewport - toolbar(~40px) - bottom tabs(~56px) - padding
+    const availW = window.innerWidth - 16; // 8px padding each side
+    const availH = window.innerHeight - 40 - 56 - 24;
+    const fitZoom = Math.min(availW / view.mockupWidth, availH / view.mockupHeight, 1);
+
+    const { setZoom } = useEditorStore.getState();
+    setZoom(Math.round(fitZoom * 100) / 100);
+  }, [selectedTemplate, activeViewId]);
+
   return (
-    <div className="relative flex-1 overflow-auto bg-gray-100 flex items-center justify-center p-8">
+    <div ref={containerRef} className="relative flex-1 overflow-auto bg-gray-100 flex items-center justify-center p-2 md:p-8">
       {showDpiWarning && (
         <div className="absolute top-3 right-3 z-10 bg-red-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
