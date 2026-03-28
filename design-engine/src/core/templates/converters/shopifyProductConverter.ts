@@ -29,7 +29,7 @@ export function convertShopifyProduct(product: ShopifyProduct): ProductTemplate 
     return {
       id: `shopify-${product.id}-img-${img.id}`,
       label: index === 0 ? 'Main' : `Image ${index + 1}`,
-      mockupImageUrl: img.src,
+      mockupImageUrl: `/api/image-proxy?url=${encodeURIComponent(img.src)}`,
       mockupWidth,
       mockupHeight,
       printableArea: {

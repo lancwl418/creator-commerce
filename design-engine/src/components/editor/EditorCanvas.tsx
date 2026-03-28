@@ -46,6 +46,20 @@ export default function EditorCanvas() {
     return () => window.removeEventListener('ideamizer:export-png', handler);
   }, [getManager]);
 
+  // Listen for mockup preview capture requests
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const manager = getManager();
+      const callback = (e as CustomEvent<(dataUrl: string) => void>).detail;
+      if (manager && callback) {
+        const preview = manager.exportMockupPreview(600);
+        callback(preview);
+      }
+    };
+    window.addEventListener('ideamizer:capture-mockup', handler);
+    return () => window.removeEventListener('ideamizer:capture-mockup', handler);
+  }, [getManager]);
+
   // Listen for layer reorder events
   useEffect(() => {
     const handler = (e: Event) => {

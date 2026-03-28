@@ -38,7 +38,7 @@ export class ObjectFactory {
 
     const imageData = layer.data as ImageLayerData;
 
-    fabric.FabricImage.fromURL(imageData.src).then((img) => {
+    fabric.FabricImage.fromURL(imageData.src, {}, { crossOrigin: 'anonymous' }).then((img) => {
       // Apply crop if set
       if (imageData.cropX != null) img.cropX = imageData.cropX;
       if (imageData.cropY != null) img.cropY = imageData.cropY;

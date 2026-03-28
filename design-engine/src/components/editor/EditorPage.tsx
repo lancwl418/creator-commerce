@@ -151,11 +151,20 @@ function EditorPageInner() {
     setSaving(true);
 
     try {
+      // Capture mockup preview of the current canvas
+      const currentMockup = await new Promise<string>((resolve) => {
+        let resolved = false;
+        const handler = (dataUrl: string) => { resolved = true; resolve(dataUrl); };
+        window.dispatchEvent(new CustomEvent('ideamizer:capture-mockup', { detail: handler }));
+        // Fallback if event not handled
+        setTimeout(() => { if (!resolved) resolve(''); }, 200);
+      });
+
       // Save current product first
       const currentDesign = structuredClone(useDesignStore.getState().design);
       const multiStore = useMultiProductStore.getState();
       if (multiStore.isMultiProduct) {
-        multiStore.saveCurrentProduct(currentDesign);
+        multiStore.saveCurrentProduct(currentDesign, currentMockup || undefined);
       }
 
       // Get artwork URL as fallback preview
@@ -176,7 +185,7 @@ function EditorPageInner() {
             template_id: selectedTemplate?.id ?? '',
             name: selectedTemplate?.name ?? '',
             base_cost: 0,
-            thumbnail: artworkUrl,
+            thumbnail: currentMockup || artworkUrl,
             layers: Object.values(currentDesign.views).flatMap((v) => v.layers),
           }];
 

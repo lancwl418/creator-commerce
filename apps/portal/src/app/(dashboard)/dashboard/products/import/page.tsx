@@ -87,6 +87,38 @@ export default function ImportFromEditorPage() {
           ? `${title_prefix} — ${product.name}`
           : title_prefix || product.name;
 
+        // Upload mockup preview to Supabase Storage if it's a data URL
+        let previewUrls: string[] = [];
+        if (product.thumbnail && product.thumbnail.startsWith('data:')) {
+          try {
+            const base64 = product.thumbnail.split(',')[1];
+            const mimeMatch = product.thumbnail.match(/data:([^;]+);/);
+            const mime = mimeMatch?.[1] || 'image/jpeg';
+            const ext = mime === 'image/png' ? 'png' : 'jpg';
+            const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+            const filePath = `${creator.id}/previews/${crypto.randomUUID()}.${ext}`;
+
+            const { error: uploadError } = await supabase.storage
+              .from('design-assets')
+              .upload(filePath, bytes, { contentType: mime });
+
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage
+                .from('design-assets')
+                .getPublicUrl(filePath);
+              previewUrls = [urlData.publicUrl];
+            }
+          } catch (e) {
+            console.error('Preview upload failed:', e);
+          }
+        } else if (product.thumbnail) {
+          previewUrls = [product.thumbnail];
+        }
+
+        if (previewUrls.length === 0 && artworkAsset?.file_url) {
+          previewUrls = [artworkAsset.file_url];
+        }
+
         const { data: instance, error: instanceError } = await supabase
           .from('sellable_product_instances')
           .insert({
@@ -97,11 +129,7 @@ export default function ImportFromEditorPage() {
             title: productTitle,
             status: 'draft',
             base_price_suggestion: product.base_cost ? product.base_cost * 2.5 : null,
-            preview_urls: product.thumbnail
-            ? [product.thumbnail]
-            : artworkAsset?.file_url
-              ? [artworkAsset.file_url]
-              : [],
+            preview_urls: previewUrls,
           })
           .select('id')
           .single();

@@ -332,6 +332,30 @@ export class CanvasManager {
     });
   }
 
+  /**
+   * Export the full canvas (including mockup background) as a preview image.
+   * Returns a JPEG data URL for smaller file size.
+   */
+  exportMockupPreview(maxSize = 600): string {
+    if (!this.canvas || !this.currentView) return '';
+
+    try {
+      // Calculate multiplier to fit within maxSize
+      const cw = this.canvas.getWidth();
+      const ch = this.canvas.getHeight();
+      const multiplier = Math.min(maxSize / cw, maxSize / ch, 1);
+
+      return this.canvas.toDataURL({
+        format: 'jpeg',
+        quality: 0.8,
+        multiplier,
+      });
+    } catch {
+      // Canvas tainted — return empty
+      return '';
+    }
+  }
+
   private findObjectByLayerId(layerId: string): fabric.FabricObject | undefined {
     return this.canvas?.getObjects().find((o) => o.data?.layerId === layerId);
   }
