@@ -61,14 +61,14 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
   const router = useRouter();
   const supabase = createClient();
 
-  // ERP SKU data
+  // SKU data from ERP/Shopify
   const [erpSkus, setErpSkus] = useState<ErpSku[]>([]);
+  const [optionNames, setOptionNames] = useState<string[]>([]);
   const [loadingSkus, setLoadingSkus] = useState(true);
   const [skuError, setSkuError] = useState('');
 
   // Selection state: set of enabled SKU IDs
   const [enabledSkuIds, setEnabledSkuIds] = useState<Set<string>>(() => {
-    // Initialize from saved selections
     const saved = product.selected_skus.filter(s => s.enabled).map(s => s.sku_id);
     return new Set(saved);
   });
@@ -80,22 +80,18 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  // Extract ERP product ID from template ID (format: "erp-{id}")
-  const erpProductId = product.product_template_id.startsWith('erp-')
-    ? product.product_template_id.slice(4)
-    : product.product_template_id;
-
-  // Fetch ERP SKU data
+  // Fetch SKU data (supports both shopify-xxx and erp-xxx template IDs)
   useEffect(() => {
     async function fetchSkus() {
       try {
-        const res = await fetch(`/api/erp/product-skus?erp_product_id=${encodeURIComponent(erpProductId)}`);
+        const res = await fetch(`/api/erp/product-skus?template_id=${encodeURIComponent(product.product_template_id)}`);
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || `Failed to fetch SKUs (${res.status})`);
         }
         const data = await res.json();
         setErpSkus(data.skus || []);
+        setOptionNames(data.option_names || []);
 
         // If no saved selections, enable all SKUs by default
         if (product.selected_skus.length === 0 && data.skus?.length > 0) {
@@ -108,7 +104,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
       }
     }
     fetchSkus();
-  }, [erpProductId]);
+  }, [product.product_template_id]);
 
   // Derive unique option values from ERP SKUs
   const option1Values = [...new Set(erpSkus.map(s => s.option1).filter(Boolean))] as string[];
@@ -294,9 +290,9 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
               {/* Table header */}
               <div className="grid grid-cols-[44px_1fr_1fr_1fr_80px] gap-2 px-2 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100">
                 <span></span>
-                {option1Values.length > 0 && <span>Option 1</span>}
-                {option2Values.length > 0 && <span>Option 2</span>}
-                {option3Values.length > 0 && <span>Option 3</span>}
+                {option1Values.length > 0 && <span>{optionNames[0] || 'Option 1'}</span>}
+                {option2Values.length > 0 && <span>{optionNames[1] || 'Option 2'}</span>}
+                {option3Values.length > 0 && <span>{optionNames[2] || 'Option 3'}</span>}
                 {!hasOptions && <span>SKU</span>}
                 <span className="text-right">Stock</span>
               </div>
