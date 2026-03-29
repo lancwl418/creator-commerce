@@ -38,7 +38,11 @@ export class ObjectFactory {
 
     const imageData = layer.data as ImageLayerData;
 
-    fabric.FabricImage.fromURL(imageData.src, {}, { crossOrigin: 'anonymous' }).then((img) => {
+    // Use crossOrigin only for external URLs; same-origin proxy URLs don't need it
+    // and setting it can cause CORS tainting issues with canvas.toDataURL()
+    const crossOriginOpt = imageData.src.startsWith('data:') || imageData.src.startsWith('/')
+      ? {} : { crossOrigin: 'anonymous' };
+    fabric.FabricImage.fromURL(imageData.src, {}, crossOriginOpt).then((img) => {
       // Apply crop if set
       if (imageData.cropX != null) img.cropX = imageData.cropX;
       if (imageData.cropY != null) img.cropY = imageData.cropY;

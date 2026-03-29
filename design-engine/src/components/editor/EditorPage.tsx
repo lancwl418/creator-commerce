@@ -27,6 +27,83 @@ import {
   FlipHorizontal2, FlipVertical2, Crop, Check, Trash2,
 } from 'lucide-react';
 
+/**
+ * Generates a composite preview by drawing the mockup background + artwork layers
+ * onto a fresh canvas. This avoids CORS tainting because images are loaded
+ * from same-origin proxy routes without the crossOrigin attribute.
+ */
+async function compositePreview(
+  template: import('@/types/product').ProductTemplate | null,
+  design: import('@/types/design').DesignDocument,
+): Promise<string> {
+  if (!template) return '';
+
+  const view = template.views[0];
+  if (!view) return '';
+
+  const width = view.mockupWidth || 600;
+  const height = view.mockupHeight || 600;
+  const maxSize = 600;
+  const scale = Math.min(maxSize / width, maxSize / height, 1);
+  const cw = Math.round(width * scale);
+  const ch = Math.round(height * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  // Helper: load image without crossOrigin (same-origin proxy = no taint)
+  const loadImg = (src: string): Promise<HTMLImageElement | null> =>
+    new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+
+  // Draw mockup background
+  const mockupImg = await loadImg(view.mockupImageUrl);
+  if (mockupImg) {
+    ctx.drawImage(mockupImg, 0, 0, cw, ch);
+  } else {
+    ctx.fillStyle = '#f3f4f6';
+    ctx.fillRect(0, 0, cw, ch);
+  }
+
+  // Draw artwork layers
+  const designView = design.views[view.id];
+  if (designView) {
+    for (const layer of designView.layers) {
+      if (!layer.visible || layer.data.type !== 'image') continue;
+      const src = (layer.data as { src?: string }).src;
+      if (!src) continue;
+
+      const artImg = await loadImg(src);
+      if (!artImg) continue;
+
+      const t = layer.transform;
+      ctx.save();
+      ctx.translate(t.x * scale, t.y * scale);
+      ctx.rotate((t.rotation || 0) * Math.PI / 180);
+      if (t.flipX) ctx.scale(-1, 1);
+      if (t.flipY) ctx.scale(1, -1);
+      const drawW = (t.width || artImg.naturalWidth) * (t.scaleX || 1) * scale;
+      const drawH = (t.height || artImg.naturalHeight) * (t.scaleY || 1) * scale;
+      ctx.globalAlpha = layer.opacity ?? 1;
+      ctx.drawImage(artImg, 0, 0, drawW, drawH);
+      ctx.restore();
+    }
+  }
+
+  try {
+    return canvas.toDataURL('image/jpeg', 0.8);
+  } catch {
+    return '';
+  }
+}
+
 interface EditorPageProps {
   config?: EditorConfig;
 }
@@ -161,7 +238,7 @@ function EditorPageInner() {
     try {
       // Capture mockup preview of the current canvas
       let currentMockup = '';
-      // Try event-based capture first
+      // Try event-based capture first (Fabric.js canvas export)
       currentMockup = await new Promise<string>((resolve) => {
         let resolved = false;
         const handler = (dataUrl: string) => { resolved = true; resolve(dataUrl); };
@@ -179,6 +256,11 @@ function EditorPageInner() {
           console.warn('[Save] Canvas capture failed (CORS tainted):', err);
         }
       }
+      // Fallback: composite preview from mockup + artwork using a fresh canvas
+      // This avoids CORS tainting by loading same-origin images without crossOrigin
+      if (!currentMockup) {
+        currentMockup = await compositePreview(selectedTemplate, useDesignStore.getState().design);
+      }
       console.log('[Save] Mockup captured:', currentMockup ? `${currentMockup.length} chars` : 'FAILED - using artwork fallback');
 
       // Save current product first
@@ -193,22 +275,37 @@ function EditorPageInner() {
         || new URLSearchParams(window.location.search).get('artwork_url')
         || null;
 
+      // Re-read state after saveCurrentProduct to get updated thumbnails
+      const updatedProducts = useMultiProductStore.getState().products;
+
       // Collect all products with their layers
-      const productsToSave = multiStore.isMultiProduct
-        ? multiStore.products.map((entry) => ({
-            template_id: entry.template.id,
-            name: entry.template.name,
-            base_cost: parseFloat(String(entry.template.metadata?.price ?? 0)) || 0,
-            thumbnail: entry.thumbnail || artworkUrl,
-            layers: Object.values(entry.design.views).flatMap((v) => v.layers),
-          }))
-        : [{
-            template_id: selectedTemplate?.id ?? '',
-            name: selectedTemplate?.name ?? '',
-            base_cost: 0,
-            thumbnail: currentMockup || artworkUrl,
-            layers: Object.values(currentDesign.views).flatMap((v) => v.layers),
-          }];
+      // For multi-product, generate composite previews for products without thumbnails
+      let productsToSave;
+      if (multiStore.isMultiProduct) {
+        productsToSave = await Promise.all(
+          updatedProducts.map(async (entry) => {
+            let thumbnail = entry.thumbnail;
+            if (!thumbnail) {
+              thumbnail = await compositePreview(entry.template, entry.design) || artworkUrl;
+            }
+            return {
+              template_id: entry.template.id,
+              name: entry.template.name,
+              base_cost: parseFloat(String(entry.template.metadata?.price ?? 0)) || 0,
+              thumbnail,
+              layers: Object.values(entry.design.views).flatMap((v) => v.layers),
+            };
+          })
+        );
+      } else {
+        productsToSave = [{
+          template_id: selectedTemplate?.id ?? '',
+          name: selectedTemplate?.name ?? '',
+          base_cost: 0,
+          thumbnail: currentMockup || artworkUrl,
+          layers: Object.values(currentDesign.views).flatMap((v) => v.layers),
+        }];
+      }
 
       // Parse callback_url and products_meta from URL params
       const params = new URLSearchParams(window.location.search);

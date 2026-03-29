@@ -72,7 +72,9 @@ export class CanvasManager {
 
     // Load mockup background
     try {
-      const img = await fabric.FabricImage.fromURL(view.mockupImageUrl, {}, { crossOrigin: 'anonymous' });
+      // Use crossOrigin only for external URLs; same-origin proxy URLs don't need it
+      const crossOriginOpt = view.mockupImageUrl.startsWith('/') ? {} : { crossOrigin: 'anonymous' };
+      const img = await fabric.FabricImage.fromURL(view.mockupImageUrl, {}, crossOriginOpt);
       if (!this.canvas) return;
 
       // Compute scale from intrinsic size; fall back to 1:1 if unavailable
