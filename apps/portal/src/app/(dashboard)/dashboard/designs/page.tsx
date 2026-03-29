@@ -96,12 +96,7 @@ export default async function DesignsPage() {
                       v{latestVersion?.version_number ?? 1}
                     </span>
                   </div>
-                  <button
-                    onClick={(e) => { e.preventDefault(); alert('Coming soon!'); }}
-                    className="mt-3 w-full rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-2 text-xs font-semibold text-white hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm"
-                  >
-                    IdeaMax Promote
-                  </button>
+                  <PromoteButton />
                 </div>
               </Link>
             );
@@ -109,6 +104,18 @@ export default async function DesignsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function PromoteButton() {
+  // Using an anchor tag styled as button to avoid onClick in server component
+  return (
+    <span
+      className="mt-3 block w-full rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-2 text-xs font-semibold text-white text-center cursor-pointer hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm"
+      title="Coming soon!"
+    >
+      IdeaMax Promote
+    </span>
   );
 }
 
