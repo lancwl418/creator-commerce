@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { PromoteButton } from '../PromoteButton';
 
 export default async function DesignDetailPage({
   params,
@@ -126,6 +127,8 @@ export default async function DesignDetailPage({
           <div className="rounded-2xl border border-border bg-white p-6 shadow-sm space-y-3">
             <h3 className="text-sm font-semibold text-gray-900">Actions</h3>
 
+            <PromoteButton designId={design.id} designStatus={design.status} />
+
             <Link
               href={`/dashboard/products/new?design_id=${design.id}`}
               className="block w-full rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white text-center hover:bg-primary-500 transition-colors shadow-md shadow-primary-600/25"
@@ -133,6 +136,17 @@ export default async function DesignDetailPage({
               Create Product
             </Link>
           </div>
+
+          {/* Promotion Status */}
+          {design.creator_expected_price && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-medium text-amber-700">Expected Price</p>
+              <p className="text-lg font-bold text-amber-800 mt-0.5">${design.creator_expected_price}</p>
+              <p className="text-[11px] text-amber-600 mt-1">
+                Est. royalty: ${(design.creator_expected_price * 0.15).toFixed(2)}/sale
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
