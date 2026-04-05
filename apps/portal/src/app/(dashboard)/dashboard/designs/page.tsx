@@ -71,35 +71,38 @@ export default async function DesignsPage() {
             );
 
             return (
-              <Link
+              <div
                 key={design.id}
-                href={`/dashboard/designs/${design.id}`}
-                className="group rounded-2xl border border-border bg-white overflow-hidden hover:shadow-lg hover:shadow-gray-200/50 transition-all duration-200 hover:-translate-y-0.5"
+                className="group rounded-2xl border border-border bg-white overflow-hidden hover:shadow-lg hover:shadow-gray-200/50 transition-all duration-200"
               >
-                <div className="aspect-square bg-surface-secondary flex items-center justify-center">
-                  {artwork ? (
-                    <img
-                      src={artwork.file_url}
-                      alt={design.title}
-                      className="w-full h-full object-contain p-6"
-                    />
-                  ) : (
-                    <span className="text-gray-400 text-sm">No preview</span>
-                  )}
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 group-hover:text-primary-700 truncate transition-colors">
-                    {design.title}
-                  </h3>
-                  <div className="flex items-center justify-between mt-2.5">
-                    <StatusBadge status={design.status} />
-                    <span className="text-xs text-gray-400 font-medium">
-                      v{latestVersion?.version_number ?? 1}
-                    </span>
+                <Link href={`/dashboard/designs/${design.id}`}>
+                  <div className="aspect-square bg-surface-secondary flex items-center justify-center">
+                    {artwork ? (
+                      <img
+                        src={artwork.file_url}
+                        alt={design.title}
+                        className="w-full h-full object-contain p-6"
+                      />
+                    ) : (
+                      <span className="text-gray-400 text-sm">No preview</span>
+                    )}
                   </div>
+                  <div className="px-4 pt-4">
+                    <h3 className="font-semibold text-gray-900 group-hover:text-primary-700 truncate transition-colors">
+                      {design.title}
+                    </h3>
+                    <div className="flex items-center justify-between mt-2.5">
+                      <StatusBadge status={design.status} />
+                      <span className="text-xs text-gray-400 font-medium">
+                        v{latestVersion?.version_number ?? 1}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+                <div className="px-4 pb-4">
                   <PromoteButton designId={design.id} designStatus={design.status} />
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

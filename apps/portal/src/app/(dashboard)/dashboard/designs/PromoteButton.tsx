@@ -88,7 +88,7 @@ export function PromoteButton({
 
       {step !== 'closed' && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          className="fixed inset-0 z-[100] flex items-center justify-center"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
           <div
