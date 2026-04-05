@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { CreatorFilters } from './CreatorFilters';
+import { AddCreator } from './AddCreator';
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-warning-50 text-warning-600',
@@ -60,15 +61,18 @@ export default async function CreatorsPage({
           <h1 className="text-2xl font-bold text-gray-900">Creators</h1>
           <p className="text-sm text-gray-500 mt-1">Manage creator accounts and applications</p>
         </div>
-        <Link
-          href="/dashboard/recruitment"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors shadow-sm"
-        >
+        <div className="flex gap-2">
+          <AddCreator />
+          <Link
+            href="/dashboard/recruitment"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors shadow-sm"
+          >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
           </svg>
           Recruit Creators
         </Link>
+        </div>
       </div>
 
       {/* Filters */}
