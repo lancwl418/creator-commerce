@@ -140,10 +140,10 @@ export default async function DesignDetailPage({
           {/* Promotion Status */}
           {design.creator_expected_price && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-xs font-medium text-amber-700">Expected Price</p>
+              <p className="text-xs font-medium text-amber-700">Expected Profit per Sale</p>
               <p className="text-lg font-bold text-amber-800 mt-0.5">${design.creator_expected_price}</p>
               <p className="text-[11px] text-amber-600 mt-1">
-                Est. royalty: ${(design.creator_expected_price * 0.15).toFixed(2)}/sale
+                70/30 split (you keep 70%)
               </p>
             </div>
           )}
