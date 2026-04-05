@@ -59,14 +59,6 @@ export default async function DesignReviewDetailPage({
     .select('id, title, status, retail_price, cost, channel_listings(id, channel_type, price, status)')
     .eq('design_id', id);
 
-  // Get royalty config
-  const { data: configData } = await supabase
-    .from('operating_config')
-    .select('config_value')
-    .eq('config_key', 'royalty_rates')
-    .single();
-  const royaltyRates = (configData?.config_value as { standard?: number; premium?: number }) || { standard: 0.15 };
-
   return (
     <div className="space-y-6">
       {/* Back */}
@@ -218,9 +210,7 @@ export default async function DesignReviewDetailPage({
           <DesignReviewActions
             designId={design.id}
             designStatus={design.status}
-            creatorId={creator?.id || ''}
-            creatorExpectedPrice={design.creator_expected_price ?? null}
-            royaltyRates={royaltyRates}
+            creatorExpectedProfit={design.creator_expected_price ?? null}
             existingProducts={products || []}
           />
 

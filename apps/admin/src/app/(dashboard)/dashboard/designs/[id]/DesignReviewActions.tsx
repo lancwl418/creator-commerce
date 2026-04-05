@@ -15,46 +15,47 @@ interface Product {
 export function DesignReviewActions({
   designId,
   designStatus,
-  creatorId,
-  creatorExpectedPrice,
-  royaltyRates,
+  creatorExpectedProfit,
   existingProducts,
 }: {
   designId: string;
   designStatus: string;
-  creatorId: string;
-  creatorExpectedPrice: number | null;
-  royaltyRates: { standard?: number; premium?: number };
+  creatorExpectedProfit: number | null;
   existingProducts: Product[];
 }) {
   const router = useRouter();
   const supabase = createClient();
 
+  const cost = existingProducts[0]?.cost ?? 10;
+
+  // If creator expects $X profit, suggested price = cost + X / 0.7 (since creator gets 70% of profit)
+  const suggestedPrice = creatorExpectedProfit
+    ? cost + creatorExpectedProfit / 0.7
+    : null;
+
   const [price, setPrice] = useState(
-    existingProducts[0]?.retail_price?.toString() || creatorExpectedPrice?.toString() || ''
+    existingProducts[0]?.retail_price?.toString() || suggestedPrice?.toFixed(2) || ''
   );
-  const [royaltyType, setRoyaltyType] = useState<'standard' | 'premium'>('standard');
   const [rejectionReason, setRejectionReason] = useState('');
   const [showReject, setShowReject] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const royaltyRate = royaltyType === 'premium'
-    ? (royaltyRates.premium ?? 0.20)
-    : (royaltyRates.standard ?? 0.15);
-
   const priceNum = parseFloat(price) || 0;
-  const cost = existingProducts[0]?.cost ?? 10;
-  const creatorEarning = priceNum * royaltyRate;
-  const platformProfit = priceNum - cost - creatorEarning;
+  const profit = priceNum - cost;
+  const creatorShare = profit * 0.7;
+  const platformShare = profit * 0.3;
 
   async function handleApprove() {
     if (!price || priceNum <= 0) {
-      alert('Please set a price before approving');
+      alert('Please set a selling price before approving');
+      return;
+    }
+    if (priceNum <= cost) {
+      alert('Selling price must be higher than production cost');
       return;
     }
     setLoading(true);
 
-    // Update design status
     const { error: designError } = await supabase
       .from('designs')
       .update({ status: 'approved', updated_at: new Date().toISOString() })
@@ -66,7 +67,6 @@ export function DesignReviewActions({
       return;
     }
 
-    // Update retail_price on existing products
     if (existingProducts.length > 0) {
       await supabase
         .from('sellable_product_instances')
@@ -122,21 +122,31 @@ export function DesignReviewActions({
   return (
     <div className="bg-white rounded-2xl border border-border-light shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-border-light">
-        <h3 className="text-sm font-semibold text-gray-900">Pricing & Royalty</h3>
+        <h3 className="text-sm font-semibold text-gray-900">Pricing & Revenue Split</h3>
+        <p className="text-[11px] text-gray-400 mt-0.5">70% Creator / 30% IdeaMax</p>
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Creator's expected price */}
-        {creatorExpectedPrice && (
+        {/* Creator's expected profit */}
+        {creatorExpectedProfit ? (
           <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
-            <p className="text-[11px] font-medium text-amber-600 uppercase tracking-wider">Creator&apos;s Expected Price</p>
-            <p className="text-lg font-bold text-amber-800 mt-0.5">${creatorExpectedPrice.toFixed(2)}</p>
+            <p className="text-[11px] font-medium text-amber-600 uppercase tracking-wider">Creator&apos;s Expected Profit</p>
+            <p className="text-lg font-bold text-amber-800 mt-0.5">${creatorExpectedProfit.toFixed(2)} <span className="text-sm font-normal text-amber-600">per sale</span></p>
+            {suggestedPrice && (
+              <p className="text-[11px] text-amber-500 mt-1">
+                Suggested selling price: ${suggestedPrice.toFixed(2)} (cost ${cost.toFixed(2)} + profit ${(creatorExpectedProfit / 0.7).toFixed(2)})
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3">
+            <p className="text-[11px] font-medium text-blue-600">Creator chose &quot;Let IdeaMax decide&quot;</p>
           </div>
         )}
 
         {/* Price Input */}
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">Marketplace Price (USD)</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">Selling Price (USD)</label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
             <input
@@ -152,37 +162,6 @@ export function DesignReviewActions({
           </div>
         </div>
 
-        {/* Royalty Type */}
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">Royalty Tier</label>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setRoyaltyType('standard')}
-              disabled={isPublished}
-              className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                royaltyType === 'standard'
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-border text-gray-500 hover:bg-gray-50'
-              } disabled:opacity-60`}
-            >
-              Standard
-              <span className="block text-[10px] mt-0.5 opacity-70">{((royaltyRates.standard ?? 0.15) * 100).toFixed(0)}% to creator</span>
-            </button>
-            <button
-              onClick={() => setRoyaltyType('premium')}
-              disabled={isPublished}
-              className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                royaltyType === 'premium'
-                  ? 'border-violet-500 bg-violet-50 text-violet-700'
-                  : 'border-border text-gray-500 hover:bg-gray-50'
-              } disabled:opacity-60`}
-            >
-              Premium
-              <span className="block text-[10px] mt-0.5 opacity-70">{((royaltyRates.premium ?? 0.20) * 100).toFixed(0)}% to creator</span>
-            </button>
-          </div>
-        </div>
-
         {/* Breakdown */}
         {priceNum > 0 && (
           <div className="rounded-xl bg-surface-secondary p-4 space-y-2">
@@ -195,19 +174,35 @@ export function DesignReviewActions({
               <span className="text-gray-500">Production Cost</span>
               <span className="text-gray-400">-${cost.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Creator Royalty ({(royaltyRate * 100).toFixed(0)}%)</span>
-              <span className="text-violet-600 font-medium">-${creatorEarning.toFixed(2)}</span>
+            <div className="border-t border-border-light pt-2 mt-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Profit</span>
+                <span className={`font-medium ${profit >= 0 ? 'text-gray-900' : 'text-danger-600'}`}>${profit.toFixed(2)}</span>
+              </div>
             </div>
-            <div className="border-t border-border-light pt-2 mt-2 flex justify-between text-sm">
-              <span className="font-semibold text-gray-700">Our Profit</span>
-              <span className={`font-bold ${platformProfit >= 0 ? 'text-success-600' : 'text-danger-600'}`}>
-                ${platformProfit.toFixed(2)}
-              </span>
-            </div>
-            <p className="text-[10px] text-gray-400 mt-1">
-              Margin: {priceNum > 0 ? ((platformProfit / priceNum) * 100).toFixed(1) : '0'}%
-            </p>
+            {profit > 0 && (
+              <>
+                <div className="flex justify-between text-sm pl-3">
+                  <span className="text-gray-400">Creator (70%)</span>
+                  <span className="text-violet-600 font-medium">${creatorShare.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm pl-3">
+                  <span className="text-gray-400">IdeaMax (30%)</span>
+                  <span className="text-amber-600 font-medium">${platformShare.toFixed(2)}</span>
+                </div>
+                {creatorExpectedProfit && (
+                  <div className="border-t border-border-light pt-2 mt-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Creator expected</span>
+                      <span className={creatorShare >= creatorExpectedProfit ? 'text-success-600' : 'text-danger-500'}>
+                        ${creatorExpectedProfit.toFixed(2)}
+                        {creatorShare >= creatorExpectedProfit ? ' (met)' : ' (not met)'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
