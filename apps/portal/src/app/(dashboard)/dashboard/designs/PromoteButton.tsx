@@ -96,7 +96,7 @@ export function PromoteButton({
             onClick={(e) => { e.stopPropagation(); setStep('closed'); setAgreed(false); }}
           />
           <div
-            className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto"
+            className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 my-4 max-h-[calc(100vh-2rem)] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Step 1: Pricing */}
