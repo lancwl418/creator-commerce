@@ -9,6 +9,15 @@ services:
       - fromGroup: creator commerce
 
   - type: web
+    name: creator-admin
+    runtime: docker
+    dockerfilePath: ./apps/admin/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - fromGroup: creator commerce
+
+  - type: web
     name: design-engine
     runtime: docker
     dockerfilePath: ./design-engine/Dockerfile
