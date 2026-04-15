@@ -3,9 +3,9 @@ import type { ProductTemplate, ProductView } from '@/types/product';
 import { resolveErpImageUrl } from '@/lib/erpImageUrl';
 
 const DEFAULT_MOCKUP_WIDTH = 800;
-const DEFAULT_MOCKUP_HEIGHT = 1000;
-const DEFAULT_PHYSICAL_WIDTH = 10;
-const DEFAULT_PHYSICAL_HEIGHT = 12;
+const DEFAULT_MOCKUP_HEIGHT = 800;
+const DEFAULT_PHYSICAL_WIDTH = 11;
+const DEFAULT_PHYSICAL_HEIGHT = 11;
 const DEFAULT_MIN_DPI = 150;
 const PRINTABLE_AREA_RATIO = 0.6;
 

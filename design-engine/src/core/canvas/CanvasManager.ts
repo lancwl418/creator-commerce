@@ -77,17 +77,18 @@ export class CanvasManager {
       const img = await fabric.FabricImage.fromURL(view.mockupImageUrl, {}, crossOriginOpt);
       if (!this.canvas) return;
 
-      // Compute scale from intrinsic size; fall back to 1:1 if unavailable
+      // Compute uniform scale to fit image within mockup dimensions without distortion
       const imgW = img.width || view.mockupWidth;
       const imgH = img.height || view.mockupHeight;
+      const uniformScale = Math.min(view.mockupWidth / imgW, view.mockupHeight / imgH);
 
       img.set({
         left: 0,
         top: 0,
         originX: 'left',
         originY: 'top',
-        scaleX: view.mockupWidth / imgW,
-        scaleY: view.mockupHeight / imgH,
+        scaleX: uniformScale,
+        scaleY: uniformScale,
         selectable: false,
         evented: false,
         excludeFromExport: true,
