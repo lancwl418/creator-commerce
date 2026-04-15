@@ -110,14 +110,26 @@ async function handlePortalMode(
 
   let matched: ProductTemplate[] = [];
 
-  if (config.portalProducts && config.portalProducts.length > 0) {
-    // Products passed directly from Portal — convert without fetching
-    const converted = convertErpProducts(config.portalProducts);
-    if (converted.length > 0) {
-      appendTemplates(converted);
-      matched = converted;
+  if (config.productsCacheKey && config.productsCacheUrl) {
+    // Fetch product data from Portal's temp cache — no ERP API call needed
+    try {
+      const cacheRes = await fetch(`${config.productsCacheUrl}?key=${config.productsCacheKey}`);
+      if (cacheRes.ok) {
+        const cacheData = await cacheRes.json();
+        if (cacheData.products?.length) {
+          const converted = convertErpProducts(cacheData.products);
+          if (converted.length > 0) {
+            appendTemplates(converted);
+            matched = converted;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[TemplateLoader] Failed to fetch from products cache:', err);
     }
-  } else {
+  }
+
+  if (matched.length === 0) {
     // Legacy flow: fetch all products and match by ID
     await fetchExternalProducts(appendTemplates);
 

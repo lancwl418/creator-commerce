@@ -118,17 +118,26 @@ export default function CatalogDetailPage() {
     setTimeout(() => setAddedToPool(false), 2000);
   }
 
-  function handleStartDesigning() {
+  async function handleStartDesigning() {
     if (!product) return;
 
     const templateIds = `erp-${product.id}`;
-    const productsData = encodeURIComponent(JSON.stringify([product]));
-    const callbackUrl = `${window.location.origin}/dashboard/products/import`;
+
+    const res = await fetch('/api/erp/products-cache', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: [product] }),
+    });
+    const { key } = await res.json();
+
+    const portalOrigin = window.location.origin;
+    const callbackUrl = `${portalOrigin}/dashboard/products/import`;
 
     window.location.href =
       `${DESIGN_ENGINE_URL}/embed` +
       `?templates=${encodeURIComponent(templateIds)}` +
-      `&products_data=${productsData}` +
+      `&products_cache_key=${key}` +
+      `&products_cache_url=${encodeURIComponent(`${portalOrigin}/api/erp/products-cache`)}` +
       `&callback_url=${encodeURIComponent(callbackUrl)}`;
   }
 

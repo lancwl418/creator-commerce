@@ -111,21 +111,28 @@ export default function CatalogPage() {
     });
   }
 
-  function handleDesignSelected() {
+  async function handleDesignSelected() {
     if (selectedIds.size === 0) return;
 
     const selected = state.products.filter((p) => selectedIds.has(p.id));
     const templateIds = selected.map((p) => `erp-${p.id}`).join(',');
 
-    // Pass full ERP product data so Design Engine doesn't need to re-fetch
-    const productsData = encodeURIComponent(JSON.stringify(selected));
+    // Store products in temp cache, pass cache key to Design Engine (avoids URL length limits)
+    const res = await fetch('/api/erp/products-cache', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: selected }),
+    });
+    const { key } = await res.json();
 
-    const callbackUrl = `${window.location.origin}/dashboard/products/import`;
+    const portalOrigin = window.location.origin;
+    const callbackUrl = `${portalOrigin}/dashboard/products/import`;
 
     const editorUrl =
       `${DESIGN_ENGINE_URL}/embed` +
       `?templates=${encodeURIComponent(templateIds)}` +
-      `&products_data=${productsData}` +
+      `&products_cache_key=${key}` +
+      `&products_cache_url=${encodeURIComponent(`${portalOrigin}/api/erp/products-cache`)}` +
       `&callback_url=${encodeURIComponent(callbackUrl)}`;
 
     window.location.href = editorUrl;
