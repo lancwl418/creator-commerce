@@ -232,7 +232,7 @@ function EditorPageInner() {
 
   // Save & Finish: save all products back to Portal and redirect
   const handleSaveAndFinish = useCallback(async () => {
-    if (!isPortal || !editorConfig.designId) return;
+    if (!isPortal) return;
     setSaving(true);
 
     try {
