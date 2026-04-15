@@ -122,23 +122,13 @@ export default function CatalogDetailPage() {
     if (!product) return;
 
     const templateIds = `erp-${product.id}`;
-    const productsMeta = encodeURIComponent(
-      JSON.stringify([
-        {
-          id: `erp-${product.id}`,
-          name: product.itemEnName || product.title || product.itemCnName,
-          base_cost: product.prodSkuList?.[0]?.price ?? 0,
-          source: 'erp',
-          thumbnail: product.mainPic ? erpImg(product.mainPic) : null,
-        },
-      ])
-    );
+    const productsData = encodeURIComponent(JSON.stringify([product]));
     const callbackUrl = `${window.location.origin}/dashboard/products/import`;
 
     window.location.href =
       `${DESIGN_ENGINE_URL}/embed` +
       `?templates=${encodeURIComponent(templateIds)}` +
-      `&products_meta=${productsMeta}` +
+      `&products_data=${productsData}` +
       `&callback_url=${encodeURIComponent(callbackUrl)}`;
   }
 

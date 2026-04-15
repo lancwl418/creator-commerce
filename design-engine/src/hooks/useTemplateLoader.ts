@@ -96,8 +96,8 @@ export function useTemplateLoader() {
 
 /**
  * Portal mode handler:
- * 1. Fetch all Shopify & ERP products
- * 2. Match the Portal-selected template IDs
+ * 1. If portalProducts are provided (from catalog), convert directly — no ERP fetch
+ * 2. Otherwise fetch all Shopify & ERP products and match by ID
  * 3. Add matched products to multi-product store
  * 4. Auto-add artwork layer to the first product
  */
@@ -108,40 +108,45 @@ async function handlePortalMode(
   const portalIds = config.portalTemplateIds ?? [];
   const artworkUrl = config.artworkUrl;
 
-  // Fetch all external products
-  await fetchExternalProducts(appendTemplates);
+  let matched: ProductTemplate[] = [];
 
-  // Now find the matching templates from the store
-  const allTemplates = useProductStore.getState().templates;
-  const matched: ProductTemplate[] = [];
-
-  for (const id of portalIds) {
-    // Try exact match first
-    let found = allTemplates.find((t) => t.id === id);
-
-    // Try matching by Shopify product ID in metadata
-    if (!found && id.startsWith('shopify-')) {
-      const shopifyId = id.replace('shopify-', '');
-      found = allTemplates.find(
-        (t) => t.metadata?.shopifyProductId?.toString() === shopifyId
-      );
+  if (config.portalProducts && config.portalProducts.length > 0) {
+    // Products passed directly from Portal — convert without fetching
+    const converted = convertErpProducts(config.portalProducts);
+    if (converted.length > 0) {
+      appendTemplates(converted);
+      matched = converted;
     }
+  } else {
+    // Legacy flow: fetch all products and match by ID
+    await fetchExternalProducts(appendTemplates);
 
-    // Try matching by ERP product ID in metadata
-    if (!found && id.startsWith('erp-')) {
-      const erpId = id.replace('erp-', '');
-      found = allTemplates.find(
-        (t) => t.metadata?.erpProductId?.toString() === erpId ||
-               t.metadata?.itemNo === erpId
-      );
+    const allTemplates = useProductStore.getState().templates;
+
+    for (const id of portalIds) {
+      let found = allTemplates.find((t) => t.id === id);
+
+      if (!found && id.startsWith('shopify-')) {
+        const shopifyId = id.replace('shopify-', '');
+        found = allTemplates.find(
+          (t) => t.metadata?.shopifyProductId?.toString() === shopifyId
+        );
+      }
+
+      if (!found && id.startsWith('erp-')) {
+        const erpId = id.replace('erp-', '');
+        found = allTemplates.find(
+          (t) => t.metadata?.erpProductId?.toString() === erpId ||
+                 t.metadata?.itemNo === erpId
+        );
+      }
+
+      if (found) matched.push(found);
     }
-
-    if (found) matched.push(found);
   }
 
   if (matched.length === 0) {
     console.warn('[TemplateLoader] No matching templates found for Portal IDs:', portalIds);
-    // Fall through — editor will show all products for manual selection
     return;
   }
 

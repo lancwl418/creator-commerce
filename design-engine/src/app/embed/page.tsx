@@ -14,9 +14,22 @@ function EmbedPageInner() {
     const artworkUrl = params.get('artwork_url');
     if (templates) {
       const templateIds = decodeURIComponent(templates).split(',').filter(Boolean);
+
+      // Parse raw ERP product data if passed from Portal catalog
+      let portalProducts;
+      const productsData = params.get('products_data');
+      if (productsData) {
+        try {
+          portalProducts = JSON.parse(decodeURIComponent(productsData));
+        } catch {
+          console.warn('[Embed] Failed to parse products_data param');
+        }
+      }
+
       return {
         mode: 'portal' as const,
         portalTemplateIds: templateIds,
+        portalProducts,
         artworkUrl: artworkUrl ? decodeURIComponent(artworkUrl) : undefined,
         designId: params.get('design_id') || undefined,
       };

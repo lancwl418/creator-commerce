@@ -116,26 +116,16 @@ export default function CatalogPage() {
 
     const selected = state.products.filter((p) => selectedIds.has(p.id));
     const templateIds = selected.map((p) => `erp-${p.id}`).join(',');
-    const productsMeta = encodeURIComponent(
-      JSON.stringify(
-        selected.map((p) => ({
-          id: `erp-${p.id}`,
-          name: p.itemEnName || p.title || p.itemCnName,
-          base_cost: p.prodSkuList?.[0]?.price ?? 0,
-          source: 'erp',
-          thumbnail: p.mainPic
-            ? `/api/erp/image?path=${encodeURIComponent(p.mainPic)}`
-            : null,
-        }))
-      )
-    );
+
+    // Pass full ERP product data so Design Engine doesn't need to re-fetch
+    const productsData = encodeURIComponent(JSON.stringify(selected));
 
     const callbackUrl = `${window.location.origin}/dashboard/products/import`;
 
     const editorUrl =
       `${DESIGN_ENGINE_URL}/embed` +
       `?templates=${encodeURIComponent(templateIds)}` +
-      `&products_meta=${productsMeta}` +
+      `&products_data=${productsData}` +
       `&callback_url=${encodeURIComponent(callbackUrl)}`;
 
     window.location.href = editorUrl;
