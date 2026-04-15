@@ -242,7 +242,7 @@ export default function ImportFromEditorPage() {
           return (
             <Link
               key={product.id}
-              href={`/dashboard/products/${product.id}`}
+              href={`/dashboard/products/${product.id}?from=import`}
               className="group flex gap-5 rounded-2xl border border-border bg-white p-5 hover:shadow-lg hover:shadow-gray-200/50 transition-all duration-200"
             >
               {/* Preview */}

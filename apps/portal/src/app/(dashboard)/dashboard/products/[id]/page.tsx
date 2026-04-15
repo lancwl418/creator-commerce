@@ -2,13 +2,17 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import ProductEditor from './ProductEditor';
+import { BackButton } from './BackButton';
 
 export default async function ProductDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
+  const { from } = await searchParams;
   const supabase = await createClient();
 
   const { data: product } = await supabase
@@ -36,7 +40,11 @@ export default async function ProductDetailPage({
   return (
     <div>
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-5">
-        <Link href="/dashboard/products" className="hover:text-primary-600 transition-colors">Created Products</Link>
+        {from === 'import' ? (
+          <BackButton />
+        ) : (
+          <Link href="/dashboard/products" className="hover:text-primary-600 transition-colors">Created Products</Link>
+        )}
         <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
         </svg>
