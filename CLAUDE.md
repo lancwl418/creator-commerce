@@ -7,8 +7,23 @@
 **本项目 (creator-commerce) 聚焦于 Creator Commerce 系统的开发**，包含 Creator Portal、Admin 管理后台和 Design Engine 三部分。
 
 - **ERP 是已有的独立系统**（Java 开发，有自己的数据库），不在本项目范围内。本项目通过调用 ERP API 获取产品/SKU/模板数据、推送订单、查询结算，**绝不直连 ERP 数据库**。
-- **Design Engine（设计器）已有 Node.js MVP**，能同步 ERP 产品数据、编辑设计、生成预览图、导出 JSON。尚未与 ERP 打通 API，下一步重点是补 API 层（保存 product_configuration 到数据库、preview/print file 写入存储）。
+- **Design Engine（设计器）已有 Node.js MVP**，能同步 ERP 产品数据、编辑设计、生成预览图、导出 JSON。是**共享工具层**，Shopify 主站和 Creator Portal 均可调用。
 - **两个系统只认 API 契约，不认数据库。** ERP 内部怎么改表结构不影响我们，我们怎么改也不影响 ERP。
+
+### 全局系统定位
+
+ERP Core 是整个业务的数据底座，向上支撑三个面向不同用户群体的前端系统：
+
+| | Shopify 主站 | Creator Commerce | 中国卖家 Portal |
+|---|---|---|---|
+| **目标用户** | C端消费者、无店铺 Distributor、Print Shop | Designer、有店铺 Distributor | 中国跨境卖家 |
+| **核心需求** | 购物/定制下单、B2B采购 | 上传设计稿/设计器、同步到自己店铺/看收益 | 多店铺管理、供应链外包 |
+| **设计器** | 需要（嵌入主站） | 需要 | 不需要 |
+| **渠道同步** | 不需要 | Shopify / Etsy / TikTok Shop | 自建独立站 |
+| **收益结算** | 无（直接采购） | 差价 / Royalty | 净收入（扣5%平台费） |
+| **现阶段方案** | 已有 Shopify 店铺 | **完整开发（本项目）** | 独立开发 |
+
+**Creator Commerce 是本项目的全部范围。** Shopify 主站已有，中国卖家 Portal 独立开发，不在本 repo。
 
 ### 项目结构：Monorepo
 
@@ -42,7 +57,7 @@ creator-commerce/                  ← 本 repo
 └── turbo.json                     ← turborepo 构建配置
 ```
 
-**Monorepo 只管源码协作，部署完全独立。** 每个 app / design-engine 有自己的 Dockerfile、独立域名、独立 CI/CD。其他系统复用 Design Engine 时，嵌入的是 `editor.yourdomain.com` 这个部署产物，不需要访问源码。
+**Monorepo 只管源码协作，部署完全独立。** 每个 app / design-engine 有自己的 Dockerfile、独立域名、独立 CI/CD。
 
 ### 关键技术决策
 
@@ -52,10 +67,11 @@ creator-commerce/                  ← 本 repo
 | **数据库策略** | 两个独立数据库：ERP 自己的 DB（已有，不动）+ Creator Commerce DB（**Supabase**，PostgreSQL 全兼容，Portal + Admin + Design Engine 共享） |
 | **Supabase 使用范围** | Auth（Creator 注册/登录）、Storage（artwork/preview/print file 存储）、Database（全部业务表）、RLS（按 creator 隔离数据） |
 | **技术栈** | Creator Commerce 全栈 Node.js/TypeScript，ERP 是 Java，不强制统一，通过 REST API 通信 |
-| **ERP Partner 创建时机** | 懒创建：Creator 注册时不创建 ERP partner 记录，**首次发布产品时**才调 ERP API 创建 partner 并回写 `erp_partner_id` |
-| **SKU 策略** | Creator 创建可售产品时默认包含该模板所有 SKU，Creator 可取消勾选不想卖的 SKU |
+| **ERP Customer 创建时机** | Creator/Distributor 审核通过后在 ERP 创建 customer 记录（customerType=creator/distributor），回写 `erpCustomerId` |
+| **SKU 策略** | 定制 SKU 单独建 `custom_product_skus` 表，与 ERP 原有 `prodSkuList`（blank SKU）严格分开。审核通过后回写 ERP 创建定制 SKU |
+| **Creator 在 ERP 中的身份** | ERP `customers` 表通过 `customerType` 字段区分（creator / distributor / cn_seller / end_consumer），不单独建 module |
 | **系统间通信** | Creator Commerce ↔ ERP 完全通过 ERP REST API，不直连数据库 |
-| **Design Engine 复用** | 独立部署独立 URL，其他系统通过 iframe + API 接入，无需访问源码；未来可提取 npm SDK |
+| **Design Engine 复用** | 独立部署独立 URL，Shopify 主站和 Creator Portal 均可通过 iframe + API 接入 |
 
 ---
 
@@ -66,59 +82,64 @@ creator-commerce/                  ← 本 repo
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        External Channels                            │
-│    Shopify (Our)  │  Creator Shopify  │  TikTok Shop/Etsy (Future)  │
+│    Shopify (Our)  │  Creator Shopify/Etsy  │  TikTok Shop (Future)  │
 └────────────┬───────────┴────────┬──────────┴────────┬───────────────┘
              │                    │                    │
              ▼                    ▼                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    Channel Sync Gateway                             │
 │        (统一渠道适配层: listing 推送 / 订单回流 / 库存同步)           │
-│                                                                     │
-│   本质：ERP Core 与外部渠道之间的桥梁                                │
-│   所有 Shopify store（无论我方还是 Creator 的）都是"外部渠道"         │
-│   区别仅在于使用哪套 store credentials                               │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
-                             │ 直接对接 ERP Core
-                             │ (listing数据从ERP取, 订单写回ERP)
-                             │
 ┌──────────────┐   ┌─────────────────┐   ┌──────────────────┐
-│              │   │                 │   │                  │
 │   Creator    │◄─►│  Design Engine  │   │    ERP Core      │
-│   Portal     │   │   (Layer 2)     │   │    (Layer 1)     │
-│  (Layer 3)   │   │                 │   │                  │
-│              │   │  ● 设计编辑     │   │  ● 产品/SKU      │◄──┘
-│  ● Onboard   │   │  ● 模板适配     │   │  ● 库存管理      │
-│  ● 上传作品  │   │  ● Mockup生成   │   │  ● 订单/履约     │
-│  ● 选品建品  │   │  ● Print File   │   │  ● 发货/物流     │
-│  ● 渠道分发  │   │  ● 图层/区域    │   │  ● 客户管理      │
-│  ● 收入查看  │   │  ● Session管理  │   │  ● 财务结算      │
-│  ● Store连接 │   │                 │   │  ● Payout Ledger │
-│              │   │                 │   │                  │
-└──────┬───────┘   └────────┬────────┘   └────────┬─────────┘
-       │                    │                      │
-       └────────────────────┼──────────────────────┘
-                            ▼
-                ┌───────────────────────┐
-                │   Shared Services     │
-                │  ● Auth / IAM         │
-                │  ● File Storage (S3)  │
-                │  ● Event Bus          │
-                │  ● Job Queue          │
-                │  ● Notification       │
-                └───────────────────────┘
+│   Portal     │   │  (共享工具层)    │   │   (数据底座)      │
+│  + Admin     │   │                 │   │                  │
+│              │   │  ● 设计编辑     │   │  ● 产品/SKU      │
+│  ● Onboard   │   │  ● 印刷区域适配 │   │  ● 库存管理      │
+│  ● 上传设计  │   │  ● Mockup生成   │   │  ● 订单/履约     │
+│  ● 选品建品  │   │  ● Print File   │   │  ● 客户管理      │
+│  ● 渠道分发  │   │  ● Session管理  │   │  ● 财务结算      │
+│  ● 收入查看  │   │                 │   │                  │
+└──────────────┘   └─────────────────┘   └──────────────────┘
 ```
 
-**核心认知：所有 Shopify store 对系统而言都是"外部渠道"。Channel Sync Gateway 的职责是作为 ERP 的渠道出口/入口，而非 store 与 store 之间的桥梁。**
+### 用户角色与系统归属
 
-### 三层职责定义
+| 角色 | 有无店铺 | 归属系统 | 发布到我们平台 | 核心流程 |
+|------|---------|---------|--------------|---------|
+| Designer（无店铺） | 无 | Creator Commerce | 可以 | 上传设计稿 → 我们选品上架 → 收 Royalty |
+| Designer（有店铺） | 有 | Creator Commerce | 可以 | 上传设计稿 → 设计器 → 自己店铺 + 我们平台，两种模式可并行 |
+| Distributor（有店铺） | 有 | Creator Commerce | **不可以** | 上传设计稿（可选）→ 设计器 → 同步到自己店铺 → 收差价 |
+| Distributor（无店铺） | 无 | Shopify 主站 | 不适用 | 直接在 Shopify 浏览产品 → 加购下单 → ERP 履约 |
 
-| 层级 | 系统 | 核心职责 | 数据所有权 |
-|------|------|---------|-----------|
-| **Layer 1** | ERP Core | 业务真相源：产品、SKU、库存、订单、履约、财务 | 拥有所有交易数据和结算数据。**不拥有设计内容**，仅存储 print_file_url 等引用 |
-| **Layer 2** | Design Engine | 可复用设计能力：编辑器、模板适配、preview/print 生成 | 拥有设计配置（product_configurations）、编辑 session、生成产物（preview/print file） |
-| **Layer 3** | Creator Portal | Creator 体验层：onboarding、内容管理、选品、分发、收入 | 拥有 creator 身份、**设计内容管理**（designs、versions、assets、tags、状态流转）、渠道偏好、listing 配置 |
-| **Layer 3** | Admin 管理后台 | 内部运营层：creator 审核、设计审核、内容管理、订单查看、结算确认、运营配置 | 与 Portal 共享同一 Creator Commerce DB，但独立部署、独立权限体系 |
+**Creator Commerce 内部权限差异：**
+
+| 用户类型 | 准入方式 | My Designs 模块 | Product Catalog | 使用设计器 | Request Promotion（自营线） | 同步到自己店铺 |
+|---------|---------|----------------|----------------|-----------|--------------------------|--------------|
+| Designer | 邀请/申请制，Admin 审核 | **可见** | 可见 | 可以 | **可以** | 可以 |
+| Distributor（有店铺） | 注册（轻量审核） | **不可见** | 可见 | 可以 | **不可以** | 可以 |
+
+Designer 和 Distributor 共用同一套系统，区别仅 `userType` 字段控制模块可见性和自营线权限。
+
+### 三条业务线
+
+| | 自营线 (Operator) | Creator 线 | Distributor 线 |
+|---|---|---|---|
+| **选品决策** | Admin Portal 选设计稿 + ERP 产品 | Creator 从 Admin 开放的产品池自选 | Distributor 自选产品（设计稿可选） |
+| **上架渠道** | 我们自己的 Shopify | Creator 自己的店铺 | Distributor 自己的店铺 |
+| **收益模型** | 设计师收 Royalty（固定比例） | 设计师收差价（售价 − 供应链成本） | Distributor 收差价（售价 − 供应链成本） |
+| **发布到我们平台** | 是（Admin 主导） | 是（设计师可选） | **否**（只能同步到自己店铺） |
+| **设计稿来源** | Admin 选用设计师作品 | Designer 上传 | Distributor 自己上传（可选）或直接选 blank |
+
+### 层级职责定义
+
+| 层级 | 系统 | 使用方 | 核心职责 |
+|------|------|-------|---------|
+| **Layer 1** | ERP Core | 内部系统 | 产品、SKU、订单、履约、客户、财务结算 — 唯一数据真相，永不对外暴露 |
+| **Layer 2** | Design Engine | Shopify主站 / Creator Portal | 可复用共享工具层：印刷区域适配、预览生成、print file 输出 |
+| **Layer 3** | Admin Portal | 内部运营团队 | 审核设计稿、选品决策、管理客户分组、控制产品池可见性 |
+| **Layer 4** | Creator Portal | Designer / Distributor | 上传设计稿、选产品、调设计器、连店铺、看收益 |
 
 ### 系统间通信原则
 
@@ -133,9 +154,10 @@ creator-commerce/                  ← 本 repo
 
 **关键原则：**
 1. **Creator Portal 绝不直接写入 ERP 核心表**，所有写入通过 API 或 Event 传递，ERP 做最终校验和写入。
-2. **Design 内容管理不进 ERP。** Creator 上传的作品（designs、design_versions、design_assets、design_tags）及其状态流转（draft → review → published）属于创作生命周期，由 Creator Portal 管理。Design Engine 负责设计配置和生成产物（preview/print file）。ERP 仅在履约时通过引用（print_file_url + sku_id）获取生产所需文件，**存引用，不存内容**。
-3. **ERP 订单必须携带完整溯源链路。** 每笔订单/订单行进入 ERP 时，必须记录 partner_id、design_id、channel_listing_id、print_file_url 等关键引用。ERP 需要知道"这是哪个合作伙伴的哪个设计、从哪个渠道卖出的"，以支撑按 partner 结算、按 design 统计销量、按渠道拆分收入、生产时定位印刷文件。这些字段在 order_item 上做快照冗余，避免结算和报表时反查外部系统。
-4. **Creator 在 ERP 中是一种 partner 类型，不单独建 module。** ERP 通过通用的 `partners` 表管理所有合作伙伴（creator / reseller / wholesaler / affiliate 等），每个 partner 有各自的 settlement_terms。Creator 的身份信息、profile、onboarding、store 连接等全部由 Creator Commerce 系统管理，ERP 只关心"钱"和"货"。
+2. **Design 内容管理不进 ERP。** Creator 上传的作品（designs、design_versions）及其状态流转属于创作生命周期，由 Creator Portal 管理。ERP 仅在履约时通过引用（print_file_url + sku_id）获取生产所需文件，**存引用，不存内容**。
+3. **ERP 订单必须携带完整溯源链路。** 每笔 order_item 上冗余快照 customerId、designId、printFileUrl、printConfigSnapshot 等字段，ERP 自身即可完成结算、报表和生产。
+4. **Creator/Distributor 在 ERP 中是 customer 的一种类型。** ERP 通过 `customers` 表的 `customerType` 字段区分（creator / distributor / cn_seller / end_consumer）。Creator Commerce 管理身份、profile、onboarding、store 连接等，ERP 只关心"钱"和"货"。
+5. **审核通过后才回写 ERP。** published_products status=approved 后才调 ERP API 创建定制 SKU，避免无效 SKU 污染 ERP 数据。
 
 ---
 
@@ -145,64 +167,84 @@ creator-commerce/                  ← 本 repo
 
 | 模块 | 职责 | 不负责 |
 |------|------|-------|
-| Product Management | 产品定义、产品模板、SKU 管理、定价基准 | 不负责 creator 设计内容（artwork、design 版本/状态/标签等均由 Creator Commerce 管理） |
+| Product Management | 产品定义、SKU 管理（含 `isCustomizable`、`printTechniques` 扩展）、定价基准 | 不负责 creator 设计内容 |
+| Print Areas | 产品印刷区域配置（`print_areas` 表，含像素+毫米双维度） | 不负责编辑器内部逻辑 |
+| Customer Management | 统一客户管理：`customerType` 区分 creator/distributor/cn_seller/end_consumer | 不负责 creator 的 profile、onboarding、store 连接 |
+| Customer Groups | 客户分组（wholesale/creator/distributor 等）、分组定价（`product_group_pricing`） | 不负责产品池可见性规则的管理界面 |
 | Inventory | 库存数量、仓库管理、库存预留 | 不负责渠道 listing 状态 |
-| Order Management | 订单创建、状态流转、拆单合单 | 不负责 creator 前端订单展示逻辑 |
+| Order Management | 订单创建（含 `orderType`/`sourceChannel` 扩展）、状态流转 | 不负责 creator 前端订单展示 |
 | Fulfillment | 拣货、包装、发货、物流跟踪 | 不负责渠道同步 |
-| Customer | 客户信息、地址管理 | 不负责 creator 身份管理 |
-| **Partner Management** | **通用合作伙伴管理：partner 记录、类型（creator/reseller/...）、settlement terms、打款账户** | **不负责 creator 的 profile、onboarding、store 连接等（均由 Creator Commerce 管理）** |
-| Finance / Settlement | Payout Ledger、Settlement Ledger、按 partner 的 settlement terms 计算 | 不负责 creator 端的收入展示聚合 |
+| Finance / Settlement | 按 customer 的 commission_rules 计算结算 | 不负责 creator 端的收入展示聚合 |
 
 ### B.2 Design Engine 模块清单
 
 | 模块 | 职责 | 不负责 |
 |------|------|-------|
 | Editor Core | Canvas 编辑器、图层管理、变换操作 | 不负责业务流程（发布、定价） |
-| Template Service | 产品模板管理、印刷区域定义、safe zone | 不负责产品的商业属性（价格、SKU） |
+| Template Service | 从 ERP 读取产品模板和印刷区域配置 | 不负责产品的商业属性（价格、SKU） |
 | Session Manager | 编辑 session 创建/恢复/保存 | 不负责 creator 身份验证 |
 | Preview Generator | Mockup 合成、多角度预览图生成 | 不负责 listing 封面图管理 |
 | Print File Generator | 印刷文件生成、色彩转换、DPI 适配 | 不负责印刷下单 |
-| Asset Storage | 设计产物（preview/print file）存储管理 | 不负责原始 artwork 管理 |
 
 ### B.3 Creator Portal 模块清单
 
-| 模块 | 职责 | 不负责 |
-|------|------|-------|
-| Auth & Onboarding | Creator 注册/登录、资料完善、审核流程 | 不负责内部员工身份 |
-| Design Management | Artwork 上传、元数据编辑、状态管理（草稿→发布） | 不负责设计编辑（由 Design Engine 处理） |
-| Product Builder | 选择产品模板、关联 design、创建可售产品实例 | 不负责产品模板定义（来自 ERP） |
-| Design Editor Integration | 嵌入 Design Engine、传递上下文、接收保存结果 | 不负责编辑器内部逻辑 |
-| Channel Distribution | 渠道选择、per-channel 定价、发布/同步触发 | 不负责渠道 API 对接（由 Sync Gateway 处理） |
-| Dashboard & Analytics | 收入总览、设计表现、渠道对比、Top Selling | 不负责底层财务计算 |
-| Store Connection | OAuth 连接 creator 自有 store、同步状态管理 | 不负责 store 内的运营管理 |
-| Earnings & Payouts | 收入明细展示、Payout 状态查看、提现申请 | 不负责结算计算（来自 ERP Finance） |
+> Portal 侧边栏根据 `userType` 动态显示模块。Designer 看到完整模块，Distributor 不显示 My Designs。
+
+| 模块 | 职责 | 可见性 | 不负责 |
+|------|------|--------|-------|
+| Auth & Onboarding | Creator/Distributor 注册/登录、资料完善、审核流程 | 全部 | 不负责内部员工身份 |
+| **My Designs**（仅 Designer） | 设计稿上传、版本管理、状态查看。每个 design 详情页提供两个操作入口：① **Request Promotion**（提交自营线，Admin 选品）② **Create Product**（自建商品，进入产品创建流程） | designer | 不负责设计编辑（由 Design Engine 处理） |
+| **Product Catalog** | 商城式展示 ERP 所有可用产品（受 product_visibility_rules 控制），按类别浏览，支持多选产品后进入 Design Editor 上传设计 | 全部 | 不负责产品模板定义（来自 ERP） |
+| **Created Products** | 已创建的 published_products 列表页（显示产品信息、状态、渠道），点击进详情 | 全部 | 不负责 ERP 侧产品定义 |
+| Design Editor Integration | 嵌入 Design Engine、传递上下文、接收保存结果 | 全部 | 不负责编辑器内部逻辑 |
+| Channel Distribution | 渠道选择、per-variant 定价（`channel_listing_variants`）、发布/同步触发 | 全部 | 不负责渠道 API 对接（由 Sync Gateway 处理） |
+| Dashboard & Analytics | 收入总览、设计表现、渠道对比 | 全部 | 不负责底层财务计算 |
+| Store Connection | OAuth 连接 creator/distributor 自有 store | 全部 | 不负责 store 内的运营管理 |
+| Earnings & Payouts | 收入明细展示、Payout 状态查看 | 全部 | 不负责结算计算 |
+
+**Portal 侧边栏结构：**
+```
+Designer 视角:                    Distributor 视角:
+├── Dashboard                     ├── Dashboard
+├── My Designs  ← 仅 Designer    ├── Product Catalog
+├── Product Catalog               ├── Created Products
+├── Created Products              ├── My Store
+├── My Store                      └── Earnings
+└── Earnings
+```
+
+**两种建品入口：**
+- **从 My Designs 进入**（Designer 专属）：design 详情页 → "Create Product" → 选产品模板 → Design Editor → 创建 published_product
+- **从 Product Catalog 进入**（全部用户）：浏览商品 → 多选产品 → Design Editor（上传/应用设计）→ 创建 published_product
 
 ### B.4 Admin 管理后台模块清单
 
-> Admin 和 Portal 是**两个独立 app**，共享同一个 Creator Commerce DB 和后端 API。Admin 面向内部运营团队，拥有最高权限。部署在内网或需要内部 SSO 认证。
+> Admin 和 Portal 共享同一个 Creator Commerce DB 和后端 API，权限在应用层隔离。Admin 面向内部运营团队。
 
 | 模块 | 职责 | 不负责 |
 |------|------|-------|
-| Creator 管理 | 查看所有 creator 列表、审核注册申请、暂停/封禁 creator、编辑 creator 信息 | 不负责 creator 自助注册流程 |
-| 设计审核 | 审核 creator 提交的 design（通过/拒绝/打回）、内容合规检查 | 不负责设计编辑 |
-| 产品管理 | 查看所有 sellable product instances、强制下架违规产品 | 不负责产品模板定义（来自 ERP） |
-| 渠道监控 | 查看所有 channel listings 状态、sync job 成功/失败/重试、强制重新同步 | 不负责渠道 adapter 开发 |
-| 订单查看 | 按 creator 维度查看订单、订单状态追踪（数据从 ERP API 读取） | 不负责订单处理和履约 |
-| 结算管理 | 查看 earnings 明细、确认/调整 payout、触发打款（调 ERP API） | 不负责结算计算逻辑 |
-| 运营配置 | Royalty rate、service fee rate、产品模板上下架、审核规则等运营参数 | 不负责系统级基础设施配置 |
-| 数据看板 | 全局 creator 数据总览、GMV、活跃 creator 数、渠道 GMV 对比 | 不负责 creator 个人视角的展示 |
+| Creator 管理 | 查看所有 creator/distributor 列表、审核注册申请、暂停/封禁 | 不负责自助注册流程 |
+| 设计审核 | 审核 design（通过/拒绝/打回）、内容合规检查 | 不负责设计编辑 |
+| **自营选品（curation_decisions）** | **Admin 选设计稿 + 产品组合，reason 字段 Day 1 必填（AI 训练数据）** | 不负责 creator 自主发布 |
+| 产品池管理 | 配置 `product_visibility_rules`，控制哪些产品开放给哪类用户 | 不负责产品模板定义（来自 ERP） |
+| 产品管理 | 查看所有 published_products、审核产品、强制下架违规产品 | 不负责 ERP 侧产品定义 |
+| 渠道监控 | 查看所有 channel listings 状态、sync job 管理 | 不负责渠道 adapter 开发 |
+| 订单查看 | 按 creator 维度查看订单（数据从 ERP API 读取） | 不负责订单处理和履约 |
+| 结算管理 | 查看 earnings 明细、确认/调整 payout、触发打款 | 不负责结算计算逻辑 |
+| 运营配置 | Royalty rate、service fee rate、产品池可见性规则 | 不负责系统级基础设施配置 |
+| 数据看板 | 全局总览（GMV、活跃 creator、渠道对比） | 不负责 creator 个人视角展示 |
 
 ### B.5 Channel Sync Gateway
 
-**定位：Channel Sync Gateway 是 ERP Core 的渠道出口/入口。** 所有外部 Shopify store（无论我方还是 Creator 的）对系统而言都是"外部渠道"。Gateway 的数据源头是 ERP，区别仅在于推送到哪个 store、使用哪套 credentials。
+**定位：ERP Core 的渠道出口/入口。** 所有外部 store 对系统而言都是"外部渠道"。Gateway 数据源头是 ERP，区别仅在于推送到哪个 store、使用哪套 credentials。
 
 | 模块 | 职责 |
 |------|------|
-| Shopify Adapter | 统一的 Shopify 渠道适配器：从 ERP 读取产品/SKU/库存 → 推送到目标 Shopify store；从 Shopify 拉取订单 → 写入 ERP。我方 store 和 Creator store 共用同一个 adapter，仅 credentials 不同 |
-| Channel Router | 根据 channel_type + store_connection 路由到对应 adapter，传入正确的 credentials |
+| Shopify Adapter | 统一的 Shopify 渠道适配器，我方 store 和 Creator store 共用，仅 credentials 不同 |
+| Channel Router | 根据 channel_type + store_connection 路由到对应 adapter |
 | Sync Job Manager | 同步任务队列、重试、状态追踪、错误处理 |
-| Order Ingestion | 外部渠道订单标准化 → 调用 ERP API 创建订单、预留库存、触发履约 |
-| Webhook Handler | 接收外部渠道 webhook（订单创建/更新、库存变更），转换后写入 ERP |
+| Order Ingestion | 外部渠道订单标准化 → 调用 ERP API 创建订单 |
+| Webhook Handler | 接收外部渠道 webhook，转换后写入 ERP |
 
 ---
 
@@ -211,844 +253,568 @@ creator-commerce/                  ← 本 repo
 ### C.1 核心概念关系图
 
 ```
-Design（创作资产）
-  │
-  │  creator 选择产品模板
-  ▼
-Product Template（产品模板，来自 ERP）
-  │
-  │  design + template → 进入编辑器配置
-  ▼
-Product Configuration（设计在产品上的配置：位置、缩放、旋转）
-  │
-  │  configuration → 生成可售实体
-  ▼
-Sellable Product Instance（可售产品实例）
-  │
-  │  instance → 分发到渠道
-  ▼
-Channel Listing（某渠道中的 listing，含独立价格）
-  │
-  │  listing 产生销售
-  ▼
-Order → Order Item → Earnings → Payout
+入口 A（Designer: My Designs）          入口 B（Product Catalog）
+Design（设计稿上传）                    ERP Product（商城浏览，按类别）
+  │                                       │
+  │  "Create Product"                     │  多选产品 → Design Editor
+  │  或 "Request Promotion"               │  上传/应用设计
+  ▼                                       ▼
+         Design + ERP Product（含 print_areas）
+                    │
+                    │  Design Editor 编辑 → editor_sessions
+                    ▼
+         Published Product（可售产品实体，含 printConfig）
+                    │
+                    │  生成定制 SKU（每个 variant 一条 custom_product_skus）
+                    │  审核通过 → 回写 ERP 创建定制 SKU
+                    ▼
+         Channel Listing + Channel Listing Variants（各 variant 独立定价）
+                    │
+                    │  listing 产生销售
+                    ▼
+         Order → Order Item → creator_earnings → creator_payouts
 ```
 
-**这四层抽象（Design → Template → Configuration/Instance → Listing）是系统最核心的数据主线，必须严格分离。**
-
-**ERP 溯源链路：** 当订单进入 ERP 时，order_item 上冗余快照以下字段，确保 ERP 自身即可完成结算、报表和生产，无需反查 Creator Portal 或 Design Engine：
-
-```
-order_item
-  ├── partner_id          → 哪个合作伙伴（ERP partners 表，type='creator'）
-  ├── design_id           → 哪个设计（外部引用，ERP 不存设计内容）
-  ├── design_version_id   → 下单时的设计版本
-  ├── product_template_id → 基于哪个产品模板
-  ├── channel_type        → 从哪个渠道卖出 (marketplace / creator_store)
-  ├── channel_listing_id  → 具体 listing
-  ├── print_file_url      → 生产用的印刷文件
-  ├── unit_price          → 售价快照
-  └── unit_cost           → 成本快照
-```
-
-### C.2 ERP Core Tables
-
-#### partners
-
-> Creator 在 ERP 中不单独建 module，而是作为通用合作伙伴的一种类型。
-> 未来 reseller、wholesaler、affiliate 等都复用同一张表。
-
-```sql
-CREATE TABLE partners (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    external_id         UUID,                       -- 外部系统 ID（如 Creator Commerce 中的 creator_id）
-    type                VARCHAR(30) NOT NULL,       -- 'creator' / 'reseller' / 'wholesaler' / 'affiliate'
-    name                VARCHAR(255) NOT NULL,
-    email               VARCHAR(255),
-    status              VARCHAR(20) DEFAULT 'active',  -- active / suspended / terminated
-    settlement_terms    JSONB NOT NULL DEFAULT '{}',
-    -- settlement_terms 示例:
-    -- Creator (marketplace): {"model": "royalty", "royalty_rate": 0.15}
-    -- Creator (own store):   {"model": "margin", "service_fee_rate": 0.05}
-    -- Reseller:              {"model": "wholesale", "discount_rate": 0.40}
-    payment_info        JSONB DEFAULT '{}',         -- 打款账户信息（加密存储）
-    -- {"method": "stripe_connect", "account_id": "acct_xxx"}
-    -- {"method": "paypal", "email": "xxx@xxx.com"}
-    metadata            JSONB DEFAULT '{}',
-    created_at          TIMESTAMPTZ DEFAULT now(),
-    updated_at          TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_partners_type ON partners(type);
-CREATE INDEX idx_partners_external_id ON partners(external_id);
-```
-
-#### products
-
-```sql
-CREATE TABLE products (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name            VARCHAR(255) NOT NULL,
-    description     TEXT,
-    category        VARCHAR(100),          -- e.g. 'apparel', 'drinkware', 'accessories'
-    base_cost       DECIMAL(10,2),         -- 我方生产/采购成本
-    status          VARCHAR(20) DEFAULT 'active',  -- active / discontinued
-    metadata        JSONB DEFAULT '{}',
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### product_templates
-
-```sql
-CREATE TABLE product_templates (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id      UUID NOT NULL REFERENCES products(id),
-    name            VARCHAR(255) NOT NULL,  -- e.g. 'Classic Tee - Front Print'
-    description     TEXT,
-    thumbnail_url   VARCHAR(500),
-    blank_mockup_url VARCHAR(500),          -- 空白产品底图
-    status          VARCHAR(20) DEFAULT 'active',
-    sort_order      INT DEFAULT 0,
-    metadata        JSONB DEFAULT '{}',     -- 尺寸规格、材质等
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### skus
-
-```sql
-CREATE TABLE skus (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id      UUID NOT NULL REFERENCES products(id),
-    sku_code        VARCHAR(100) UNIQUE NOT NULL,
-    attributes      JSONB NOT NULL DEFAULT '{}',  -- {"size": "L", "color": "Black"}
-    cost            DECIMAL(10,2),
-    weight_g        INT,
-    status          VARCHAR(20) DEFAULT 'active',
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### inventory
-
-```sql
-CREATE TABLE inventory (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sku_id          UUID NOT NULL REFERENCES skus(id),
-    warehouse_id    VARCHAR(50) NOT NULL,
-    quantity         INT NOT NULL DEFAULT 0,
-    reserved_qty    INT NOT NULL DEFAULT 0,   -- 已被订单预留
-    updated_at      TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(sku_id, warehouse_id)
-);
-```
-
-#### orders
-
-```sql
-CREATE TABLE orders (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    order_number    VARCHAR(50) UNIQUE NOT NULL,
-    source          VARCHAR(30) NOT NULL,      -- 'marketplace' / 'creator_store'
-    channel_type    VARCHAR(30),               -- 'our_shopify' / 'creator_shopify'
-    partner_id      UUID REFERENCES partners(id),  -- 关联的合作伙伴（creator/reseller 等，可为空：自营订单）
-    customer_id     UUID REFERENCES customers(id),
-    external_order_id VARCHAR(100),            -- 外部渠道订单号
-    status          VARCHAR(30) DEFAULT 'pending',  -- pending/confirmed/processing/shipped/delivered/cancelled
-    subtotal        DECIMAL(10,2),
-    shipping_cost   DECIMAL(10,2),
-    tax             DECIMAL(10,2),
-    total_amount    DECIMAL(10,2) NOT NULL,
-    currency        VARCHAR(3) DEFAULT 'USD',
-    shipping_address JSONB,
-    notes           TEXT,
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### order_items
-
-```sql
-CREATE TABLE order_items (
-    id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    order_id                    UUID NOT NULL REFERENCES orders(id),
-    sku_id                      UUID NOT NULL REFERENCES skus(id),
-    sellable_product_instance_id UUID REFERENCES sellable_product_instances(id),
-    channel_listing_id          UUID,
-
-    -- 溯源快照字段（冗余存储，避免结算/报表/生产时反查外部系统）
-    partner_id                  UUID,                 -- 快照：所属合作伙伴（ERP partners 表）
-    design_id                   UUID,                 -- 快照：来源 design（外部引用）
-    design_version_id           UUID,                 -- 快照：下单时的 design 版本
-    product_template_id         UUID,                 -- 快照：产品模板
-    channel_type                VARCHAR(30),           -- 快照：'marketplace' / 'creator_store'
-    print_file_url              VARCHAR(500),          -- 快照：印刷文件 URL，生产履约直接使用
-
-    quantity                    INT NOT NULL DEFAULT 1,
-    unit_price                  DECIMAL(10,2) NOT NULL,
-    unit_cost                   DECIMAL(10,2),        -- 快照：下单时成本
-    total_price                 DECIMAL(10,2) NOT NULL,
-    metadata                    JSONB DEFAULT '{}',
-    created_at                  TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_order_items_partner ON order_items(partner_id);
-CREATE INDEX idx_order_items_design ON order_items(design_id);
-```
-
-#### shipments
-
-```sql
-CREATE TABLE shipments (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    order_id        UUID NOT NULL REFERENCES orders(id),
-    tracking_number VARCHAR(100),
-    carrier         VARCHAR(50),
-    status          VARCHAR(30) DEFAULT 'pending',  -- pending/shipped/in_transit/delivered
-    shipped_at      TIMESTAMPTZ,
-    delivered_at    TIMESTAMPTZ,
-    metadata        JSONB DEFAULT '{}',
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### customers
-
-```sql
-CREATE TABLE customers (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email           VARCHAR(255),
-    name            VARCHAR(255),
-    phone           VARCHAR(50),
-    default_address JSONB,
-    metadata        JSONB DEFAULT '{}',
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### payout_ledger
-
-```sql
-CREATE TABLE payout_ledger (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    partner_id      UUID NOT NULL REFERENCES partners(id),
-    order_item_id   UUID REFERENCES order_items(id),
-    earning_type    VARCHAR(30) NOT NULL,    -- 'royalty' / 'margin' / 'bonus'
-    channel_type    VARCHAR(30) NOT NULL,    -- 'marketplace' / 'creator_store'
-    gross_amount    DECIMAL(10,2) NOT NULL,  -- 售价
-    cost_amount     DECIMAL(10,2) NOT NULL,  -- 成本
-    platform_fee    DECIMAL(10,2) DEFAULT 0, -- 平台抽成
-    net_amount      DECIMAL(10,2) NOT NULL,  -- partner 实得
-    currency        VARCHAR(3) DEFAULT 'USD',
-    status          VARCHAR(20) DEFAULT 'pending',  -- pending / settled / paid
-    period          VARCHAR(7),              -- e.g. '2026-03' 所属结算周期
-    created_at      TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_payout_ledger_partner ON payout_ledger(partner_id);
-```
-
-#### settlement_ledger
-
-```sql
-CREATE TABLE settlement_ledger (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    partner_id      UUID NOT NULL REFERENCES partners(id),
-    period          VARCHAR(7) NOT NULL,     -- '2026-03'
-    total_earnings  DECIMAL(10,2) NOT NULL,
-    deductions      DECIMAL(10,2) DEFAULT 0,
-    net_payout      DECIMAL(10,2) NOT NULL,
-    status          VARCHAR(20) DEFAULT 'pending',  -- pending / processing / paid / failed
-    payment_method  VARCHAR(30),
-    payment_ref     VARCHAR(200),            -- 支付平台交易号
-    paid_at         TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### C.3 Creator Tables (归属 Creator Commerce 系统，非 ERP)
-
-> 以下表全部由 Creator Commerce 系统管理。Creator 的身份、资料、store 连接、收入展示都不进 ERP。
-> Creator 在 ERP 中仅对应 `partners` 表中一条 `type='creator'` 的记录。
-> `erp_partner_id` 懒创建：Creator 注册时为 NULL，首次发布产品时调 ERP API 创建 partner 并回写。
-
-#### creators
-
-```sql
-CREATE TABLE creators (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    erp_partner_id  UUID,                       -- 对应 ERP partners 表的 ID，首次发布产品时懒创建（注册时为 NULL）
-    email           VARCHAR(255) UNIQUE NOT NULL,
-    password_hash   VARCHAR(255),
-    status          VARCHAR(20) DEFAULT 'pending',  -- pending/active/suspended/banned
-    onboarding_step VARCHAR(30) DEFAULT 'profile',
-    agreed_terms_at TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_creators_erp_partner ON creators(erp_partner_id);
-```
-
-#### creator_profiles
-
-```sql
-CREATE TABLE creator_profiles (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_id      UUID UNIQUE NOT NULL REFERENCES creators(id),
-    display_name    VARCHAR(100) NOT NULL,
-    slug            VARCHAR(100) UNIQUE,       -- URL-friendly 唯一标识
-    bio             TEXT,
-    avatar_url      VARCHAR(500),
-    banner_url      VARCHAR(500),
-    social_links    JSONB DEFAULT '{}',        -- {"instagram": "...", "twitter": "..."}
-    country         VARCHAR(2),
-    timezone        VARCHAR(50),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### creator_store_connections
-
-```sql
-CREATE TABLE creator_store_connections (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_id      UUID NOT NULL REFERENCES creators(id),
-    platform        VARCHAR(30) NOT NULL,      -- 'shopify' / 'tiktok_shop' / 'etsy'
-    store_name      VARCHAR(255),
-    store_url       VARCHAR(500),
-    access_token    TEXT,                       -- 加密存储
-    refresh_token   TEXT,
-    token_expires_at TIMESTAMPTZ,
-    scopes          TEXT[],
-    status          VARCHAR(20) DEFAULT 'connected',  -- connected/disconnected/expired/error
-    last_sync_at    TIMESTAMPTZ,
-    metadata        JSONB DEFAULT '{}',
-    connected_at    TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(creator_id, platform)
-);
-```
-
-#### creator_earnings_summary (聚合视图，底层数据来自 ERP payout_ledger)
-
-> Creator Commerce 定期从 ERP 的 payout_ledger 同步/聚合数据到本地，用于 Dashboard 展示。
-> 这是一张**读优化的本地缓存表**，不是 source of truth（source of truth 在 ERP payout_ledger）。
-
-```sql
-CREATE TABLE creator_earnings_summary (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_id      UUID NOT NULL REFERENCES creators(id),
-    erp_partner_id  UUID NOT NULL,              -- 冗余：方便从 ERP 同步时匹配
-    period          VARCHAR(7) NOT NULL,        -- '2026-03'
-    channel_type    VARCHAR(30) NOT NULL,
-    total_orders    INT DEFAULT 0,
-    total_units     INT DEFAULT 0,
-    gross_revenue   DECIMAL(10,2) DEFAULT 0,
-    total_cost      DECIMAL(10,2) DEFAULT 0,
-    platform_fees   DECIMAL(10,2) DEFAULT 0,
-    net_earnings    DECIMAL(10,2) DEFAULT 0,
-    currency        VARCHAR(3) DEFAULT 'USD',
-    synced_at       TIMESTAMPTZ,                -- 最后从 ERP 同步时间
-    updated_at      TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(creator_id, period, channel_type)
-);
-```
-
-### C.4 Design Tables (归属 Creator Portal，非 ERP)
-
-> 以下表由 Creator Portal 服务管理。Design 内容属于创作生命周期，不进入 ERP。
-> ERP 仅在履约环节通过 `print_file_url` 引用获取生产所需文件。
-
-#### designs
-
-```sql
-CREATE TABLE designs (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_id      UUID NOT NULL REFERENCES creators(id),
-    title           VARCHAR(255) NOT NULL,
-    description     TEXT,
-    category        VARCHAR(100),
-    status          VARCHAR(20) DEFAULT 'draft',  -- draft/pending_review/approved/published/archived/rejected
-    rejection_reason TEXT,
-    current_version_id UUID,                       -- 指向当前活跃版本
-    view_count      INT DEFAULT 0,
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### design_versions
-
-```sql
-CREATE TABLE design_versions (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    design_id       UUID NOT NULL REFERENCES designs(id),
-    version_number  INT NOT NULL,
-    changelog       TEXT,
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(design_id, version_number)
-);
-```
-
-#### design_assets
-
-```sql
-CREATE TABLE design_assets (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    design_version_id UUID NOT NULL REFERENCES design_versions(id),
-    asset_type      VARCHAR(30) NOT NULL,     -- 'artwork' / 'preview' / 'source_file'
-    file_url        VARCHAR(500) NOT NULL,
-    file_name       VARCHAR(255),
-    file_size       BIGINT,
-    mime_type       VARCHAR(100),
-    width_px        INT,
-    height_px       INT,
-    dpi             INT,
-    metadata        JSONB DEFAULT '{}',
-    created_at      TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### design_tags
-
-```sql
-CREATE TABLE design_tags (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    design_id       UUID NOT NULL REFERENCES designs(id),
-    tag             VARCHAR(50) NOT NULL,
-    UNIQUE(design_id, tag)
-);
-CREATE INDEX idx_design_tags_tag ON design_tags(tag);
-```
-
-### C.5 Design Engine / Product Config Tables
-
-#### print_areas
-
-```sql
-CREATE TABLE print_areas (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_template_id UUID NOT NULL REFERENCES product_templates(id),
-    name                VARCHAR(100) NOT NULL,     -- 'front', 'back', 'left_sleeve'
-    position_x          DECIMAL(8,2) NOT NULL,     -- 印刷区域左上角 X (mm)
-    position_y          DECIMAL(8,2) NOT NULL,
-    width               DECIMAL(8,2) NOT NULL,     -- 印刷区域宽 (mm)
-    height              DECIMAL(8,2) NOT NULL,
-    safe_zone_margin    DECIMAL(8,2) DEFAULT 0,    -- 安全边距 (mm)
-    max_dpi             INT DEFAULT 300,
-    sort_order          INT DEFAULT 0,
-    metadata            JSONB DEFAULT '{}',
-    created_at          TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### editor_sessions
-
-```sql
-CREATE TABLE editor_sessions (
-    id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_id                  UUID NOT NULL REFERENCES creators(id),
-    product_template_id         UUID NOT NULL REFERENCES product_templates(id),
-    design_version_id           UUID NOT NULL REFERENCES design_versions(id),
-    sellable_product_instance_id UUID,              -- 如果是编辑已有实例
-    session_data                JSONB DEFAULT '{}', -- 编辑器完整状态快照
-    status                      VARCHAR(20) DEFAULT 'active',  -- active/saved/expired
-    expires_at                  TIMESTAMPTZ,
-    created_at                  TIMESTAMPTZ DEFAULT now(),
-    updated_at                  TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### product_configurations
-
-```sql
-CREATE TABLE product_configurations (
-    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sellable_product_instance_id UUID UNIQUE NOT NULL,
-    design_version_id       UUID NOT NULL REFERENCES design_versions(id),
-    product_template_id     UUID NOT NULL REFERENCES product_templates(id),
-    layers                  JSONB NOT NULL DEFAULT '[]',
-    -- layers 示例:
-    -- [
-    --   {
-    --     "print_area_id": "uuid",
-    --     "artwork_asset_id": "uuid",
-    --     "transform": {"x": 120, "y": 80, "scale": 1.2, "rotation": 0},
-    --     "z_index": 1,
-    --     "visible": true
-    --   }
-    -- ]
-    editor_session_id       UUID,
-    finalized_at            TIMESTAMPTZ,           -- 确认完成编辑
-    created_at              TIMESTAMPTZ DEFAULT now(),
-    updated_at              TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### preview_assets
-
-```sql
-CREATE TABLE preview_assets (
-    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_configuration_id UUID NOT NULL REFERENCES product_configurations(id),
-    preview_type            VARCHAR(30) NOT NULL,  -- 'front' / 'back' / 'angle_45' / 'lifestyle'
-    file_url                VARCHAR(500) NOT NULL,
-    width_px                INT,
-    height_px               INT,
-    generated_at            TIMESTAMPTZ DEFAULT now()
-);
-```
-
-#### print_assets
-
-```sql
-CREATE TABLE print_assets (
-    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_configuration_id UUID NOT NULL REFERENCES product_configurations(id),
-    print_area_id           UUID NOT NULL REFERENCES print_areas(id),
-    file_url                VARCHAR(500) NOT NULL,
-    file_format             VARCHAR(10) DEFAULT 'PDF',  -- PDF / PNG / TIFF
-    dpi                     INT DEFAULT 300,
-    color_profile           VARCHAR(30) DEFAULT 'CMYK',
-    file_size               BIGINT,
-    generated_at            TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### C.6 Sellable Product & Channel Tables
-
-#### sellable_product_instances
-
-```sql
-CREATE TABLE sellable_product_instances (
-    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_id              UUID NOT NULL REFERENCES creators(id),
-    design_id               UUID NOT NULL REFERENCES designs(id),
-    design_version_id       UUID NOT NULL REFERENCES design_versions(id),
-    product_template_id     UUID NOT NULL REFERENCES product_templates(id),
-    title                   VARCHAR(255),               -- 可售产品标题（可自定义）
-    description             TEXT,
-    status                  VARCHAR(20) DEFAULT 'draft', -- draft/ready/listed/paused/archived
-    base_price_suggestion   DECIMAL(10,2),              -- 系统建议零售价
-    print_file_url          VARCHAR(500),               -- 最终印刷文件引用（来自 Design Engine）
-    preview_urls            JSONB DEFAULT '[]',         -- 预览图 URL 列表（来自 Design Engine）
-    created_at              TIMESTAMPTZ DEFAULT now(),
-    updated_at              TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_spi_creator ON sellable_product_instances(creator_id);
-CREATE INDEX idx_spi_design ON sellable_product_instances(design_id);
-```
-
-#### channel_listings
-
-```sql
-CREATE TABLE channel_listings (
-    id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sellable_product_instance_id    UUID NOT NULL REFERENCES sellable_product_instances(id),
-    channel_type                    VARCHAR(30) NOT NULL,   -- 'marketplace' / 'creator_store'
-    creator_store_connection_id     UUID REFERENCES creator_store_connections(id),  -- NULL = marketplace
-    external_product_id             VARCHAR(200),           -- 外部渠道的 product ID
-    external_listing_url            VARCHAR(500),
-    price                           DECIMAL(10,2) NOT NULL,
-    compare_at_price                DECIMAL(10,2),
-    currency                        VARCHAR(3) DEFAULT 'USD',
-    status                          VARCHAR(20) DEFAULT 'draft', -- draft/pending/active/paused/error/removed
-    published_at                    TIMESTAMPTZ,
-    error_message                   TEXT,
-    metadata                        JSONB DEFAULT '{}',
-    created_at                      TIMESTAMPTZ DEFAULT now(),
-    updated_at                      TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(sellable_product_instance_id, channel_type, creator_store_connection_id)
-);
-```
-
-#### sync_jobs
-
-```sql
-CREATE TABLE sync_jobs (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    channel_listing_id  UUID NOT NULL REFERENCES channel_listings(id),
-    action              VARCHAR(20) NOT NULL,   -- 'create' / 'update' / 'delete' / 'sync_inventory'
-    status              VARCHAR(20) DEFAULT 'pending', -- pending/processing/completed/failed/retrying
-    attempts            INT DEFAULT 0,
-    max_attempts        INT DEFAULT 3,
-    request_payload     JSONB,
-    response_payload    JSONB,
-    error_message       TEXT,
-    started_at          TIMESTAMPTZ,
-    completed_at        TIMESTAMPTZ,
-    next_retry_at       TIMESTAMPTZ,
-    created_at          TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_sync_jobs_status ON sync_jobs(status) WHERE status IN ('pending', 'retrying');
-```
-
-#### publishing_records (审计日志)
-
-```sql
-CREATE TABLE publishing_records (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    channel_listing_id  UUID NOT NULL REFERENCES channel_listings(id),
-    action              VARCHAR(30) NOT NULL,   -- 'publish' / 'unpublish' / 'price_change' / 'sync'
-    actor_type          VARCHAR(20) NOT NULL,   -- 'creator' / 'system' / 'admin'
-    actor_id            UUID,
-    before_state        JSONB,
-    after_state         JSONB,
-    created_at          TIMESTAMPTZ DEFAULT now()
-);
-```
+**核心数据主线：Design → Product → Published Product → Channel Listing，必须严格分离。**
+**两个建品入口最终汇入同一条主线，区别仅在于起点不同。**
+
+### C.2 ERP 数据结构扩展
+
+> ERP 已有 `ErpProduct` / `ErpProductSku` / `ErpProductImage`，以下为需要新增或扩展的部分。
+> ERP 字段沿用 **camelCase** 命名风格。`ErpProductSku` 不做扩展，定制 SKU 单独建 `custom_product_skus` 表管理。
+
+#### customers 表 — 新增字段
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| customerType | ENUM | ✓ | distributor \| creator \| cn_seller \| end_consumer |
+| companyName | VARCHAR(255) | – | 公司/工作室名称（B端必填） |
+| taxId | VARCHAR(100) | – | 税号 |
+| status | ENUM | ✓ | active \| suspended \| pending_review |
+| erpInternalNote | TEXT | – | 内部备注，仅 Admin 可见 |
+
+#### customer_stores 表 — 新增
+
+一个客户可绑定多个店铺，不限平台。Distributor、Creator 均可使用。
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| customerId | UUID | ✓ | FK → customers.id |
+| storeType | ENUM | ✓ | shopify \| etsy \| tiktok_shop \| woocommerce \| other |
+| storeName | VARCHAR(255) | ✓ | 店铺显示名称 |
+| storeUrl | VARCHAR(500) | ✓ | 店铺域名/URL |
+| accessToken | TEXT | – | OAuth token（加密存储） |
+| refreshToken | TEXT | – | 刷新 token |
+| tokenExpiresAt | TIMESTAMP | – | token 过期时间 |
+| syncStatus | ENUM | ✓ | active \| disconnected \| error \| pending |
+| lastSyncAt | TIMESTAMP | – | 最后同步时间 |
+| isPrimary | BOOLEAN | ✓ | 是否主店铺，默认 false |
+
+#### customer_payout_methods 表 — 新增
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| customerId | UUID | ✓ | FK → customers.id |
+| methodType | ENUM | ✓ | paypal \| wire \| check \| store_credit |
+| accountInfo | TEXT | ✓ | 账户信息（加密存储） |
+| isDefault | BOOLEAN | ✓ | 是否默认结算方式 |
+| status | ENUM | ✓ | active \| inactive |
+
+#### customer_commission_rules 表 — 新增
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| customerId | UUID | ✓ | FK → customers.id |
+| channelType | ENUM | ✓ | our_shopify \| creator_store \| distributor_store |
+| earningsType | ENUM | ✓ | royalty（自营线，固定比例）\| margin（差价） |
+| royaltyRate | DECIMAL(5,4) | – | 仅 royalty 类型，例如 0.15 = 15% |
+| isActive | BOOLEAN | ✓ | 是否生效 |
+| effectiveFrom | DATE | ✓ | 生效日期 |
+| effectiveTo | DATE | – | 失效日期，null = 永久有效 |
+
+> Creator：our_shopify → royalty；creator_store → margin。
+> Distributor：distributor_store → margin（只有差价，无自营线）。
+
+#### customer_groups 表 — 新增
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| groupName | VARCHAR(100) | ✓ | wholesale \| creator \| distributor \| retail \| vip \| cn_seller |
+| description | TEXT | – | 分组说明 |
+| discountType | ENUM | ✓ | fixed_price \| percentage_off \| cost_plus |
+
+#### customer_group_members 表 — 新增
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| customerId | UUID | ✓ | FK → customers.id |
+| groupId | UUID | ✓ | FK → customer_groups.id |
+| effectiveFrom | DATE | ✓ | 生效日期 |
+| effectiveTo | DATE | – | 失效日期 |
+
+#### products 表 — 新增字段（定制 POD 支持）
+
+ERP 原有产品表核心字段（id、itemNo、productName、categoryId、brandId、description、status、prodSkuList、prodImageList）保持不变，新增：
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| isCustomizable | BOOLEAN | ✓ | 是否可用于定制 POD，默认 false |
+| printTechniques | JSON Array | – | 支持的印刷工艺：[dtf, dtg, sublimation, embroidery] |
+| customizationNotes | TEXT | – | 定制注意事项 |
+
+#### product_visibility_rules 表 — 新增
+
+控制哪些客户分组能看到并使用某个产品：
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| erpProductId | UUID | ✓ | FK → products.id |
+| groupId | UUID | ✓ | FK → customer_groups.id |
+| canUseForPod | BOOLEAN | ✓ | 该分组是否可用此产品做定制 POD |
+| requiresApproval | BOOLEAN | ✓ | 使用此产品是否需要审核，默认 true |
+| maxDesignsPerProduct | INT | – | 该分组在此产品上可上架的最大设计数量 |
+| updatedBy | UUID | ✓ | 最后修改的 Admin user ID |
+
+#### print_areas 表 — 新增
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| erpProductId | UUID | ✓ | FK → products.id |
+| itemNo | VARCHAR(100) | ✓ | 对应 ErpProduct.itemNo |
+| areaName | VARCHAR(100) | ✓ | front \| back \| left_sleeve \| right_sleeve 等 |
+| widthPx | INT | ✓ | 印刷区域宽度（像素） |
+| heightPx | INT | ✓ | 印刷区域高度（像素） |
+| widthMm | DECIMAL(8,2) | ✓ | 实际印刷宽度（毫米） |
+| heightMm | DECIMAL(8,2) | ✓ | 实际印刷高度（毫米） |
+| offsetX | INT | – | 区域在产品模板图上的 X 偏移（像素） |
+| offsetY | INT | – | 区域在产品模板图上的 Y 偏移（像素） |
+| dpiRequired | INT | ✓ | 最低印刷 DPI，通常 300 |
+| safeZonePx | INT | – | 安全边距（像素），默认 0 |
+| isPrimary | BOOLEAN | ✓ | 是否主印刷区，默认 true |
+| previewTemplateUrl | VARCHAR(500) | – | 该区域的 mockup 底图路径（空白产品图，设计器叠加用） |
+| sortOrder | INT | – | 排列顺序 |
+
+> `previewTemplateUrl` 是空白产品底图（如白 T 恤平铺图），设计器把设计稿叠上去生成最终预览图。
+
+#### product_group_pricing 表 — 新增
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| erpProductId | UUID | ✓ | FK → products.id |
+| erpSkuId | UUID | ✓ | FK → prodSkuList[].id，细分到 variant |
+| groupId | UUID | ✓ | FK → customer_groups.id |
+| basePrice | DECIMAL(10,2) | ✓ | 该分组的供应链报价，覆盖 ErpProductSku.price |
+| currency | VARCHAR(10) | ✓ | 默认 USD |
+| effectiveFrom | DATE | ✓ | 生效日期 |
+| effectiveTo | DATE | – | 失效日期 |
+| updatedBy | UUID | ✓ | 最后修改 Admin ID |
+
+#### orders 表 — 新增字段
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| orderType | ENUM | ✓ | dtf_standard \| blank \| pod_standard \| pod_custom \| mixed |
+| sourceChannel | ENUM | ✓ | our_shopify \| creator_shopify \| creator_etsy \| creator_tiktok \| distributor_store \| b2b_direct |
+| customerStoreId | UUID | – | FK → customer_stores.id |
+| externalOrderId | VARCHAR(255) | – | 外部平台订单号 |
+
+#### order_items 表 — 新增字段
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| itemType | ENUM | ✓ | dtf \| blank \| pod_standard \| pod_custom |
+| customProductSkuId | UUID | – | FK → custom_product_skus.id，仅 pod_custom |
+| printFileUrl | VARCHAR(500) | – | 印刷文件路径快照，仅 pod_custom |
+| printConfigSnapshot | JSON | – | 印刷参数快照：{areaId, x, y, scale, rotation}，仅 pod_custom |
+| designId | UUID | – | 关联设计稿 ID，用于收益统计 |
+
+> `printFileUrl` 和 `printConfigSnapshot` 在 order_item 层做快照，保证下单后印刷参数不因后续修改而变化。
+
+### C.3 Creator Commerce 数据结构
+
+> 以下表全部由 Creator Commerce 系统管理，存储在 Supabase。
+
+#### creators 表
+
+Creator 和 Distributor（有店铺）均存此表，通过 `userType` 区分：
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| erpCustomerId | UUID | ✓ | FK → ERP customers.id，财务结算走 ERP |
+| userId | UUID | ✓ | Portal 登录账号 ID |
+| userType | ENUM | ✓ | designer \| distributor — 决定 Portal 显示哪些功能模块 |
+| displayName | VARCHAR(255) | ✓ | 公开展示名称/艺名/公司名 |
+| bio | TEXT | – | 个人简介 |
+| avatarUrl | VARCHAR(500) | – | 头像 |
+| portfolioUrl | VARCHAR(500) | – | 作品集链接（Designer 用） |
+| specialties | JSON Array | – | 擅长风格：[illustration, typography, anime] |
+| onboardingStatus | ENUM | ✓ | applied \| approved \| active \| suspended |
+| appliedAt | TIMESTAMP | – | 申请时间 |
+| approvedAt | TIMESTAMP | – | 审核通过时间 |
+| approvedBy | UUID | – | 审核 Admin user ID |
+
+> `userType = designer` → Portal 显示 My Designs 模块，可走自营线（Request Promotion），也可自建商品。
+> `userType = distributor` → 不显示 My Designs，只能从 Product Catalog 建品，不可走自营线。
+
+#### designs 表
+
+Designer 上传的原始设计稿。仅 Designer 可见此模块（My Designs）。从 Product Catalog 建品时在 Design Editor 内上传的设计也会创建 design 记录：
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| creatorId | UUID | ✓ | FK → creators.id |
+| title | VARCHAR(255) | ✓ | 设计稿标题 |
+| description | TEXT | – | 描述 |
+| tags | JSON Array | – | 标签 |
+| category | VARCHAR(100) | – | 分类 |
+| artworkUrl | VARCHAR(500) | ✓ | 原始上传文件路径（PNG/SVG/AI 等） |
+| thumbnailUrl | VARCHAR(500) | – | 缩略图 |
+| fileWidthPx | INT | – | 文件宽度（像素） |
+| fileHeightPx | INT | – | 文件高度（像素） |
+| fileDpi | INT | – | 文件 DPI |
+| fileSizeBytes | BIGINT | – | 文件大小 |
+| status | ENUM | ✓ | draft \| pending_review \| approved \| rejected \| archived |
+| reviewNote | TEXT | – | 审核意见，Admin 填写 |
+| reviewedBy | UUID | – | 审核 Admin user ID |
+| reviewedAt | TIMESTAMP | – | 审核时间 |
+
+#### design_versions 表
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| designId | UUID | ✓ | FK → designs.id |
+| versionNumber | INT | ✓ | 版本号，从 1 开始递增 |
+| artworkUrl | VARCHAR(500) | ✓ | 该版本文件路径 |
+| changeNote | TEXT | – | 修改说明 |
+| isCurrent | BOOLEAN | ✓ | 是否为当前版本 |
+
+#### editor_sessions 表
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| userId | UUID | ✓ | FK → creators.id（Designer 或 Distributor） |
+| designId | UUID | – | FK → designs.id，Distributor 可不上传设计稿则为 null |
+| erpProductId | UUID | ✓ | FK → ERP products.id |
+| printAreaId | UUID | – | FK → print_areas.id，有设计稿时必填 |
+| configSnapshot | JSON | – | 当前编辑状态：{x, y, scale, rotation} |
+| previewUrl | VARCHAR(500) | – | 当前预览图 |
+| status | ENUM | ✓ | active \| saved \| abandoned |
+| savedToProductId | UUID | – | FK → published_products.id，保存后关联 |
+
+#### published_products 表
+
+设计稿 + ERP 产品模板生成的可售产品实体。`printConfig` 存在此层，各 variant 共用：
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| sourceType | ENUM | ✓ | operator（自营）\| creator（Designer发布）\| distributor（Distributor发布） |
+| creatorId | UUID | – | FK → creators.id，仅 creator/distributor 来源有值 |
+| designId | UUID | – | FK → designs.id，Distributor 可不上传设计稿 |
+| designVersionId | UUID | – | FK → design_versions.id，锁定版本，有设计稿时必填 |
+| erpProductId | UUID | ✓ | FK → ERP products.id（blank 产品） |
+| printAreaId | UUID | – | FK → print_areas.id，有设计稿时必填 |
+| printConfig | JSON | – | {x, y, scale, rotation, widthPx, heightPx}，有设计稿时存此层 |
+| printFileUrl | VARCHAR(500) | – | 生成的印刷文件路径 |
+| previewImageUrl | VARCHAR(500) | – | 通用预览图 |
+| title | VARCHAR(255) | ✓ | 产品标题 |
+| description | TEXT | – | 产品描述 |
+| status | ENUM | ✓ | draft \| pending_review \| approved \| published \| unpublished \| archived |
+| reviewNote | TEXT | – | 审核备注，Admin 填写 |
+| reviewedBy | UUID | – | 审核 Admin user ID |
+| reviewedAt | TIMESTAMP | – | 审核时间 |
+
+> `sourceType = distributor` 时，发布渠道只能是自己的店铺，系统屏蔽 our_shopify 选项。
+> 审核通过（approved）后才触发回写 ERP API，在 ERP 创建新 SKU 记录。
+
+#### custom_product_skus 表
+
+定制 SKU，与 ERP 原有 `ErpProductSku`（blank SKU）严格分开。每个 variant（颜色 × 尺码）一条记录：
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| publishedProductId | UUID | ✓ | FK → published_products.id |
+| erpProductId | UUID | ✓ | FK → ERP products.id |
+| erpSkuId | UUID | ✓ | FK → prodSkuList[].id，继承颜色/尺码/重量等 |
+| previewImageUrl | VARCHAR(500) | – | 该 variant 预览图（颜色底图不同） |
+| erpSyncedSkuId | UUID | – | 回写 ERP 后得到的新 SKU ID |
+| syncedAt | TIMESTAMP | – | 回写时间 |
+| syncStatus | ENUM | ✓ | pending \| synced \| error |
+| isActive | BOOLEAN | ✓ | 是否上架该 variant，默认 true |
+
+> `printConfig` 统一存在 `published_products` 层，各 variant 共用。
+> 查找设计师路径：`custom_product_skus → published_products.designId → designs.creatorId → creators`
+
+#### channel_listings 表
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| publishedProductId | UUID | ✓ | FK → published_products.id |
+| channelType | ENUM | ✓ | our_shopify \| creator_shopify \| creator_etsy \| creator_tiktok \| distributor_shopify \| distributor_etsy |
+| customerStoreId | UUID | – | FK → customer_stores.id |
+| externalListingId | VARCHAR(255) | – | 外部平台的商品 ID |
+| externalListingUrl | VARCHAR(500) | – | 外部商品链接 |
+| status | ENUM | ✓ | pending_sync \| active \| paused \| error \| removed |
+| syncErrorMsg | TEXT | – | 同步失败原因 |
+| lastSyncedAt | TIMESTAMP | – | 最后同步时间 |
+| publishedAt | TIMESTAMP | – | 上架时间 |
+
+#### channel_listing_variants 表
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| channelListingId | UUID | ✓ | FK → channel_listings.id |
+| erpSkuId | UUID | ✓ | FK → prodSkuList[].id，对应具体颜色/尺码 variant |
+| salePrice | DECIMAL(10,2) | ✓ | 客户自定义的对外售价 |
+| compareAtPrice | DECIMAL(10,2) | – | 划线价（可选） |
+| baseCostSnapshot | DECIMAL(10,2) | ✓ | 创建时从 product_group_pricing 拍下的供应链成本快照 |
+| isActive | BOOLEAN | ✓ | 是否上架该 variant，默认 true |
+
+> **baseCostSnapshot 必须在记录创建时拍快照**，不能动态引用 basePrice，否则供应链涨价会影响历史收益计算。
+
+#### creator_earnings 表
+
+每笔订单产生后自动写入，Creator 和 Distributor 的收益均在此记录：
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| creatorId | UUID | ✓ | FK → creators.id |
+| erpOrderId | UUID | ✓ | ERP 订单 ID |
+| erpOrderItemId | UUID | ✓ | ERP 订单行项目 ID |
+| publishedProductId | UUID | ✓ | FK → published_products.id |
+| channelListingId | UUID | ✓ | FK → channel_listings.id |
+| channelType | ENUM | ✓ | our_shopify \| creator_store \| distributor_store |
+| salePrice | DECIMAL(10,2) | ✓ | 实际售价快照 |
+| baseCost | DECIMAL(10,2) | ✓ | 供应链成本快照 |
+| earningsType | ENUM | ✓ | royalty \| margin |
+| royaltyRate | DECIMAL(5,4) | – | 仅 royalty 类型：佣金比例快照 |
+| earningsAmount | DECIMAL(10,2) | ✓ | 本笔收益金额 |
+| status | ENUM | ✓ | pending \| confirmed \| paid \| cancelled |
+| payoutId | UUID | – | FK → creator_payouts.id，结算时关联 |
+
+> 自营线：`earningsAmount = salePrice × royaltyRate`
+> Creator 线 / Distributor 线：`earningsAmount = salePrice − baseCost`
+
+#### creator_payouts 表
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| creatorId | UUID | ✓ | FK → creators.id |
+| erpCustomerId | UUID | ✓ | FK → ERP customers.id，财务对账用 |
+| periodStart | DATE | ✓ | 结算周期开始 |
+| periodEnd | DATE | ✓ | 结算周期结束 |
+| totalEarnings | DECIMAL(12,2) | ✓ | 本期总收益 |
+| totalOrders | INT | ✓ | 本期订单数 |
+| platformFee | DECIMAL(10,2) | – | 平台服务费 |
+| payoutAmount | DECIMAL(12,2) | ✓ | 实际打款金额 |
+| status | ENUM | ✓ | calculating \| pending_approval \| approved \| processing \| paid \| failed |
+| paidAt | TIMESTAMP | – | 实际打款时间 |
+| paymentReference | VARCHAR(255) | – | 转账流水号 |
+| approvedBy | UUID | – | 审批 Admin user ID |
+
+### C.4 Admin Portal 数据结构
+
+#### curation_decisions 表
+
+Admin 自营选品决策记录。**AI 选品模型未来的训练数据基础，必须从 Day 1 开始填写：**
+
+| Field | Type | Req | Notes |
+|-------|------|-----|-------|
+| id | UUID | ✓ | 主键 |
+| designId | UUID | ✓ | FK → designs.id |
+| erpProductId | UUID | ✓ | FK → ERP products.id |
+| decision | ENUM | ✓ | selected \| rejected \| deferred |
+| reason | TEXT | ✓ | **决策原因 — AI 训练数据核心字段，必填，不能留空** |
+| decidedBy | UUID | ✓ | Admin user ID |
+| decidedAt | TIMESTAMP | ✓ | |
+| resultedInProductId | UUID | – | FK → published_products.id，选中后生成的产品 |
+
+### C.5 核心实体关系
+
+| 表 A | 关系 | 表 B | 说明 |
+|------|------|------|------|
+| ERP customers | 1:N | customer_stores | 一个客户可绑定多个店铺 |
+| ERP customers | 1:N | customer_payout_methods | 多种结算方式 |
+| ERP customers | 1:N | customer_commission_rules | 按渠道定义不同佣金 |
+| ERP customers | 1:1 | creators | Creator/Distributor 对应 ERP 一条客户记录 |
+| customer_groups | M:N | ERP customers | 通过 customer_group_members 关联 |
+| ERP products | 1:N | print_areas | 一个产品有多个印刷区域 |
+| ERP products | 1:N | product_visibility_rules | 按分组控制可见性 |
+| creators | 1:N | designs | 一个 Creator 可上传多个设计稿 |
+| designs | 1:N | design_versions | 多个历史版本 |
+| designs + ERP products | → | published_products | 设计稿 + 产品 = 可售实体 |
+| published_products | 1:N | custom_product_skus | 每个 variant 一条记录 |
+| published_products | 1:N | channel_listings | 一个产品可在多渠道上架 |
+| channel_listings | 1:N | channel_listing_variants | 每个渠道各 variant 独立定价 |
+| channel_listings | 1:N | creator_earnings | 每笔销售产生一条收益记录 |
+| creator_earnings | N:1 | creator_payouts | 多条收益汇总到一次结算 |
+| designs | 1:N | curation_decisions | Admin 选品决策记录 |
 
 ---
 
 ## D. 核心流程设计
 
-### D.1 Creator 上传 Design
+### D.1 定制 SKU 完整生成流程
 
+以一件 Gildan 白色 T恤 M 码为例：
+
+**Step 1** — ERP 里已有 blank SKU：
 ```
-Creator 操作                        系统处理
-─────────                          ─────────
-1. 进入 Design Management
-2. 点击 "Upload New Design"
-3. 上传 artwork 文件               → 文件上传至 S3，生成 design_asset 记录
-4. (可选) 上传 source file         → 存储为附加 asset
-5. 填写标题/描述/标签              → 创建 design 记录（status=draft）
-6. 系统自动创建 version 1          → 创建 design_version + 关联 assets
-7. (可选) 提交审核                 → status 变为 pending_review
-8. 管理员审核通过                  → status 变为 approved，creator 可继续建品
-```
-
-**关键决策**：Design 上传后是 draft 状态。只有 approved 状态的 design 才能用于创建可售产品。如果初期不需要审核流程，可以设置自动审核通过。
-
-### D.2 Creator 选择产品模板
-
-```
-Creator 操作                        系统处理
-─────────                          ─────────
-1. 在某个 design 下点击
-   "Create Product"
-2. 看到可用产品模板列表             ← Creator Portal 调用 ERP API
-   (T-shirt, Mug, Hat...)            GET /api/erp/product-templates?status=active
-3. 选择一个模板（如 Classic Tee）
-4. 系统自动生成初步 preview         ← Design Engine: 将 artwork 居中放置到模板
-                                      默认 transform，生成快速预览
-5. Creator 看到 preview
-6. Creator 满意 → 确认              → 创建 sellable_product_instance (status=draft)
-                                    → 创建初步 product_configuration
-   Creator 想微调 → 进入编辑器      → 进入 D.3 流程
+prodSkuList
+├── id:         sku_001
+├── productId:  product_tshirt_gildan
+├── skuType:    blank
+├── parentSkuId: null
+├── color:      White
+├── size:       M
+├── price:      $4.50  (供应链成本)
+└── barcode:    xxx
 ```
 
-### D.3 Creator 进入 Design Editor 编辑
-
-```
-Creator 操作                        系统处理
-─────────                          ─────────
-1. 点击 "Edit in Designer"
-2.                                  → Creator Portal 调用 Design Engine:
-                                      POST /api/design-engine/sessions
-                                      {
-                                        creator_id, design_version_id,
-                                        product_template_id,
-                                        sellable_product_instance_id (如已有)
-                                      }
-                                    ← 返回 session_id + editor_url
-3. Editor 以 iframe 方式加载        → iframe src=editor_url?session=xxx&token=yyy
-4. Editor 加载:
-   - 产品底图
-   - 印刷区域 overlay
-   - 当前 artwork
-   - 已有 configuration (如有)
-5. Creator 编辑:
-   - 拖拽调整位置
-   - 缩放
-   - 旋转
-   - 适配 print area
-6. Creator 点击 "Save"              → Editor 通过 postMessage 通知 Portal
-                                    → Design Engine 保存:
-                                      PUT /api/design-engine/sessions/:id/save
-                                      更新 product_configurations
-7. Creator 点击 "Generate Preview"  → POST /api/design-engine/preview/generate
-                                    → 异步生成 mockup，写入 preview_assets
-8. Creator 点击 "Done"              → Editor 通过 postMessage 通知 Portal
-                                    → Portal 关闭 iframe，刷新产品页
+**Step 2** — 审核通过，调用 `POST /products/custom-sku` 传给 ERP：
+```json
+{
+  "baseSkuId": "sku_001",
+  "productId": "prod_001",
+  "printFileUrl": "https://...",
+  "printAreaId": "area_front",
+  "printConfig": {
+    "x": 120, "y": 80, "scale": 1.2, "rotation": 0,
+    "widthPx": 1200, "heightPx": 1400,
+    "widthMm": 280, "heightMm": 320,
+    "dpi": 300, "colorMode": "CMYK", "fileFormat": "PNG",
+    "technique": "dtf",
+    "whiteInk": false,
+    "mirrorPrint": true,
+    "safeZonePx": 20
+  }
+}
 ```
 
-### D.4 保存 Product Configuration
-
+**Step 3** — ERP 创建定制 SKU，继承 blank SKU 属性：
 ```
-Design Engine 内部:
-1. 收到 save 请求
-2. 从 editor session 提取当前状态:
-   - 每个 print_area 上的 artwork 位置 (x, y)
-   - 缩放比例 (scale)
-   - 旋转角度 (rotation)
-   - 图层信息 (z_index, visibility)
-3. 写入 / 更新 product_configurations 表
-4. 标记 editor_session 为 saved
-5. (如果请求了 preview) 触发 preview 异步生成
-6. (如果请求了 print file) 触发 print file 异步生成
+prodSkuList（新增一条）
+├── id:           sku_custom_001
+├── productId:    prod_001
+├── skuType:      custom
+├── parentSkuId:  sku_001          ← 继承自白色 M 码
+├── color / size: 继承自 sku_001
+├── printFileUrl: https://...
+├── printAreaId:  'area_front'
+└── printConfig:  { ...完整参数... }
 ```
 
-### D.5 Creator 选择 Channel 并设置价格
+**Step 4** — ERP 返回新 SKU ID → 写入 `custom_product_skus.erpSyncedSkuId`
 
-```
-Creator 操作                        系统处理
-─────────                          ─────────
-1. 在 Product Builder 中，
-   产品配置完成后，
-   进入 "Distribution" 步骤
-2. 看到渠道选项:
-   □ Our Marketplace
-   □ My Store (Shopify)              ← 如果已连接 store 才可选
-3. 勾选渠道
-4. 分别设置价格:
-   - Marketplace: $29               → 创建 channel_listing (channel_type='marketplace')
-   - My Store: $35                  → 创建 channel_listing (channel_type='creator_store')
-5. 系统展示收入预估:
-   - Marketplace: royalty $X        ← 根据 royalty 规则计算
-   - My Store: margin $Y            ← 售价 - 成本
-6. Creator 确认发布                 → 更新 sellable_product_instance status='listed'
-                                    → 触发各渠道的 sync_job
-```
+**Step 5** — 有客人下单，ERP 通过 `erpSyncedSkuId` 知道怎么生产
 
-### D.6 发布到 Marketplace
+### D.2 自营线：Admin 选品 → 上架
 
-```
-数据流: Creator Portal → 触发 sync_job → Channel Sync Gateway → 从 ERP 读取数据 → 推送到我方 Shopify
+| Step | 操作 |
+|------|------|
+| 1 | Admin 从 product_visibility_rules 确认产品在 operator 分组可用 |
+| 2 | Admin 在 curation_decisions 记录选品决策（设计稿 + 产品组合，**必填 reason**） |
+| 3 | 系统调 Design Engine，Admin 调整印刷参数，生成 published_products（status: draft, sourceType: operator） |
+| 4 | Admin 审核通过 → status: approved → 触发回写 ERP API → 创建定制 SKU |
+| 5 | ERP 返回新 SKU ID → 写入 custom_product_skus.erpSyncedSkuId |
+| 6 | 创建 channel_listings（our_shopify）+ channel_listing_variants（各 variant 定价） |
+| 7 | 上架 Shopify 主站 → status: published |
 
-系统处理:
-1. Creator 在 Portal 确认发布
-2. channel_listing (marketplace) status → 'pending'
-3. 创建 sync_job (action='create')
-4. Channel Sync Gateway 处理:
-   a. 从 ERP 读取产品数据:
-      - 产品名称、描述 (from ERP products/product_templates)
-      - SKU variants、库存 (from ERP skus/inventory)
-      - preview 图片 (from preview_assets)
-   b. 合并 channel_listing 中的价格设置
-   c. 使用我方 Shopify store credentials
-   d. 调用 Shopify API 创建 Product
-   e. 记录 external_product_id
-5. 成功 → channel_listing status='active', published_at=now()
-   失败 → channel_listing status='error', 记录 error_message
-6. 写入 publishing_record
-```
+### D.3 Designer 线 — 从 My Designs 建品
 
-### D.7 同步到 Creator 自己的 Store
+Designer 上传设计稿后，在 design 详情页有两个操作入口：
 
-```
-数据流: Creator Portal → 触发 sync_job → Channel Sync Gateway → 从 ERP 读取数据 → 推送到 Creator 的 Shopify
+**路径 A：Request Promotion（走自营线）**
 
-与 D.6 流程完全一致，区别仅在于:
-- 使用 creator_store_connection 中的 credentials（而非我方 store credentials）
-- 使用 creator 为该渠道设置的价格
+| Step | 操作 |
+|------|------|
+| 1 | Designer 上传设计稿 → designs（status: pending_review） |
+| 2 | Admin 审核设计稿 → status: approved |
+| 3 | Designer 在 design 详情页点击 **"Request Promotion"** |
+| 4 | 进入 D.2 自营线流程（Admin 选品决策 + 上架到我们平台） |
+| 5 | Designer 收 Royalty |
 
-系统处理:
-1. Creator 在 Portal 确认同步到自己的 Store
-2. channel_listing (creator_store) status → 'pending'
-3. 验证 creator_store_connection 有效（token 未过期）
-4. 创建 sync_job (action='create')
-5. Channel Sync Gateway 处理:
-   a. 从 ERP 读取同样的产品/SKU/库存数据
-   b. 合并 channel_listing 中 creator 设置的价格
-   c. 使用 creator 的 store access_token
-   d. 调用 Shopify API 创建 Product
-   e. 记录 external_product_id
-6. 成功 → channel_listing status='active'
-   失败 → 重试或标记 error
-7. 写入 publishing_record
-```
+**路径 B：Create Product（自建商品到自己店铺）**
 
-**关键认知：D.6 和 D.7 本质上是同一条流程。Channel Sync Gateway 不关心目标 store 是谁的，它只关心：从 ERP 拿什么数据、用哪套 credentials 推到哪个 store。这正是 adapter 模式的价值。**
+| Step | 操作 |
+|------|------|
+| 1 | Designer 上传设计稿 → designs（status: pending_review） |
+| 2 | Admin 审核设计稿 → status: approved |
+| 3 | Designer 在 design 详情页点击 **"Create Product"** |
+| 4 | 选择产品模板（从 Product Catalog 中选，受 product_visibility_rules 控制） |
+| 5 | 进入 Design Editor → editor_sessions 记录编辑状态 |
+| 6 | 保存 → 生成 published_products（status: pending_review, sourceType: creator） |
+| 7 | Admin 审核产品 → status: approved → 回写 ERP 创建定制 SKU |
+| 8 | Designer 选择渠道（自己的店铺）→ 设置各 variant 售价 → channel_listing_variants |
+| 9 | 同步到 Designer 的 Shopify/Etsy → channel_listings.status: active |
+| 10 | 订单产生 → 推给 ERP 履约 → 自动写入 creator_earnings（earningsType: margin） |
 
-### D.8 订单回流到 ERP
+> 路径 A 和 B 可并行：同一个 design 既可以提交自营线让我们推广，也可以自建商品到自己店铺。
 
-```
-数据流: 外部 Shopify Store → Webhook → Channel Sync Gateway → 写入 ERP
+### D.4 从 Product Catalog 建品（Designer + Distributor 共用）
 
-无论订单来自我方 Shopify 还是 Creator 的 Shopify，回流路径一致:
+| Step | 操作 |
+|------|------|
+| 1 | 用户进入 **Product Catalog**，浏览 ERP 产品（按类别展示，商城风格） |
+| 2 | 多选产品 → 点击 "Design & Create" |
+| 3 | 进入 Design Editor → 上传/选择设计稿 → 编辑 → editor_sessions |
+| 4 | 保存 → 生成 published_products（sourceType: creator 或 distributor，取决于 userType） |
+| 5 | Admin 审核产品 → status: approved → 回写 ERP 创建定制 SKU |
+| 6 | 用户选择渠道 → 设置各 variant 售价（**Distributor 不显示 our_shopify 选项**） |
+| 7 | 同步到用户的店铺 → channel_listings.status: active |
+| 8 | 订单产生 → 推给 ERP 履约 → 自动写入 creator_earnings |
 
-1. Shopify Webhook → order/create → Channel Sync Gateway Webhook Handler
-2. Gateway 识别来源:
-   - 通过 webhook 注册信息匹配到 store_connection
-   - 确定 channel_type (marketplace / creator_store)
-   - 匹配 external_product_id → channel_listing → sellable_product_instance → creator_id → erp_partner_id
-3. Gateway 调用 ERP API 创建订单:
-   - POST /api/erp/orders
-   - 包含: source, channel_type, partner_id, customer info, line items (含 design_id, print_file_url 等快照), shipping address
-4. ERP 处理:
-   - 创建 order (source 区分来源)
-   - 创建 order_items (关联 sku, sellable_product_instance, channel_listing)
-   - 预留库存
-   - Event: ORDER_CREATED → 触发履约流程、earnings 计算
-```
+> Distributor 的唯一建品入口就是 Product Catalog（没有 My Designs 模块）。
+> Designer 也可从 Product Catalog 建品，不一定要先上传 design。
 
-### D.9 Creator Earnings / Royalties / Payouts 计算
+### D.5 收益计算逻辑
 
-```
-收入模型:
-─────────
-A. Marketplace (Mode A):
-   Creator 收入 = 售价 × royalty_rate
-   平台保留 = 售价 - 生产成本 - creator royalty
+| 类型 | 计算方式 |
+|------|---------|
+| 自营线 | `earningsAmount = salePrice × royaltyRate`（从 customer_commission_rules 取） |
+| Creator 线 | `earningsAmount = salePrice − baseCostSnapshot`（从 channel_listing_variants 取） |
+| Distributor 线 | `earningsAmount = salePrice − baseCostSnapshot`（与 Creator 线相同逻辑） |
+| 结算触发 | 按周期汇总 creator_earnings → 生成 creator_payouts → Admin 审批 → 打款 |
+| ERP 对账 | creator_payouts.erpCustomerId 关联 ERP customers，财务在 ERP 侧完成对账 |
 
-   例：售价 $29, 成本 $8, royalty_rate 15%
-   → Creator 得 $4.35
-   → 平台得 $29 - $8 - $4.35 = $16.65
+### D.6 订单回流到 ERP
 
-B. Creator Store (Mode B):
-   Creator 收入 = 售价 - 生产成本 - 平台服务费
+无论订单来自我方 Shopify 还是 Creator/Distributor 的店铺，回流路径一致：
 
-   例：售价 $35, 成本 $8, 服务费率 5%
-   → 平台服务费 $35 × 5% = $1.75
-   → Creator 得 $35 - $8 - $1.75 = $25.25
-
-处理流程:
-─────────
-1. 订单确认（或发货后）→ Event: ORDER_CONFIRMED
-2. ERP Earnings Calculator 消费事件:
-   a. 查询 order_item 上的 partner_id + channel_type
-   b. 读取 partners 表的 settlement_terms 确定计算规则
-   c. 写入 payout_ledger (partner_id, status='pending')
-3. 定期结算 (e.g. 每月1号):
-   a. 按 partner_id 汇总上月所有 pending 的 payout_ledger
-   b. 创建 settlement_ledger 记录
-   c. Event: SETTLEMENT_CREATED → Creator Commerce 同步更新 creator_earnings_summary
-4. 财务确认并发起打款:
-   a. settlement_ledger status → 'processing' → 'paid'
-   b. 根据 partners.payment_info 打款
-   c. 记录 payment_ref
-   d. Event: PAYOUT_COMPLETED → Creator Commerce 通知 creator
-```
+1. Shopify/Etsy Webhook → Channel Sync Gateway Webhook Handler
+2. Gateway 识别来源：匹配 store_connection → channel_listing → published_product → creator → erpCustomerId
+3. Gateway 调 ERP API 创建订单（含 orderType、sourceChannel、溯源快照字段）
+4. ERP 处理：创建 order + order_items、预留库存、触发履约
+5. 订单确认后 → Creator Commerce 自动写入 creator_earnings
 
 ---
 
 ## E. Design Engine 接入方案
 
-### E.1 方案对比
-
-| 方案 | 优点 | 缺点 | 适用场景 |
-|------|------|------|---------|
-| **iframe Embedded** | 隔离性好、独立部署、跨系统复用最简单 | 跨域通信需 postMessage、样式隔离但不易统一 | **短期首选** |
-| Micro-frontend (Module Federation) | 共享运行时、样式可统一、性能好 | 构建耦合、版本协调复杂 | 中期演进 |
-| Standalone App + Token | 完全独立、可给外部使用 | 体验割裂（跳转新页面） | 外部开放 |
-| Internal Module | 开发简单、体验最一体化 | 无法复用给其他系统、耦合度高 | 不推荐 |
-
-### E.2 推荐路线
-
-**短期 (Phase 1): iframe Embedded**
+### 短期 (Phase 1): iframe Embedded
 
 ```
 Creator Portal                    Design Engine
 ┌──────────────────┐             ┌──────────────────┐
-│                  │  iframe     │                  │
 │  Product Builder │◄──────────►│  Editor App      │
-│                  │  postMsg   │                  │
-│  ┌────────────┐  │             │  独立部署         │
+│                  │  iframe     │                  │
+│  ┌────────────┐  │  postMsg   │  独立部署         │
 │  │  iframe     │  │             │  独立域名         │
 │  │  editor.    │  │             │  /editor?session= │
 │  │  domain.com │  │             │  &token=          │
@@ -1056,21 +822,21 @@ Creator Portal                    Design Engine
 └──────────────────┘             └──────────────────┘
 ```
 
-通信协议设计:
+通信协议：
 
 ```typescript
-// Portal → Editor (通过 iframe postMessage)
+// Portal → Editor
 interface EditorInitMessage {
   type: 'INIT_EDITOR';
   payload: {
     sessionId: string;
-    token: string;           // 短期 JWT
-    theme: 'light' | 'dark'; // 统一主题
+    token: string;
+    theme: 'light' | 'dark';
     locale: string;
   };
 }
 
-// Editor → Portal (通过 postMessage)
+// Editor → Portal
 interface EditorEventMessage {
   type: 'EDITOR_SAVE_COMPLETE'
       | 'EDITOR_PREVIEW_READY'
@@ -1085,22 +851,10 @@ interface EditorEventMessage {
 }
 ```
 
-统一体验策略:
-- Editor 支持主题参数，Portal 传入品牌色/主题
-- Editor 隐藏自身导航栏，只显示画布和工具栏
-- Loading 状态由 Portal 统一管理
-
-**长期 (Phase 3): Micro-frontend + SDK**
-
-```
-Phase 3 演进:
-1. 提取 Design Engine SDK (npm package)
-   - @company/design-engine-sdk
-   - 提供 React 组件: <DesignEditor />
-   - 提供 headless API client
-2. 支持 Module Federation 方式嵌入
-3. SDK 可供外部系统使用（开放平台场景）
-```
+### 长期 (Phase 3): Micro-frontend + SDK
+- 提取 `@company/design-engine-sdk` (npm package)
+- 提供 React 组件 `<DesignEditor />`
+- 支持 Module Federation
 
 ---
 
@@ -1108,19 +862,15 @@ Phase 3 演进:
 
 ### F.1 Creator Portal API (BFF 层)
 
-Creator Portal 的后端作为 BFF (Backend for Frontend)，聚合来自各系统的数据。
-
 #### Creator 身份与 Profile
-
 ```
-POST   /api/creators/register            注册
-POST   /api/creators/login               登录
-GET    /api/creators/me                   获取当前 creator 信息
-PUT    /api/creators/me/profile           更新 profile
+POST   /api/creators/register
+POST   /api/creators/login
+GET    /api/creators/me
+PUT    /api/creators/me/profile
 ```
 
 #### Design Management
-
 ```
 POST   /api/designs                       创建 design (上传 artwork)
 GET    /api/designs                       列表 (支持 status/tag 筛选)
@@ -1129,172 +879,143 @@ PUT    /api/designs/:id                   更新 metadata
 DELETE /api/designs/:id                   删除/归档
 POST   /api/designs/:id/versions          上传新版本
 POST   /api/designs/:id/submit-review     提交审核
-GET    /api/designs/:id/stats             设计表现数据
 ```
 
 #### Product Builder
-
 ```
-GET    /api/product-templates              获取可用产品模板（来自 ERP）
-GET    /api/product-templates/:id          模板详情（含 print areas）
-POST   /api/sellable-products              创建可售产品实例
-GET    /api/sellable-products              列表
-GET    /api/sellable-products/:id          详情
-PUT    /api/sellable-products/:id          更新
+GET    /api/product-templates              获取可用产品（受 product_visibility_rules 控制）
+GET    /api/product-templates/:id          产品详情（含 print areas）
+POST   /api/published-products             创建 published product
+GET    /api/published-products             列表
+GET    /api/published-products/:id         详情
+PUT    /api/published-products/:id         更新
 ```
 
 #### Design Editor Integration
-
 ```
-POST   /api/editor/sessions                创建编辑 session → 调 Design Engine
+POST   /api/editor/sessions                创建编辑 session
 GET    /api/editor/sessions/:id            获取 session 状态
 POST   /api/editor/sessions/:id/finalize   确认编辑完成
 ```
 
 #### Channel Distribution
-
 ```
 POST   /api/channel-listings                         创建渠道 listing
-GET    /api/channel-listings?product_instance_id=     查询某产品的所有 listing
-PUT    /api/channel-listings/:id                      更新（改价格等）
+GET    /api/channel-listings?published_product_id=    查询某产品的所有 listing
+PUT    /api/channel-listings/:id                      更新
 POST   /api/channel-listings/:id/publish              发布
 POST   /api/channel-listings/:id/unpublish            下架
-GET    /api/channel-listings/:id/sync-status           同步状态
 ```
 
 #### Store Connection
-
 ```
-POST   /api/store-connections/shopify/auth-url         获取 Shopify OAuth URL
-POST   /api/store-connections/shopify/callback          OAuth 回调
-GET    /api/store-connections                           列表
-DELETE /api/store-connections/:id                       断开连接
-POST   /api/store-connections/:id/test                  测试连接
+POST   /api/store-connections/shopify/auth-url
+POST   /api/store-connections/shopify/callback
+GET    /api/store-connections
+DELETE /api/store-connections/:id
 ```
 
 #### Orders & Earnings
-
 ```
-GET    /api/orders                          creator 的订单 (支持 channel/design/product 筛选)
+GET    /api/orders                          creator 的订单
 GET    /api/orders/:id                      订单详情
-GET    /api/earnings/summary                收入总览 (today/month/total/pending/settled)
-GET    /api/earnings/by-period              按周期收入
-GET    /api/earnings/by-channel             按渠道收入
-GET    /api/earnings/by-design              按 design 收入
+GET    /api/earnings/summary                收入总览
+GET    /api/earnings/by-period              按周期
+GET    /api/earnings/by-channel             按渠道
+GET    /api/earnings/by-design              按 design
 GET    /api/payouts                         Payout 列表
-GET    /api/payouts/:id                     Payout 详情
 ```
 
 #### Dashboard
-
 ```
-GET    /api/dashboard/overview              聚合数据: 收入、订单、top designs
-GET    /api/dashboard/top-designs           Top selling designs
-GET    /api/dashboard/top-products          Top selling products
-GET    /api/dashboard/channel-performance   渠道表现对比
+GET    /api/dashboard/overview
+GET    /api/dashboard/top-designs
+GET    /api/dashboard/top-products
+GET    /api/dashboard/channel-performance
 ```
 
 ### F.2 Admin 管理后台 API
 
-> Admin 和 Portal 可共享同一套后端 API 服务，通过角色权限区分。Admin 路由需要内部员工身份认证（SSO/RBAC）。
-
 ```
 # Creator 管理
-GET    /api/admin/creators                     Creator 列表（支持状态/搜索筛选）
-GET    /api/admin/creators/:id                 Creator 详情（含 profile、store 连接、统计）
-PUT    /api/admin/creators/:id/status          审核/暂停/封禁 creator
-PUT    /api/admin/creators/:id                 编辑 creator 信息
+GET    /api/admin/creators                     列表
+GET    /api/admin/creators/:id                 详情
+PUT    /api/admin/creators/:id/status          审核/暂停/封禁
 
 # 设计审核
-GET    /api/admin/designs                      待审核/全部 design 列表
-GET    /api/admin/designs/:id                  Design 详情（含 assets、版本历史）
+GET    /api/admin/designs                      列表
+GET    /api/admin/designs/:id                  详情
 POST   /api/admin/designs/:id/approve          审核通过
-POST   /api/admin/designs/:id/reject           审核拒绝（附拒绝原因）
+POST   /api/admin/designs/:id/reject           审核拒绝
+
+# 自营选品
+POST   /api/admin/curation-decisions           记录选品决策（reason 必填）
+GET    /api/admin/curation-decisions            决策列表
+
+# 产品池管理
+GET    /api/admin/product-visibility-rules      规则列表
+PUT    /api/admin/product-visibility-rules/:id  更新规则
 
 # 产品管理
-GET    /api/admin/sellable-products            所有可售产品列表
-PUT    /api/admin/sellable-products/:id/status 强制下架/恢复
+GET    /api/admin/published-products           列表
+PUT    /api/admin/published-products/:id/status 强制下架/审核
 
 # 渠道监控
-GET    /api/admin/channel-listings             所有 listing 列表（支持状态筛选）
-GET    /api/admin/sync-jobs                    同步任务列表（支持状态筛选）
-POST   /api/admin/sync-jobs/:id/retry          手动重试失败的同步
+GET    /api/admin/channel-listings             listing 列表
+GET    /api/admin/sync-jobs                    同步任务列表
+POST   /api/admin/sync-jobs/:id/retry          手动重试
 
 # 订单（从 ERP 读取）
-GET    /api/admin/orders                       全局订单列表（支持 creator/渠道/状态筛选）
-GET    /api/admin/orders/:id                   订单详情
+GET    /api/admin/orders                       全局订单列表
 
-# 结算管理（调 ERP API）
-GET    /api/admin/earnings                     全局 earnings 列表
-GET    /api/admin/settlements                  结算记录列表
-POST   /api/admin/settlements/:id/confirm      确认打款
-PUT    /api/admin/payouts/:id/adjust           调整 payout 金额（需审计记录）
+# 结算管理
+GET    /api/admin/earnings                     全局 earnings
+GET    /api/admin/payouts                      结算列表
+POST   /api/admin/payouts/:id/approve          审批打款
+PUT    /api/admin/payouts/:id/adjust           调整金额
 
 # 运营配置
-GET    /api/admin/config                       获取运营配置
-PUT    /api/admin/config/royalty-rates          设置 royalty rate
-PUT    /api/admin/config/service-fees           设置 service fee rate
+GET    /api/admin/config
+PUT    /api/admin/config/royalty-rates
+PUT    /api/admin/config/service-fees
 
 # 数据看板
-GET    /api/admin/dashboard/overview           全局总览（GMV、活跃 creator、订单量）
-GET    /api/admin/dashboard/creators           Creator 排行
-GET    /api/admin/dashboard/channels           渠道 GMV 对比
+GET    /api/admin/dashboard/overview
+GET    /api/admin/dashboard/creators
+GET    /api/admin/dashboard/channels
 ```
 
-### F.3 Design Engine Internal API
+### F.3 ERP 对接接口清单
+
+#### 现有接口（已有）
+
+| 接口 | 方向 | 用途 |
+|------|------|------|
+| GET /products | ERP → 我们 | 拉取产品列表 |
+| GET /products/:id | ERP → 我们 | 产品详情（含 prodSkuList、prodImageList） |
+| POST /orders | 我们 → ERP | 推送订单给 ERP 履约 |
+
+#### 需要新增的接口
+
+| 接口 | 方向 | 用途 |
+|------|------|------|
+| GET /products/:id/print-areas | ERP → 我们 | 拉取印刷区域配置 |
+| PUT /customers/:id | 我们 → ERP | 更新 customerType 字段 |
+| POST /customers | 我们 → ERP | 审核通过后在 ERP 创建客户记录 |
+| **POST /products/custom-sku** | **我们 → ERP** | **审核通过后回写：创建定制 SKU** |
+| GET /orders/:id/fulfillment | ERP → 我们 | 查询订单履约状态 |
+| GET /skus/:id/cost | ERP → 我们 | 拉取 SKU 供应链成本 |
+| GET /products/:id/skus | ERP → 我们 | 拉取产品所有 variant SKU 列表 |
+
+### F.4 Channel Sync Gateway API (内部)
 
 ```
-POST   /api/design-engine/sessions                 创建编辑 session
-GET    /api/design-engine/sessions/:id             获取 session（含完整状态）
-PUT    /api/design-engine/sessions/:id/save        保存编辑状态
-DELETE /api/design-engine/sessions/:id             关闭 session
-
-GET    /api/design-engine/templates/:id            获取模板配置
-GET    /api/design-engine/templates/:id/print-areas 获取印刷区域
-
-POST   /api/design-engine/configurations           创建/更新产品配置
-GET    /api/design-engine/configurations/:id       获取配置
-
-POST   /api/design-engine/preview/generate         生成 preview/mockup（异步）
-GET    /api/design-engine/preview/:id/status        查询生成状态
-POST   /api/design-engine/print-file/generate      生成印刷文件（异步）
-GET    /api/design-engine/print-file/:id/status     查询生成状态
-```
-
-### F.4 ERP Core API (供 Creator Commerce 调用)
-
-```
-GET    /api/erp/products                    产品列表
-GET    /api/erp/products/:id               产品详情
-GET    /api/erp/product-templates           产品模板列表
-GET    /api/erp/product-templates/:id       模板详情
-GET    /api/erp/skus?product_id=            SKU 列表
-
-POST   /api/erp/orders                     创建订单（由 Sync Gateway 调用）
-GET    /api/erp/orders?partner_id=           查询某 partner 的订单
-GET    /api/erp/orders/:id                 订单详情
-
-GET    /api/erp/partners/:id               获取 partner 信息（settlement terms 等）
-GET    /api/erp/payout-ledger?partner_id=   Partner 收入明细
-GET    /api/erp/settlements?partner_id=      结算记录
-```
-
-### F.5 Channel Sync Gateway API (内部)
-
-Gateway 作为 ERP 的渠道桥梁，所有数据从 ERP 读取后推送到外部 store，外部订单回流写入 ERP。
-
-```
-# Listing 同步（ERP 数据 → 外部渠道）
-POST   /api/sync/listings                  推送 listing 到渠道（Gateway 从 ERP 读取产品/SKU/库存）
-PUT    /api/sync/listings/:id              更新 listing（价格变更、库存同步）
-DELETE /api/sync/listings/:id              删除/下架 listing
-POST   /api/sync/listings/:id/retry        重试失败的同步
-
-# 库存同步（ERP 库存变更 → 推送到相关渠道）
-POST   /api/sync/inventory/push            ERP 库存变更后触发，更新所有相关渠道的库存
-
-# Webhook 入口（外部渠道 → 写入 ERP）
-POST   /api/sync/webhooks/shopify          Shopify Webhook 入口（订单/退款等 → 写入 ERP）
+POST   /api/sync/listings                  推送 listing 到渠道
+PUT    /api/sync/listings/:id              更新 listing
+DELETE /api/sync/listings/:id              删除/下架
+POST   /api/sync/listings/:id/retry        重试
+POST   /api/sync/inventory/push            库存变更推送
+POST   /api/sync/webhooks/shopify          Shopify Webhook 入口
 POST   /api/sync/webhooks/:platform        通用 Webhook 入口
 ```
 
@@ -1302,122 +1023,86 @@ POST   /api/sync/webhooks/:platform        通用 Webhook 入口
 
 ## G. 版本路线图
 
-### Phase 1: 最小可运行版本 (MVP)
+### Phase A1 — MVP（当前，目标 6 月 Go/No-Go）
 
-**目标**：Creator 可以上传设计、选品、编辑、在我们的 Marketplace 上发布销售，看到基本收入。
+| 模块 | 时间线 | 交付内容 |
+|------|--------|---------|
+| Creator/Distributor 招募审核 | 4月 | 注册申请、资料审核、Admin 审核流程、onboarding_status 状态机 |
+| 设计稿管理 | 4月 | 上传设计稿、版本管理（design_versions）、Admin 审核、designs 表 |
+| 产品池管理（Admin） | 4月 | Admin 配置 product_visibility_rules，控制哪些产品开放给哪类用户 |
+| 设计器集成 | 4-5月 | 调用设计器、保存 editor_sessions、生成 published_products |
+| Admin 选品（自营线） | 4-5月 | Admin 选设计稿 + 产品，curation_decisions 记录，审核通过回写 ERP |
+| custom_product_skus | 5月 | 定制 SKU 生成、variant 管理、ERP 回写接口 |
+| 渠道发布（Shopify） | 5月 | Shopify 对接、channel_listings + channel_listing_variants |
+| 收益计算基础 | 5-6月 | creator_earnings 自动写入、royalty vs margin 两种计算 |
+| Dashboard | 6月 | 订单数据、收益概览、设计稿表现 |
 
-| 模块 | 功能范围 |
-|------|---------|
-| Creator Auth | 注册、登录、基础 profile |
-| Design Management | 上传 artwork、管理 metadata、状态流转（简化审核：自动通过） |
-| Product Builder | 支持 2-3 个产品模板（T-shirt、Mug）、自动生成 preview |
-| Design Editor | iframe 嵌入、基础编辑（移动/缩放/旋转）、保存配置 |
-| Channel Distribution | **仅 Marketplace**（Mode A）、单一价格设置、发布到我们的 Shopify |
-| Orders | Creator 查看自己的 Marketplace 订单 |
-| Earnings | 基础 royalty 计算、收入总览（不含提现） |
-| Dashboard | 简单总览：总收入、总订单、top designs |
+**6月 Go/No-Go 六项指标**：签约 Designer 数、SKU 上线数、月 GMV、top Designer GMV、社媒内容触达、文件返修率
 
-**Phase 1 不做**：
-- Creator 自有 store 连接
-- Mode B / Hybrid
-- Payout 打款流程
-- 高级 analytics
-- 多渠道
+### Phase A2 — 渠道扩展（Q3）
 
-**预计交付物**：
-- Creator Portal 前端 (Next.js / React)
-- Creator Portal BFF 后端
-- Design Engine 基础 API + Editor iframe
-- ERP 侧新增 payout_ledger 表 + 基础 API
-- Channel Sync Gateway (仅 Shopify marketplace adapter)
-- 数据库完整 schema (按上述设计建表，即使 Phase 1 不用的字段也预留)
+| 模块 | 时间线 | 交付内容 |
+|------|--------|---------|
+| Etsy 对接 | 7月 | 产品同步、订单回流、listing 状态管理 |
+| TikTok Shop 对接 | 7月 | 产品同步、订单回流 |
+| Distributor 无店铺直接下单 | 7月 | 绕过渠道同步，订单直推 ERP |
+| 结算自动化 | 8月 | 按周期汇总 creator_earnings → creator_payouts 审批 → 打款 |
+| KYC / 税表 | 8月 | W-8/W-9 上传、提现前身份验证 |
+| 多渠道数据统计 | 9月 | 渠道收入对比、设计稿跨渠道表现分析 |
 
-### Phase 2: 渠道与同步增强
+### Phase A3 — AI 化（2027）
 
-**目标**：支持 Creator 连接自己的 Shopify Store，实现 Mode B 和 Hybrid。
-
-| 模块 | 新增功能 |
-|------|---------|
-| Store Connection | Shopify OAuth 连接流程、连接状态管理、自动刷新 token |
-| Channel Distribution | Mode B: 同步到 creator store、Hybrid: 两个渠道同时上架、per-channel 独立定价 |
-| Sync Engine | Creator store sync adapter、sync job 队列/重试/状态追踪、Webhook 处理（creator store 订单回流） |
-| Earnings | Mode B margin 计算、双渠道收入对比、收入明细按渠道拆分 |
-| Payouts | 结算周期管理、Payout 状态追踪、（对接支付渠道可后置） |
-| Dashboard | 渠道表现对比、按渠道维度的 analytics |
-| Design Editor | 增强：更多编辑功能（多图层、文字叠加等） |
-
-### Phase 3: Creator 生态化
-
-**目标**：丰富产品线，扩展渠道，构建 creator 生态。
-
-| 模块 | 新增功能 |
-|------|---------|
-| Product Templates | 更多模板：Hat、Tote Bag、Phone Case、Poster... |
-| Channels | TikTok Shop adapter、Etsy adapter、通用 API adapter |
-| Creator Tiers | Creator 等级体系、不同等级不同 royalty rate、邀请机制 |
-| Advanced Analytics | Design 表现趋势、A/B 测试建议、渠道 ROI 分析 |
-| Batch Operations | 批量上架/下架、批量改价 |
-| Design Engine SDK | 发布 npm SDK、支持 Module Federation、外部系统接入文档 |
-| Open API | 开放 API 给 creator 自行集成、Webhook 通知 |
-| Payout 自动化 | 对接 Stripe Connect / PayPal Payouts、自动打款 |
+| 方向 | 内容 |
+|------|------|
+| AI 选品 | 基于 curation_decisions.reason + 销售数据训练推荐模型 |
+| AI 预检 | 设计稿提交时自动检查 DPI/尺寸/版权风险 |
+| 智能定价 | 基于市场数据推荐各渠道最优售价 |
 
 ---
 
-## H. 技术选型建议
+## H. 技术选型
 
-| 层级 | 建议技术栈 | 备注 |
-|------|-----------|------|
-| Creator Portal Frontend | Next.js (App Router) + TypeScript + Tailwind CSS + shadcn/ui | 本项目开发 |
-| Creator Portal BFF | Next.js API Routes 或独立 Node.js (Fastify/Express) | 本项目开发 |
-| Design Engine Editor | React + Canvas API (Fabric.js / Konva.js) 或 WebGL | 已有 Node.js MVP，继续迭代 |
-| Design Engine Backend | Node.js (独立 service) | 本项目开发，补 API 层 |
-| ERP Core | Java（已有），暴露 REST API | 不在本项目范围，我们只调 API |
-| Channel Sync Gateway | Node.js + Bull/BullMQ (Job Queue) + Redis | 本项目开发 |
-| Database | **Supabase** (PostgreSQL，含 Auth/Storage/RLS) + Redis (缓存/队列) | 与 ERP DB 完全独立 |
-| File Storage | AWS S3 / Cloudflare R2 | |
-| Event Bus | Redis Streams 或 RabbitMQ（初期用 Bull job events 即可） | |
-| Auth | Supabase Auth（Creator 独立身份体系，支持 email/password + OAuth） | |
-| 部署 | Docker + Vercel (Portal) / AWS ECS (Engine, Sync) | |
+| 层级 | 建议技术栈 |
+|------|-----------|
+| Creator Portal Frontend | Next.js (App Router) + TypeScript + Tailwind CSS + shadcn/ui |
+| Creator Portal BFF | Next.js API Routes 或独立 Node.js (Fastify/Express) |
+| Design Engine Editor | React + Canvas API (Fabric.js / Konva.js) |
+| Design Engine Backend | Node.js (独立 service) |
+| ERP Core | Java（已有），暴露 REST API |
+| Channel Sync Gateway | Node.js + Bull/BullMQ (Job Queue) + Redis |
+| Database | **Supabase** (PostgreSQL + Auth + Storage + RLS) + Redis (缓存/队列) |
+| File Storage | AWS S3 / Cloudflare R2 |
+| Auth | Supabase Auth |
+| 部署 | Docker + Render (Admin) / Vercel (Portal) / AWS ECS (Engine, Sync) |
 
 ---
 
-## I. 风险提醒
+## I. 关键风险与设计决策
 
-### 最危险的架构误区
+| 风险点 | 决策 |
+|--------|------|
+| ERP 回写时机 | 必须在 Admin 审核通过（approved）后才调用创建定制 SKU 接口 |
+| designVersionId 版本锁定 | published_products 必须锁定版本，设计师更新设计不能影响已上架产品 |
+| baseCostSnapshot 快照 | channel_listing_variants 和 creator_earnings 创建时必须拍快照 |
+| curation_decisions.reason | 必须从 Day 1 强制填写，AI 选品唯一训练数据来源 |
+| Distributor 不可走自营线 | sourceType=distributor 时，不允许 channelType=our_shopify，API 层强制校验 |
+| 渠道售价独立性 | salePrice 完全由 Creator/Distributor 自定义，不与 ERP SKU 价格绑定 |
+| ErpProductSku 不扩展 | 定制 SKU 全部在 custom_product_skus 管理，ERP 原有 SKU 结构保持干净 |
+| printConfig 存储位置 | 存在 published_products 层，各 variant 共用，不重复存 |
+| creator_id 不冗余存储 | 通过 custom_product_skus → published_products.designId → designs.creatorId 查找 |
+| 权限隔离 | Admin 和 Creator Portal 共享数据库，API 层用 session/role 控制 |
 
-1. **把 Creator 系统做成 ERP 的一个页面**
-   Creator Portal 是面向外部用户的产品，交互逻辑、权限模型、数据视角都不同于内部 ERP。如果塞进 ERP，会导致 UX 妥协和权限混乱。
-
-2. **Design 和 Product Instance 不做区分**
-   一个 Design 可以应用到多个产品模板上，生成多个可售实例。如果把 design 和 product 混为一谈，后面多模板/多渠道场景全部要重构。
-
-3. **把 Design Engine 写死在 Creator Portal 里**
-   编辑器如果作为 Portal 的内部组件开发，未来给其他系统复用时需要整体重写。从 Day 1 保持独立部署和独立 API。
-
-4. **渠道逻辑硬编码**
-   如果只按 "Shopify" 来写，加 TikTok/Etsy 时要大改。应该抽象为 channel_type + adapter 模式。
-
-5. **Earnings 计算不走 Ledger**
-   不要在展示层直接用订单数据计算收入。必须有独立的 payout_ledger 做为可审计的财务底账，展示层只读 ledger 数据。
-
-### 现在最应该优先做的 3 件事
-
-1. **确定数据模型并建表** — Creator Commerce DB 中 Design → Product Configuration → Sellable Product Instance → Channel Listing 这条主线的表结构必须第一时间确认，它决定了所有后续开发。
-
-2. **给现有 Design Engine MVP 补 API 层** — 把"导出 JSON"变成"保存 product_configuration 到数据库"，把"下载预览图"变成"写入 S3 + 返回 URL"。然后验证 iframe 嵌入 + postMessage 通信。
-
-3. **跑通 Phase 1 核心链路** — Creator 上传 design → 选模板 → 编辑 → 发布到 Marketplace → 调 ERP API 创建订单 → 看到收入。先端到端跑通，再横向扩展功能。
-
-### 短期先简化 vs Day 1 必须设计对
+### 短期可简化 vs Day 1 必须对
 
 | 可以短期简化 | Day 1 必须对 |
 |-------------|-------------|
-| 审核流程（自动通过） | Design / ProductInstance / Listing 三层数据分离 |
-| 仅支持 Marketplace 渠道 | channel_type 字段和 adapter 抽象 |
-| Payout 不做自动打款（人工处理） | payout_ledger 独立表结构 |
-| 只支持 2-3 个模板 | product_template + print_areas 的通用结构 |
-| Dashboard 简化展示 | earnings 从 ledger 读取而非订单直算 |
-| 不做 creator tier | creators 表预留 tier/level 字段 |
+| 仅支持 Shopify 渠道 | channelType 字段和 adapter 抽象 |
+| Payout 不做自动打款 | creator_earnings 独立表结构 |
+| 只支持 2-3 个模板 | print_areas 通用结构 |
+| Dashboard 简化 | earnings 从 ledger 读取而非订单直算 |
+| 不做 creator tier | creators 表预留 userType 字段 |
 | Design Engine 仅 iframe 嵌入 | Design Engine 独立部署 + 独立 API |
-| | Design 内容管理归 Creator Portal，ERP 只存引用不存内容 |
-| | Creator 在 ERP 中是 partner 类型，不单独建 module；通用 partners 表 + settlement_terms |
+| | curation_decisions Day 1 必上，reason 必填 |
+| | product_visibility_rules 控制产品池 |
+| | baseCostSnapshot 快照机制 |
+| | Distributor 不可走自营线的 API 校验 |

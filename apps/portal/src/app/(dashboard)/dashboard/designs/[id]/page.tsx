@@ -60,7 +60,7 @@ export default async function DesignDetailPage({
   return (
     <div>
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-5">
-        <Link href="/dashboard/designs" className="hover:text-primary-600 transition-colors">Designs</Link>
+        <Link href="/dashboard/designs" className="hover:text-primary-600 transition-colors">My Designs</Link>
         <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
         </svg>
@@ -126,6 +126,9 @@ export default async function DesignDetailPage({
           {/* Actions */}
           <div className="rounded-2xl border border-border bg-white p-6 shadow-sm space-y-3">
             <h3 className="text-sm font-semibold text-gray-900">Actions</h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Promote your design on our marketplace, or create your own product to sell on your store.
+            </p>
 
             <PromoteButton designId={design.id} designStatus={design.status} />
 

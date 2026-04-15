@@ -14,9 +14,17 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
+  const { data: creator } = await supabase
+    .from('creators')
+    .select('user_type')
+    .eq('auth_user_id', user.id)
+    .single();
+
+  const userType = (creator?.user_type as 'designer' | 'distributor') ?? 'designer';
+
   return (
     <div className="min-h-screen bg-surface-secondary flex">
-      <Sidebar />
+      <Sidebar userType={userType} />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white/80 backdrop-blur-md border-b border-border-light h-16 flex items-center justify-between px-6 pl-16 md:pl-6 shrink-0 sticky top-0 z-30">
           <div />

@@ -26,8 +26,8 @@ export default async function ProductsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Products</h2>
-          <p className="text-gray-500 text-sm mt-1">Your sellable product instances</p>
+          <h2 className="text-2xl font-bold text-gray-900">Created Products</h2>
+          <p className="text-gray-500 text-sm mt-1">Products you've created and their current status</p>
         </div>
         <Link
           href="/dashboard/products/new"

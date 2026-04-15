@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { PromoteButton } from './PromoteButton';
 
 export default async function DesignsPage() {
   const supabase = await createClient();
@@ -35,8 +34,8 @@ export default async function DesignsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Designs</h2>
-          <p className="text-gray-500 text-sm mt-1">Manage your artwork and designs</p>
+          <h2 className="text-2xl font-bold text-gray-900">My Designs</h2>
+          <p className="text-gray-500 text-sm mt-1">Upload and manage your artwork designs</p>
         </div>
         <Link
           href="/dashboard/designs/new"
@@ -87,7 +86,7 @@ export default async function DesignsPage() {
                       <span className="text-gray-400 text-sm">No preview</span>
                     )}
                   </div>
-                  <div className="px-4 pt-4">
+                  <div className="px-4 py-4">
                     <h3 className="font-semibold text-gray-900 group-hover:text-primary-700 truncate transition-colors">
                       {design.title}
                     </h3>
@@ -99,9 +98,6 @@ export default async function DesignsPage() {
                     </div>
                   </div>
                 </Link>
-                <div className="px-4 pb-4">
-                  <PromoteButton designId={design.id} designStatus={design.status} />
-                </div>
               </div>
             );
           })}

@@ -4,15 +4,26 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  designerOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-  { href: '/dashboard/designs', label: 'Designs', icon: PaletteIcon },
-  { href: '/dashboard/products', label: 'Products', icon: PackageIcon },
+  { href: '/dashboard/designs', label: 'My Designs', icon: PaletteIcon, designerOnly: true },
+  { href: '/dashboard/products', label: 'Created Products', icon: PackageIcon },
 ];
 
-export function Sidebar() {
+export function Sidebar({ userType }: { userType: 'designer' | 'distributor' }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  const filteredNav = navItems.filter(
+    (item) => !item.designerOnly || userType === 'designer'
+  );
 
   useEffect(() => {
     setOpen(false);
@@ -49,7 +60,7 @@ export function Sidebar() {
 
       <nav className="flex-1 px-3 py-2 space-y-0.5">
         <p className="px-3 pt-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">Menu</p>
-        {navItems.map((item) => {
+        {filteredNav.map((item) => {
           const isActive = item.href === '/dashboard'
             ? pathname === '/dashboard'
             : pathname.startsWith(item.href);
