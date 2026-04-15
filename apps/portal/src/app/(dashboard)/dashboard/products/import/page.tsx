@@ -9,7 +9,10 @@ import { createClient } from '@/lib/supabase/client';
  *
  * Landing page after Design Engine "Save & Finish".
  * Reads product data from URL hash, creates products in DB, redirects to products list.
- * This runs client-side on the Portal domain, so auth cookies are available.
+ *
+ * Supports two flows:
+ * 1. From My Designs → Create Product: has design_id, links to existing design
+ * 2. From Product Catalog: no design_id, creates product without design link
  */
 export default function ImportFromEditorPage() {
   const router = useRouter();
@@ -24,7 +27,7 @@ export default function ImportFromEditorPage() {
   async function saveProducts() {
     try {
       // Read data from URL hash
-      const hash = window.location.hash.slice(1); // remove #
+      const hash = window.location.hash.slice(1);
       if (!hash) {
         setError('No product data received');
         setStatus('error');
@@ -34,8 +37,8 @@ export default function ImportFromEditorPage() {
       const payload = JSON.parse(decodeURIComponent(hash));
       const { design_id, products, title_prefix } = payload;
 
-      if (!design_id || !products || products.length === 0) {
-        setError('Invalid product data');
+      if (!products || products.length === 0) {
+        setError('No products to save');
         setStatus('error');
         return;
       }
@@ -59,33 +62,37 @@ export default function ImportFromEditorPage() {
         return;
       }
 
-      // Get design version and artwork
-      const { data: design } = await supabase
-        .from('designs')
-        .select('id, current_version_id')
-        .eq('id', design_id)
-        .single();
+      // If coming from My Designs flow, get design version and artwork
+      let designVersionId: string | null = null;
+      let artworkFallbackUrl: string | null = null;
 
-      if (!design?.current_version_id) {
-        setError('Design or version not found');
-        setStatus('error');
-        return;
+      if (design_id) {
+        const { data: design } = await supabase
+          .from('designs')
+          .select('id, current_version_id')
+          .eq('id', design_id)
+          .single();
+
+        if (design?.current_version_id) {
+          designVersionId = design.current_version_id;
+
+          const { data: artworkAsset } = await supabase
+            .from('design_assets')
+            .select('file_url')
+            .eq('design_version_id', designVersionId)
+            .eq('asset_type', 'artwork')
+            .single();
+
+          artworkFallbackUrl = artworkAsset?.file_url ?? null;
+        }
       }
-
-      // Get artwork URL as fallback preview
-      const { data: artworkAsset } = await supabase
-        .from('design_assets')
-        .select('file_url')
-        .eq('design_version_id', design.current_version_id)
-        .eq('asset_type', 'artwork')
-        .single();
 
       // Create products
       let createdCount = 0;
       for (const product of products) {
         const productTitle = products.length > 1
-          ? `${title_prefix} — ${product.name}`
-          : title_prefix || product.name;
+          ? `${title_prefix || 'Product'} — ${product.name}`
+          : title_prefix || product.name || 'Untitled Product';
 
         // Upload mockup preview to Supabase Storage if it's a data URL
         let previewUrls: string[] = [];
@@ -115,16 +122,16 @@ export default function ImportFromEditorPage() {
           previewUrls = [product.thumbnail];
         }
 
-        if (previewUrls.length === 0 && artworkAsset?.file_url) {
-          previewUrls = [artworkAsset.file_url];
+        if (previewUrls.length === 0 && artworkFallbackUrl) {
+          previewUrls = [artworkFallbackUrl];
         }
 
         const { data: instance, error: instanceError } = await supabase
           .from('sellable_product_instances')
           .insert({
             creator_id: creator.id,
-            design_id: design.id,
-            design_version_id: design.current_version_id,
+            design_id: design_id || null,
+            design_version_id: designVersionId,
             product_template_id: product.template_id,
             title: productTitle,
             status: 'draft',
@@ -139,14 +146,17 @@ export default function ImportFromEditorPage() {
           continue;
         }
 
-        await supabase
-          .from('product_configurations')
-          .insert({
-            sellable_product_instance_id: instance.id,
-            design_version_id: design.current_version_id,
-            product_template_id: product.template_id,
-            layers: product.layers || [],
-          });
+        // Only create product_configurations if we have design version
+        if (designVersionId) {
+          await supabase
+            .from('product_configurations')
+            .insert({
+              sellable_product_instance_id: instance.id,
+              design_version_id: designVersionId,
+              product_template_id: product.template_id,
+              layers: product.layers || [],
+            });
+        }
 
         createdCount++;
       }
