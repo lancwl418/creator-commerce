@@ -14,12 +14,19 @@ interface ErpProduct {
   description: string;
   vendor: string;
   productType: string;
+  category?: string;
+  categoryName?: string;
   status: number;
   tags: string;
   itemNo: string;
   mainPic: string;
   prodSkuList: { id: string; price: number; option1: string; option2: string }[];
   prodImageList: { picSrc: string; isMain: number }[];
+}
+
+/** Get display category from product, falling back through available fields */
+function getCategory(p: ErpProduct): string {
+  return p.category || p.categoryName || p.productType || '';
 }
 
 interface CatalogState {
@@ -145,14 +152,14 @@ export default function CatalogPage() {
     return null;
   }
 
-  // Extract unique categories from productType
+  // Extract unique categories
   const categories = ['all', ...Array.from(
-    new Set(state.products.map((p) => p.productType).filter(Boolean))
+    new Set(state.products.map((p) => getCategory(p)).filter(Boolean))
   )];
 
   // Filter
   const filteredProducts = state.products.filter((p) => {
-    if (activeCategory !== 'all' && p.productType !== activeCategory) return false;
+    if (activeCategory !== 'all' && getCategory(p) !== activeCategory) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -342,9 +349,9 @@ export default function CatalogPage() {
                         </span>
                       )}
                     </div>
-                    {product.productType && (
+                    {getCategory(product) && (
                       <span className="inline-block mt-2 rounded-md bg-surface-secondary px-2 py-0.5 text-[10px] text-gray-500 font-medium">
-                        {product.productType}
+                        {getCategory(product)}
                       </span>
                     )}
                   </div>

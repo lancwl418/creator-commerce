@@ -34,12 +34,18 @@ interface ErpProduct {
   description: string;
   vendor: string;
   productType: string;
+  category?: string;
+  categoryName?: string;
   status: number;
   tags: string;
   itemNo: string;
   mainPic: string;
   prodSkuList: ErpProductSku[];
   prodImageList: ErpProductImage[];
+}
+
+function getCategory(p: ErpProduct): string {
+  return p.category || p.categoryName || p.productType || '';
 }
 
 function erpImg(path: string): string {
@@ -261,9 +267,9 @@ export default function CatalogDetailPage() {
             )}
             <div className="flex items-center gap-3 mt-3">
               <span className="text-xs text-gray-400 font-mono">{product.itemNo}</span>
-              {product.productType && (
+              {getCategory(product) && (
                 <span className="inline-block rounded-md bg-surface-secondary px-2.5 py-0.5 text-[11px] text-gray-500 font-medium">
-                  {product.productType}
+                  {getCategory(product)}
                 </span>
               )}
               {product.vendor && (
