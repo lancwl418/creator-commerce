@@ -295,6 +295,7 @@ function EditorPageInner() {
             return {
               template_id: entry.template.id,
               name: entry.template.name,
+              description: entry.template.description || '',
               base_cost: parseFloat(String(entry.template.metadata?.price ?? 0)) || 0,
               thumbnail,
               layers: allLayers,
@@ -310,6 +311,7 @@ function EditorPageInner() {
         productsToSave = [{
           template_id: selectedTemplate?.id ?? '',
           name: selectedTemplate?.name ?? '',
+          description: selectedTemplate?.description || '',
           base_cost: 0,
           thumbnail: currentMockup || artworkUrl,
           layers: allLayers,
