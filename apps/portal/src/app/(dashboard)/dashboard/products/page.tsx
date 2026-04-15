@@ -55,7 +55,7 @@ export default async function ProductsPage() {
       ) : (
         <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
           {/* Table header */}
-          <div className="hidden sm:grid sm:grid-cols-[auto_1fr_140px_120px_100px_100px] gap-4 items-center px-5 py-3 bg-surface-secondary border-b border-border-light text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+          <div className="hidden sm:grid sm:grid-cols-[auto_1fr_160px_120px_100px_100px] gap-4 items-center px-5 py-3 bg-surface-secondary border-b border-border-light text-[11px] font-semibold uppercase tracking-wider text-gray-400">
             <div className="w-10" />
             <div>Product</div>
             <div>Design</div>
@@ -68,13 +68,14 @@ export default async function ProductsPage() {
           <div className="divide-y divide-border-light">
             {products.map((product) => {
               const previewUrl = (product.preview_urls as string[])?.[0];
+              const artworkUrls = (product.design_artwork_urls as string[]) ?? [];
               const listing = product.channel_listings?.[0];
 
               return (
                 <Link
                   key={product.id}
                   href={`/dashboard/products/${product.id}`}
-                  className="group flex flex-col sm:grid sm:grid-cols-[auto_1fr_140px_120px_100px_100px] gap-3 sm:gap-4 items-start sm:items-center px-5 py-4 hover:bg-surface-hover transition-colors"
+                  className="group flex flex-col sm:grid sm:grid-cols-[auto_1fr_160px_120px_100px_100px] gap-3 sm:gap-4 items-start sm:items-center px-5 py-4 hover:bg-surface-hover transition-colors"
                 >
                   {/* Thumbnail */}
                   <div className="w-10 h-10 rounded-lg bg-surface-secondary flex items-center justify-center overflow-hidden shrink-0">
@@ -99,9 +100,20 @@ export default async function ProductsPage() {
 
                   {/* Design */}
                   <div className="min-w-0">
-                    <p className="text-xs text-gray-500 truncate">
-                      {product.designs?.title || '—'}
-                    </p>
+                    {artworkUrls.length > 0 ? (
+                      <div className="flex items-center gap-1.5">
+                        {artworkUrls.slice(0, 3).map((url, i) => (
+                          <div key={i} className="w-8 h-8 rounded-md bg-surface-secondary overflow-hidden shrink-0 border border-border-light">
+                            <img src={url} alt="" className="w-full h-full object-contain" />
+                          </div>
+                        ))}
+                        {artworkUrls.length > 3 && (
+                          <span className="text-[10px] text-gray-400 font-medium">+{artworkUrls.length - 3}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
                   </div>
 
                   {/* Channel */}

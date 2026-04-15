@@ -11,6 +11,7 @@ interface CreatedProduct {
   status: string;
   base_price_suggestion: number | null;
   preview_urls: string[];
+  design_artwork_urls: string[];
   product_template_id: string;
   created_at: string;
 }
@@ -124,6 +125,41 @@ export default function ImportFromEditorPage() {
           previewUrls = [artworkFallbackUrl];
         }
 
+        // Extract design artwork URLs from layers or explicit artwork_urls
+        let designArtworkUrls: string[] = product.artwork_urls ?? [];
+        if (designArtworkUrls.length === 0 && product.layers) {
+          designArtworkUrls = product.layers
+            .filter((l: { type: string; data?: { src?: string } }) => l.type === 'image' && l.data?.src)
+            .map((l: { data: { src: string } }) => l.data.src);
+        }
+
+        // Upload any data: URL artworks to storage
+        const storedArtworkUrls: string[] = [];
+        for (const artUrl of designArtworkUrls) {
+          if (artUrl.startsWith('data:')) {
+            try {
+              const b64 = artUrl.split(',')[1];
+              const mMatch = artUrl.match(/data:([^;]+);/);
+              const m = mMatch?.[1] || 'image/png';
+              const e = m === 'image/png' ? 'png' : 'jpg';
+              const bts = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+              const fp = `${creator.id}/artworks/${crypto.randomUUID()}.${e}`;
+              const { error: upErr } = await supabase.storage.from('design-assets').upload(fp, bts, { contentType: m });
+              if (!upErr) {
+                const { data: ud } = supabase.storage.from('design-assets').getPublicUrl(fp);
+                storedArtworkUrls.push(ud.publicUrl);
+              }
+            } catch { /* skip */ }
+          } else if (artUrl && !artUrl.startsWith('blob:')) {
+            storedArtworkUrls.push(artUrl);
+          }
+        }
+
+        // If no mockup preview but we have artwork, use first artwork as preview
+        if (previewUrls.length === 0 && storedArtworkUrls.length > 0) {
+          previewUrls = [storedArtworkUrls[0]];
+        }
+
         const basePriceSuggestion = product.base_cost ? product.base_cost * 2.5 : null;
 
         const { data: instance, error: instanceError } = await supabase
@@ -137,6 +173,7 @@ export default function ImportFromEditorPage() {
             status: 'draft',
             base_price_suggestion: basePriceSuggestion,
             preview_urls: previewUrls,
+            design_artwork_urls: storedArtworkUrls,
           })
           .select('*')
           .single();
@@ -238,6 +275,7 @@ export default function ImportFromEditorPage() {
       <div className="space-y-4">
         {createdProducts.map((product) => {
           const previewUrl = (product.preview_urls as string[])?.[0];
+          const artworkUrls = (product.design_artwork_urls as string[]) ?? [];
 
           return (
             <Link
@@ -245,7 +283,7 @@ export default function ImportFromEditorPage() {
               href={`/dashboard/products/${product.id}?from=import`}
               className="group flex gap-5 rounded-2xl border border-border bg-white p-5 hover:shadow-lg hover:shadow-gray-200/50 transition-all duration-200"
             >
-              {/* Preview */}
+              {/* Preview — mockup with design */}
               <div className="w-28 h-28 rounded-xl bg-surface-secondary flex items-center justify-center overflow-hidden shrink-0">
                 {previewUrl ? (
                   <img
@@ -269,7 +307,19 @@ export default function ImportFromEditorPage() {
                   Created {new Date(product.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </p>
 
-                <div className="flex items-center gap-3 mt-3">
+                {/* Design artwork thumbnails */}
+                {artworkUrls.length > 0 && (
+                  <div className="flex items-center gap-1.5 mt-2.5">
+                    <span className="text-[10px] text-gray-400 font-medium mr-1">Design:</span>
+                    {artworkUrls.map((url, i) => (
+                      <div key={i} className="w-8 h-8 rounded-md bg-white overflow-hidden border border-border-light shrink-0">
+                        <img src={url} alt="" className="w-full h-full object-contain" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 mt-2">
                   <span className="inline-block rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600">
                     Draft
                   </span>

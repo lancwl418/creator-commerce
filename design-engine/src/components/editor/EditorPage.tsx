@@ -288,22 +288,32 @@ function EditorPageInner() {
             if (!thumbnail) {
               thumbnail = await compositePreview(entry.template, entry.design) || artworkUrl;
             }
+            const allLayers = Object.values(entry.design.views).flatMap((v) => v.layers);
+            const artworkUrls = allLayers
+              .filter((l) => l.type === 'image' && l.data?.src)
+              .map((l) => l.data.src as string);
             return {
               template_id: entry.template.id,
               name: entry.template.name,
               base_cost: parseFloat(String(entry.template.metadata?.price ?? 0)) || 0,
               thumbnail,
-              layers: Object.values(entry.design.views).flatMap((v) => v.layers),
+              layers: allLayers,
+              artwork_urls: artworkUrls,
             };
           })
         );
       } else {
+        const allLayers = Object.values(currentDesign.views).flatMap((v) => v.layers);
+        const artworkUrls = allLayers
+          .filter((l) => l.type === 'image' && l.data?.src)
+          .map((l) => l.data.src as string);
         productsToSave = [{
           template_id: selectedTemplate?.id ?? '',
           name: selectedTemplate?.name ?? '',
           base_cost: 0,
           thumbnail: currentMockup || artworkUrl,
-          layers: Object.values(currentDesign.views).flatMap((v) => v.layers),
+          layers: allLayers,
+          artwork_urls: artworkUrls,
         }];
       }
 
