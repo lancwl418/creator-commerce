@@ -426,7 +426,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
           </div>
         )}
 
-        {/* Save Button */}
+        {/* Actions */}
         <div className="flex items-center gap-3">
           <button
             onClick={handleSave}
@@ -435,12 +435,15 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
           >
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Product'}
           </button>
-          <Link
-            href="/dashboard/products"
-            className="rounded-xl border border-border px-6 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          <button
+            onClick={() => {
+              // TODO: implement store sync flow
+              alert('Store sync coming soon! Connect your store first in Settings.');
+            }}
+            className="flex-1 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-500 transition-all shadow-md shadow-emerald-600/25"
           >
-            Back
-          </Link>
+            Sync to Your Stores
+          </button>
         </div>
       </div>
     </div>
