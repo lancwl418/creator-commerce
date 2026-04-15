@@ -36,7 +36,7 @@ export default async function ProductDetailPage({
   return (
     <div>
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-5">
-        <Link href="/dashboard/products" className="hover:text-primary-600 transition-colors">Products</Link>
+        <Link href="/dashboard/products" className="hover:text-primary-600 transition-colors">Created Products</Link>
         <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
         </svg>
