@@ -24,6 +24,17 @@ interface PrintableAreaEditorProps {
     productRectData: ProductRectData,
   ) => void;
   onClose: () => void;
+  /** When true, render inline (no modal overlay) and hide internal Save/Cancel buttons. */
+  embedded?: boolean;
+  /** Fires on every edit; used by embed host to accumulate state across views. */
+  onChange?: (
+    viewId: string,
+    printableArea: PrintableArea,
+    productRectData: ProductRectData,
+  ) => void;
+  /** Force a specific active view (controlled). If omitted, internal state is used. */
+  activeViewIdOverride?: string;
+  onActiveViewChange?: (viewId: string) => void;
 }
 
 type DragMode =
@@ -57,8 +68,21 @@ const HANDLE_DEFS: { mode: DragMode; style: React.CSSProperties; cursor: string 
   { mode: 'se', style: { bottom: -HANDLE_SIZE / 2, right: -HANDLE_SIZE / 2 }, cursor: 'nwse-resize' },
 ];
 
-export default function PrintableAreaEditor({ template, onSave, onClose }: PrintableAreaEditorProps) {
-  const [activeViewId, setActiveViewId] = useState(template.defaultViewId);
+export default function PrintableAreaEditor({
+  template,
+  onSave,
+  onClose,
+  embedded = false,
+  onChange,
+  activeViewIdOverride,
+  onActiveViewChange,
+}: PrintableAreaEditorProps) {
+  const [internalActiveViewId, setInternalActiveViewId] = useState(template.defaultViewId);
+  const activeViewId = activeViewIdOverride ?? internalActiveViewId;
+  const setActiveViewId = (id: string) => {
+    if (activeViewIdOverride === undefined) setInternalActiveViewId(id);
+    onActiveViewChange?.(id);
+  };
   const view = template.views.find((v) => v.id === activeViewId) ?? template.views[0];
 
   // Restore saved product rect from metadata, or use default (80% centered)
@@ -103,6 +127,19 @@ export default function PrintableAreaEditor({ template, onSave, onClose }: Print
   // Image display state
   const [imgLoaded, setImgLoaded] = useState(false);
   const [displaySize, setDisplaySize] = useState({ w: 0, h: 0 });
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  // Track the image's actual rendered size so the overlay rectangles stay
+  // aligned when the viewport / container resizes.
+  useEffect(() => {
+    if (!imgLoaded || !imgRef.current) return;
+    const el = imgRef.current;
+    const update = () => setDisplaySize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [imgLoaded, view.mockupImageUrl]);
 
   // Scale factor: display pixels → mockup pixels
   const scale = displaySize.w > 0 ? view.mockupWidth / displaySize.w : 1;
@@ -115,7 +152,9 @@ export default function PrintableAreaEditor({ template, onSave, onClose }: Print
   const printPhysicalW = +(printRect.w * inchesPerPx).toFixed(2);
   const printPhysicalH = +(printRect.h * inchesPerPxY).toFixed(2);
 
-  // Sync state when view changes
+  // Sync state when the active view changes (NOT on every template prop change —
+  // doing so would create an infinite loop when the parent echoes our onChange
+  // back as a new template object).
   useEffect(() => {
     const v = template.views.find((vw) => vw.id === activeViewId) ?? template.views[0];
     const saved = getSavedProductRect(activeViewId);
@@ -131,7 +170,7 @@ export default function PrintableAreaEditor({ template, onSave, onClose }: Print
     setMinDPI(v.printableArea.minDPI);
     setImgLoaded(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeViewId, template]);
+  }, [activeViewId]);
 
   const handleImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -236,6 +275,31 @@ export default function PrintableAreaEditor({ template, onSave, onClose }: Print
     };
   }, [scale, view.mockupWidth, view.mockupHeight]);
 
+  // Fire onChange continuously (embed mode uses this to accumulate state).
+  useEffect(() => {
+    if (!onChange) return;
+    const printableArea: PrintableArea = {
+      shape: view.printableArea.shape,
+      x: printRect.x,
+      y: printRect.y,
+      width: printRect.w,
+      height: printRect.h,
+      physicalWidthInches: printPhysicalW,
+      physicalHeightInches: printPhysicalH,
+      minDPI,
+    };
+    const productRectData: ProductRectData = {
+      x: productRect.x,
+      y: productRect.y,
+      w: productRect.w,
+      h: productRect.h,
+      physicalW: productPhysicalW,
+      physicalH: productPhysicalH,
+    };
+    onChange(activeViewId, printableArea, productRectData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeViewId, printRect, productRect, productPhysicalW, productPhysicalH, minDPI, printPhysicalW, printPhysicalH]);
+
   const handleSave = () => {
     const printableArea: PrintableArea = {
       shape: view.printableArea.shape,
@@ -269,10 +333,10 @@ export default function PrintableAreaEditor({ template, onSave, onClose }: Print
   const dispProduct = toDisplay(productRect);
   const dispPrint = toDisplay(printRect);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl w-[640px] max-h-[90vh] flex flex-col">
+  const inner = (
+    <div className={cn('bg-white flex flex-col', embedded ? 'w-full h-full' : 'rounded-xl shadow-2xl w-[640px] max-h-[90vh]')}>
         {/* Header */}
+        {!embedded && (
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-800">
             Printable Area — {template.name}
@@ -281,9 +345,10 @@ export default function PrintableAreaEditor({ template, onSave, onClose }: Print
             <X className="w-4 h-4 text-gray-400" />
           </button>
         </div>
+        )}
 
-        {/* View tabs */}
-        {template.views.length > 1 && (
+        {/* View tabs (hidden in embedded mode — parent renders its own) */}
+        {!embedded && template.views.length > 1 && (
           <div className="flex gap-1 px-4 pt-3">
             {template.views.map((v) => (
               <button
@@ -315,16 +380,16 @@ export default function PrintableAreaEditor({ template, onSave, onClose }: Print
         </div>
 
         {/* Image + two rectangle overlays */}
-        <div className="p-4 flex-1 overflow-hidden flex justify-center">
+        <div className={cn('p-4 flex justify-center items-center', embedded ? 'flex-1 min-h-0' : 'flex-1 overflow-hidden')}>
           <div
-            className="relative inline-block bg-gray-100 rounded-lg overflow-visible select-none"
-            style={{ maxWidth: '100%', maxHeight: '380px' }}
+            className="relative inline-block bg-gray-100 rounded-lg overflow-visible select-none max-w-full max-h-full"
           >
             <img
+              ref={imgRef}
               src={view.mockupImageUrl}
               alt={view.label}
               onLoad={handleImgLoad}
-              className="block max-w-full max-h-[380px] object-contain"
+              className={cn('block object-contain', embedded ? 'max-w-full max-h-[55vh]' : 'max-w-full max-h-[380px]')}
               draggable={false}
               crossOrigin="anonymous"
             />
@@ -460,6 +525,7 @@ export default function PrintableAreaEditor({ template, onSave, onClose }: Print
         </div>
 
         {/* Actions */}
+        {!embedded && (
         <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200">
           <button
             onClick={onClose}
@@ -474,7 +540,14 @@ export default function PrintableAreaEditor({ template, onSave, onClose }: Print
             Save
           </button>
         </div>
-      </div>
+        )}
+    </div>
+  );
+
+  if (embedded) return inner;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      {inner}
     </div>
   );
 }

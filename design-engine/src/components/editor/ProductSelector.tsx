@@ -4,11 +4,9 @@ import { useState, useCallback } from 'react';
 import { useProductStore } from '@/stores/productStore';
 import { useDesignStore } from '@/stores/designStore';
 import { useMultiProductStore } from '@/stores/multiProductStore';
-import { Shirt, Coffee, Smartphone, Package, ShoppingBag, ChevronDown, ChevronRight, Settings } from 'lucide-react';
+import { Shirt, Coffee, Smartphone, Package, ShoppingBag, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import PrintableAreaEditor from './PrintableAreaEditor';
-import type { ProductRectData } from './PrintableAreaEditor';
-import type { ProductTemplate, PrintableArea } from '@/types/product';
+import type { ProductTemplate } from '@/types/product';
 
 const productIcons: Record<string, typeof Shirt> = {
   tshirt: Shirt,
@@ -28,11 +26,10 @@ interface TemplateGroupProps {
   templates: ProductTemplate[];
   selectedTemplate: ProductTemplate | null;
   onSelect: (id: string) => void;
-  onEdit?: (template: ProductTemplate) => void;
   defaultExpanded?: boolean;
 }
 
-function TemplateGroup({ title, templates, selectedTemplate, onSelect, onEdit, defaultExpanded = true }: TemplateGroupProps) {
+function TemplateGroup({ title, templates, selectedTemplate, onSelect, defaultExpanded = true }: TemplateGroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   if (templates.length === 0) return null;
@@ -59,40 +56,27 @@ function TemplateGroup({ title, templates, selectedTemplate, onSelect, onEdit, d
             const thumbnailUrl = isExternal ? template.views[0]?.mockupImageUrl : null;
 
             return (
-              <div key={template.id} className="flex items-center gap-1">
-                <button
-                  onClick={() => onSelect(template.id)}
-                  className={cn(
-                    'flex-1 flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors min-w-0',
-                    isSelected
-                      ? 'bg-blue-50 text-blue-700 font-medium'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  )}
-                >
-                  {thumbnailUrl ? (
-                    <img
-                      src={thumbnailUrl}
-                      alt=""
-                      className="w-6 h-6 object-contain rounded flex-shrink-0"
-                    />
-                  ) : (
-                    <Icon className="w-4 h-4 flex-shrink-0" />
-                  )}
-                  <span className="truncate">{template.name}</span>
-                </button>
-                {isExternal && onEdit && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(template);
-                    }}
-                    className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-                    title="Edit printable area"
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                  </button>
+              <button
+                key={template.id}
+                onClick={() => onSelect(template.id)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors min-w-0',
+                  isSelected
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
                 )}
-              </div>
+              >
+                {thumbnailUrl ? (
+                  <img
+                    src={thumbnailUrl}
+                    alt=""
+                    className="w-6 h-6 object-contain rounded flex-shrink-0"
+                  />
+                ) : (
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                )}
+                <span className="truncate">{template.name}</span>
+              </button>
             );
           })}
         </div>
@@ -102,16 +86,14 @@ function TemplateGroup({ title, templates, selectedTemplate, onSelect, onEdit, d
 }
 
 export default function ProductSelector() {
-  const { templates, selectedTemplate, selectTemplate, activeViewId, setActiveView, updateTemplateView } =
+  const { templates, selectedTemplate, selectTemplate, activeViewId, setActiveView } =
     useProductStore();
   const design = useDesignStore((s) => s.design);
-  const [editingTemplate, setEditingTemplate] = useState<ProductTemplate | null>(null);
 
   const demoTemplates = templates.filter((t) => !t.metadata?.source);
   const shopifyTemplates = templates.filter((t) => t.metadata?.source === 'shopify');
   const erpTemplates = templates.filter((t) => t.metadata?.source === 'erp');
 
-  const updateTemplateMetadata = useProductStore((s) => s.updateTemplateMetadata);
   const addProduct = useMultiProductStore((s) => s.addProduct);
   const multiProducts = useMultiProductStore((s) => s.products);
   const isMultiProduct = useMultiProductStore((s) => s.isMultiProduct);
@@ -127,25 +109,6 @@ export default function ProductSelector() {
     (templateId: string) => multiProducts.some((p) => p.template.id === templateId),
     [multiProducts]
   );
-
-  const handleSavePrintableArea = (
-    templateId: string,
-    viewId: string,
-    printableArea: PrintableArea,
-    productRectData: ProductRectData,
-  ) => {
-    // Save printable area to the view
-    updateTemplateView(templateId, viewId, { printableArea });
-
-    // Save product rect data to template metadata for persistence
-    const template = templates.find((t) => t.id === templateId);
-    const existingRects = (template?.metadata?.productRects as Record<string, ProductRectData>) ?? {};
-    updateTemplateMetadata(templateId, {
-      productRects: { ...existingRects, [viewId]: productRectData },
-    });
-
-    setEditingTemplate(null);
-  };
 
   return (
     <div className="flex flex-col">
@@ -165,7 +128,6 @@ export default function ProductSelector() {
         templates={shopifyTemplates}
         selectedTemplate={selectedTemplate}
         onSelect={selectTemplate}
-        onEdit={setEditingTemplate}
       />
 
       <TemplateGroup
@@ -173,7 +135,6 @@ export default function ProductSelector() {
         templates={erpTemplates}
         selectedTemplate={selectedTemplate}
         onSelect={selectTemplate}
-        onEdit={setEditingTemplate}
       />
 
       {selectedTemplate && selectedTemplate.views.length > 1 && (
@@ -227,14 +188,6 @@ export default function ProductSelector() {
         </div>
       )}
 
-      {/* Printable area editor modal */}
-      {editingTemplate && (
-        <PrintableAreaEditor
-          template={editingTemplate}
-          onSave={handleSavePrintableArea}
-          onClose={() => setEditingTemplate(null)}
-        />
-      )}
     </div>
   );
 }

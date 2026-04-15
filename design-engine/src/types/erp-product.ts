@@ -25,6 +25,19 @@ export interface ErpProductImage {
   itemNo: string;
 }
 
+/**
+ * Print template setup data, populated by ERP operators via the
+ * /embed/template-setup tool. When present, the editor uses these mockup
+ * images and printable areas verbatim instead of falling back to defaults.
+ */
+export interface ErpPrintTemplate {
+  views: import('./product').ProductView[];
+  productRects: Record<string, {
+    x: number; y: number; w: number; h: number;
+    physicalW: number; physicalH: number;
+  }>;
+}
+
 /** ERP 商品 */
 export interface ErpProduct {
   id: string;
@@ -40,6 +53,8 @@ export interface ErpProduct {
   mainPic: string;
   prodSkuList: ErpProductSku[];
   prodImageList: ErpProductImage[];
+  /** Optional: print-area template configured via the ERP embed tool. */
+  printTemplate?: ErpPrintTemplate;
 }
 
 /** ERP API 分页响应 */
