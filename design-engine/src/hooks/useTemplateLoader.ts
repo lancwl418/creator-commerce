@@ -249,7 +249,7 @@ async function fetchExternalProducts(
       if (!res.ok) throw new Error(`Shopify API ${res.status}`);
       return res.json() as Promise<{ products: ShopifyProduct[] }>;
     }),
-    fetch('/api/erp-products?pageNo=1&pageSize=20').then((res) => {
+    fetch('/api/erp-products?pageNo=1&pageSize=200').then((res) => {
       if (!res.ok) throw new Error(`ERP API ${res.status}`);
       return res.json() as Promise<ErpProductListResponse>;
     }),
