@@ -290,8 +290,8 @@ function EditorPageInner() {
             }
             const allLayers = Object.values(entry.design.views).flatMap((v) => v.layers);
             const artworkUrls = allLayers
-              .filter((l) => l.type === 'image' && l.data?.src)
-              .map((l) => l.data.src as string);
+              .filter((l) => l.type === 'image' && l.data.type === 'image')
+              .map((l) => (l.data as { src: string }).src);
             return {
               template_id: entry.template.id,
               name: entry.template.name,
@@ -306,8 +306,8 @@ function EditorPageInner() {
       } else {
         const allLayers = Object.values(currentDesign.views).flatMap((v) => v.layers);
         const artworkUrls = allLayers
-          .filter((l) => l.type === 'image' && l.data?.src)
-          .map((l) => l.data.src as string);
+          .filter((l) => l.type === 'image' && l.data.type === 'image')
+          .map((l) => (l.data as { src: string }).src);
         productsToSave = [{
           template_id: selectedTemplate?.id ?? '',
           name: selectedTemplate?.name ?? '',
