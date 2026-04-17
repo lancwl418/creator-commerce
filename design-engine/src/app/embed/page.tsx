@@ -28,6 +28,9 @@ function EmbedPageInner() {
         productsCacheUrl,
         artworkUrl: artworkUrl ? decodeURIComponent(artworkUrl) : undefined,
         designId: params.get('design_id') || undefined,
+        selectedColor: params.get('selected_color')
+          ? decodeURIComponent(params.get('selected_color')!)
+          : undefined,
       };
     }
 

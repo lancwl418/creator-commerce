@@ -20,6 +20,8 @@ export interface EditorConfig {
   artworkUrl?: string;
   /** Portal mode: design ID from Portal */
   designId?: string;
+  /** Portal mode: pre-selected color from catalog page */
+  selectedColor?: string;
   /** Callback when user saves the design */
   onSave?: (designJson: string) => void;
   /** Callback when user exports the design */

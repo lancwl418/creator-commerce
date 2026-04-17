@@ -53,6 +53,12 @@ function erpImg(path: string): string {
   return `/api/erp/image?path=${encodeURIComponent(path)}`;
 }
 
+// Heuristic: detect if values look like sizes (S, M, L, XL, 2XL, etc.)
+function looksLikeSizes(values: string[]): boolean {
+  const sizePatterns = /^(XXS|XS|S|M|L|XL|XXL|XXXL|\d{0,1}XL|\d{1,3})$/i;
+  return values.length > 0 && values.filter(v => sizePatterns.test(v.trim())).length > values.length * 0.5;
+}
+
 export default function CatalogDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -61,6 +67,8 @@ export default function CatalogDetailPage() {
   const [error, setError] = useState('');
   const [activeImage, setActiveImage] = useState<string>('');
   const [addedToPool, setAddedToPool] = useState(false);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProduct();
@@ -133,12 +141,18 @@ export default function CatalogDetailPage() {
     const portalOrigin = window.location.origin;
     const callbackUrl = `${portalOrigin}/dashboard/products/import`;
 
-    window.location.href =
+    let url =
       `${DESIGN_ENGINE_URL}/embed` +
       `?templates=${encodeURIComponent(templateIds)}` +
       `&products_cache_key=${key}` +
       `&products_cache_url=${encodeURIComponent(`${portalOrigin}/api/erp/products-cache`)}` +
       `&callback_url=${encodeURIComponent(callbackUrl)}`;
+
+    if (selectedColor) {
+      url += `&selected_color=${encodeURIComponent(selectedColor)}`;
+    }
+
+    window.location.href = url;
   }
 
   // Get all product images sorted
@@ -153,7 +167,7 @@ export default function CatalogDetailPage() {
     : [];
 
   // Extract unique option values for display
-  const options = product?.prodSkuList?.reduce(
+  const rawOptions = product?.prodSkuList?.reduce(
     (acc, sku) => {
       if (sku.option1 && !acc.option1.includes(sku.option1)) acc.option1.push(sku.option1);
       if (sku.option2 && !acc.option2.includes(sku.option2)) acc.option2.push(sku.option2);
@@ -162,6 +176,32 @@ export default function CatalogDetailPage() {
     },
     { option1: [] as string[], option2: [] as string[], option3: [] as string[] }
   );
+
+  // Detect which option is color vs size based on values
+  const option1IsSizes = rawOptions ? looksLikeSizes(rawOptions.option1) : false;
+  const option2IsSizes = rawOptions ? looksLikeSizes(rawOptions.option2) : false;
+
+  const colorValues = rawOptions
+    ? (option1IsSizes ? rawOptions.option2 : !option2IsSizes ? rawOptions.option1 : [])
+    : [];
+  const sizeValues = rawOptions
+    ? (option1IsSizes ? rawOptions.option1 : option2IsSizes ? rawOptions.option2 : [])
+    : [];
+  // Which option key holds colors
+  const colorOptionKey: 'option1' | 'option2' = option1IsSizes ? 'option2' : 'option1';
+
+  // When a color is clicked, update the main image
+  function handleColorSelect(color: string) {
+    setSelectedColor(color);
+    if (!product) return;
+    // Find any SKU with this color that has an image
+    const matchingSku = product.prodSkuList.find(
+      (sku) => sku[colorOptionKey] === color && sku.skuImage
+    );
+    if (matchingSku?.skuImage) {
+      setActiveImage(erpImg(matchingSku.skuImage));
+    }
+  }
 
   const priceRange = product?.prodSkuList?.length
     ? {
@@ -301,37 +341,55 @@ export default function CatalogDetailPage() {
           )}
 
           {/* Options / Variants */}
-          {options && (options.option1.length > 0 || options.option2.length > 0) && (
+          {(colorValues.length > 0 || sizeValues.length > 0) && (
             <div className="space-y-3">
-              {options.option1.length > 0 && (
+              {colorValues.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Color{selectedColor ? `: ${selectedColor}` : ''}
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {colorValues.map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => handleColorSelect(v)}
+                        className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-all ${
+                          selectedColor === v
+                            ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm'
+                            : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {sizeValues.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Size</h3>
                   <div className="flex flex-wrap gap-1.5">
-                    {options.option1.map((v) => (
-                      <span key={v} className="rounded-lg border border-border bg-white px-2.5 py-1 text-xs text-gray-700 font-medium">
+                    {sizeValues.map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setSelectedSize(v)}
+                        className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-all ${
+                          selectedSize === v
+                            ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm'
+                            : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
                         {v}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 </div>
               )}
-              {options.option2.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Color</h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {options.option2.map((v) => (
-                      <span key={v} className="rounded-lg border border-border bg-white px-2.5 py-1 text-xs text-gray-700 font-medium">
-                        {v}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {options.option3.length > 0 && (
+              {rawOptions && rawOptions.option3.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Option 3</h3>
                   <div className="flex flex-wrap gap-1.5">
-                    {options.option3.map((v) => (
+                    {rawOptions.option3.map((v) => (
                       <span key={v} className="rounded-lg border border-border bg-white px-2.5 py-1 text-xs text-gray-700 font-medium">
                         {v}
                       </span>
