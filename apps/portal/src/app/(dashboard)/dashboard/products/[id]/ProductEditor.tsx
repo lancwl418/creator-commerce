@@ -294,9 +294,11 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                     ))}
                   </div>
                 )}
-                <Link href={`/dashboard/designs/${product.design_id}`} className="text-primary-600 hover:text-primary-700 font-medium">
-                  {designTitle || '—'}
-                </Link>
+                {designTitle && (
+                  <Link href={`/dashboard/designs/${product.design_id}`} className="text-primary-600 hover:text-primary-700 font-medium">
+                    {designTitle}
+                  </Link>
+                )}
               </div>
             </div>
             <div className="flex justify-between">
