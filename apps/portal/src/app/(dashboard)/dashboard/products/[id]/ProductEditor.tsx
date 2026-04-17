@@ -153,14 +153,14 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     return variants;
   }, [erpSkus]);
 
-  // Composite design artwork onto each color variant image
-  // Strategy: load the design preview (already composited onto the main mockup),
-  // extract the artwork area, and overlay it onto each variant's SKU image
-  // at the same relative position
+  // Composite design onto each color variant by using the existing preview
+  // image (which has the design at the correct position on the main mockup)
+  // as a "multiply" overlay onto each variant's SKU image.
+  // Both images show the same product in the same pose, just different colors.
   const [colorPreviews, setColorPreviews] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
-    if (colorVariants.length === 0 || designArtworkUrls.length === 0) return;
+    if (colorVariants.length === 0 || !previewUrl) return;
 
     const THUMB_SIZE = 200;
 
@@ -170,7 +170,6 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         if (src.startsWith('http')) img.crossOrigin = 'anonymous';
         img.onload = () => resolve(img);
         img.onerror = () => {
-          // Retry without crossOrigin if CORS fails
           if (img.crossOrigin) {
             const retry = new Image();
             retry.onload = () => resolve(retry);
@@ -184,9 +183,9 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
       });
 
     async function generate() {
-      // Load the first artwork image to use as overlay
-      const artworkImg = await loadImg(designArtworkUrls[0]);
-      if (!artworkImg) return;
+      // Load the design preview (design already composited on main mockup)
+      const previewImg = await loadImg(previewUrl!);
+      if (!previewImg) return;
 
       const newPreviews = new Map<string, string>();
 
@@ -194,7 +193,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         const variantImg = await loadImg(variant.imageUrl);
         if (!variantImg) continue;
 
-        // Use the variant image's natural aspect ratio
+        // Use consistent canvas size
         const vw = variantImg.naturalWidth;
         const vh = variantImg.naturalHeight;
         const scale = THUMB_SIZE / Math.max(vw, vh);
@@ -207,19 +206,20 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         const ctx = canvas.getContext('2d');
         if (!ctx) continue;
 
-        // Draw variant background
+        // Step 1: Draw the variant's base color image
         ctx.drawImage(variantImg, 0, 0, cw, ch);
 
-        // Overlay artwork centered on the product area
-        // Position: centered horizontally, upper-center vertically (typical T-shirt chest area)
-        const artW = cw * 0.35;  // artwork covers ~35% of image width
-        const artH = artW * (artworkImg.naturalHeight / artworkImg.naturalWidth);
-        const artX = (cw - artW) / 2;
-        const artY = ch * 0.25;  // start at ~25% from top
+        // Step 2: Overlay the design preview using "multiply" blend mode
+        // This keeps the variant's color while applying the design's dark ink
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.drawImage(previewImg, 0, 0, cw, ch);
 
-        ctx.globalAlpha = 0.92;
-        ctx.drawImage(artworkImg, artX, artY, artW, artH);
-        ctx.globalAlpha = 1;
+        // Step 3: Restore and re-draw the variant lightly to preserve
+        // the original brightness in non-design areas
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(variantImg, 0, 0, cw, ch);
+
+        ctx.globalCompositeOperation = 'source-over';
 
         try {
           newPreviews.set(variant.color, canvas.toDataURL('image/jpeg', 0.85));
@@ -230,7 +230,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     }
 
     generate();
-  }, [colorVariants, designArtworkUrls]);
+  }, [colorVariants, previewUrl]);
 
   // Always show the design preview — this is a created product page,
   // not the catalog. The previewUrl is the composited design from the editor.
