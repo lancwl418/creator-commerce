@@ -65,7 +65,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/stores?error=token_exchange', req.url));
   }
 
-  const { access_token, scope } = await tokenRes.json();
+  const tokenData = await tokenRes.json();
+  const { access_token, scope } = tokenData;
+  // Shopify now returns expiring offline tokens with expires_in (seconds)
+  const expiresIn = tokenData.expires_in as number | undefined;
+  const tokenExpiresAt = expiresIn
+    ? new Date(Date.now() + expiresIn * 1000).toISOString()
+    : null;
 
   // Fetch shop info for display name
   let storeName = shop;
@@ -92,6 +98,8 @@ export async function GET(req: NextRequest) {
         access_token,
         scopes: scope?.split(',') || [],
         status: 'connected',
+        token_expires_at: tokenExpiresAt,
+        metadata: { expires_in: expiresIn, token_type: expiresIn ? 'expiring' : 'legacy' },
         connected_at: new Date().toISOString(),
       },
       { onConflict: 'creator_id,platform' }
