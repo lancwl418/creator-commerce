@@ -75,7 +75,8 @@ export default function SettingsPage() {
     setSaved(false);
 
     try {
-      const { error: profileError } = await supabase
+      // Try update first
+      const { data: updated, error: updateError } = await supabase
         .from('creator_profiles')
         .update({
           display_name: profile.display_name.trim(),
@@ -83,9 +84,26 @@ export default function SettingsPage() {
           country: profile.country?.trim() || null,
           timezone: profile.timezone?.trim() || null,
         })
-        .eq('creator_id', creatorId);
+        .eq('creator_id', creatorId)
+        .select();
 
-      if (profileError) throw profileError;
+      if (updateError) throw updateError;
+
+      // If no row was updated (profile doesn't exist yet), insert one
+      if (!updated || updated.length === 0) {
+        const { error: insertError } = await supabase
+          .from('creator_profiles')
+          .insert({
+            creator_id: creatorId,
+            display_name: profile.display_name.trim(),
+            bio: profile.bio.trim(),
+            country: profile.country?.trim() || null,
+            timezone: profile.timezone?.trim() || null,
+          });
+
+        if (insertError) throw insertError;
+      }
+
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
