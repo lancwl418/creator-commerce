@@ -141,18 +141,12 @@ export default function CatalogDetailPage() {
     const portalOrigin = window.location.origin;
     const callbackUrl = `${portalOrigin}/dashboard/products/import`;
 
-    let url =
+    window.location.href =
       `${DESIGN_ENGINE_URL}/embed` +
       `?templates=${encodeURIComponent(templateIds)}` +
       `&products_cache_key=${key}` +
       `&products_cache_url=${encodeURIComponent(`${portalOrigin}/api/erp/products-cache`)}` +
       `&callback_url=${encodeURIComponent(callbackUrl)}`;
-
-    if (selectedColor) {
-      url += `&selected_color=${encodeURIComponent(selectedColor)}`;
-    }
-
-    window.location.href = url;
   }
 
   // Get all product images sorted

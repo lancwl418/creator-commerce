@@ -9,7 +9,25 @@ const DEFAULT_PHYSICAL_HEIGHT = 11;
 const DEFAULT_MIN_DPI = 150;
 const PRINTABLE_AREA_RATIO = 0.6;
 
+/** Extract unique color variants with their mockup images from SKU list */
+function extractColorVariants(product: ErpProduct): { color: string; imageUrl: string }[] {
+  const seen = new Set<string>();
+  const variants: { color: string; imageUrl: string }[] = [];
+
+  for (const sku of product.prodSkuList ?? []) {
+    // Try option1 first (often color), then option2
+    const color = sku.option1 || sku.option2;
+    if (!color || !sku.skuImage || seen.has(color)) continue;
+    seen.add(color);
+    variants.push({ color, imageUrl: resolveErpImageUrl(sku.skuImage) });
+  }
+
+  return variants;
+}
+
 export function convertErpProduct(product: ErpProduct): ProductTemplate | null {
+  const colorVariants = extractColorVariants(product);
+
   // If ERP operators have already configured a print template via the embed
   // tool, use it verbatim — this is the source of truth for mockups and
   // printable areas. Falls through to the default-image flow only when not set.
@@ -29,6 +47,7 @@ export function convertErpProduct(product: ErpProduct): ProductTemplate | null {
         price: product.prodSkuList?.[0]?.price ?? null,
         vendor: product.vendor,
         productRects: pt.productRects,
+        colorVariants,
       },
     };
   }
@@ -87,6 +106,7 @@ export function convertErpProduct(product: ErpProduct): ProductTemplate | null {
       itemNo: product.itemNo,
       price: product.prodSkuList?.[0]?.price ?? null,
       vendor: product.vendor,
+      colorVariants,
     },
   };
 }

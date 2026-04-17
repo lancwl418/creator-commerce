@@ -12,9 +12,7 @@ import { convertErpProducts } from '@/core/templates/converters/erpProductConver
 import type { ProductTemplate } from '@/types/product';
 import type { ShopifyProduct } from '@/types/shopify-product';
 import type { ErpProductListResponse } from '@/types/erp-product';
-import type { ErpProduct, ErpProductSku } from '@/types/erp-product';
 import type { EditorConfig } from '@/types/editor-config';
-import { resolveErpImageUrl } from '@/lib/erpImageUrl';
 
 /**
  * Loads templates into productStore based on EditorConfig mode.
@@ -120,21 +118,6 @@ async function handlePortalMode(
         const cacheData = await cacheRes.json();
         if (cacheData.products?.length) {
           const converted = convertErpProducts(cacheData.products);
-
-          // If a color was selected in the catalog, swap the first view's
-          // mockup image to the matching SKU's color variant image.
-          if (config.selectedColor && converted.length > 0) {
-            const rawProduct = cacheData.products[0] as ErpProduct;
-            const colorSku = rawProduct.prodSkuList?.find(
-              (sku: ErpProductSku) =>
-                (sku.option1 === config.selectedColor || sku.option2 === config.selectedColor) &&
-                sku.skuImage
-            );
-            if (colorSku?.skuImage && converted[0].views.length > 0) {
-              converted[0].views[0].mockupImageUrl = resolveErpImageUrl(colorSku.skuImage);
-            }
-          }
-
           if (converted.length > 0) {
             appendTemplates(converted);
             matched = converted;

@@ -8,6 +8,7 @@ import MultiProductPanel from './MultiProductPanel';
 import DesignUploader from './DesignUploader';
 import LayerPanel from './LayerPanel';
 import PropertiesPanel from './PropertiesPanel';
+import VariantPreviewStrip from './VariantPreviewStrip';
 import ValidationDialog from './ValidationDialog';
 import { EditorConfigContext, useEditorConfig } from './EditorConfigContext';
 import { useDesignStore } from '@/stores/designStore';
@@ -447,8 +448,11 @@ function EditorPageInner() {
           </div>
         </div>
 
-        {/* Canvas area — full width on mobile */}
-        <EditorShell />
+        {/* Canvas area + variant preview strip */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          <EditorShell />
+          <VariantPreviewStrip />
+        </div>
 
         {/* Right sidebar — desktop only */}
         <div className="hidden md:flex w-64 bg-white border-l border-gray-200 flex-col overflow-y-auto">
