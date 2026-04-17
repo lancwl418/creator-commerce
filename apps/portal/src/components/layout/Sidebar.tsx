@@ -16,6 +16,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/catalog', label: 'Product Catalog', icon: StorefrontIcon },
   { href: '/dashboard/designs', label: 'My Designs', icon: PaletteIcon, designerOnly: true },
   { href: '/dashboard/products', label: 'Created Products', icon: PackageIcon },
+  { href: '/dashboard/stores', label: 'Channels & Stores', icon: StoreIcon },
   { href: '/dashboard/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
@@ -172,6 +173,14 @@ function PackageIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+    </svg>
+  );
+}
+
+function StoreIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
     </svg>
   );
 }
