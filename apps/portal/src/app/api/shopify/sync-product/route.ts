@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2025-01';
+const COST = 10.00; // MVP hardcoded cost
 
 interface SkuSelection {
   sku_id: string;
@@ -17,7 +18,10 @@ interface SkuSelection {
  * POST /api/shopify/sync-product
  * Body: { product_instance_id, store_connection_id }
  *
- * Creates a product on the creator's connected Shopify store.
+ * 1. Creates custom_product_skus for each enabled variant
+ * 2. Creates product on Shopify via Admin API
+ * 3. Records channel_listing + channel_listing_variants
+ * 4. Maps Shopify variant IDs back to custom SKUs
  */
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -69,12 +73,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Store connection not found' }, { status: 404 });
   }
 
-  if (connection.status !== 'connected') {
-    return NextResponse.json({ error: 'Store is not connected. Please reconnect first.' }, { status: 400 });
-  }
-
-  if (!connection.access_token) {
-    return NextResponse.json({ error: 'Store access token missing. Please reconnect.' }, { status: 400 });
+  if (connection.status !== 'connected' || !connection.access_token) {
+    return NextResponse.json({ error: 'Store is not connected. Please reconnect.' }, { status: 400 });
   }
 
   // Check if already synced
@@ -89,17 +89,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Product is already synced to this store', listing: existingListing }, { status: 409 });
   }
 
-  // Build Shopify product payload
+  // ── Step 1: Create custom_product_skus ──
   const selectedSkus = ((product.selected_skus as SkuSelection[]) || []).filter(s => s.enabled);
+  const erpProductId = (product.product_template_id as string)?.replace('erp-', '').replace('shopify-', '') || '';
+
+  // Upsert custom SKUs for each enabled variant
+  const customSkuRows = selectedSkus.map(sku => ({
+    sellable_product_instance_id: product_instance_id,
+    erp_product_id: erpProductId,
+    erp_sku_id: sku.sku_id,
+    sku_code: sku.sku,
+    option1: sku.option1,
+    option2: sku.option2,
+    option3: sku.option3,
+    sale_price: sku.price ?? product.retail_price ?? 25,
+    base_cost_snapshot: COST,
+    is_active: true,
+    erp_sync_status: 'pending',
+  }));
+
+  const { data: customSkus, error: skuError } = await supabase
+    .from('custom_product_skus')
+    .upsert(customSkuRows, { onConflict: 'sellable_product_instance_id,erp_sku_id' })
+    .select('*');
+
+  if (skuError) {
+    console.error('[Sync] Failed to create custom SKUs:', skuError);
+    return NextResponse.json({ error: 'Failed to create custom SKUs: ' + skuError.message }, { status: 500 });
+  }
+
+  // ── Step 2: Build & send Shopify product ──
   const previewUrls = (product.preview_urls as string[]) || [];
   const artworkUrls = (product.design_artwork_urls as string[]) || [];
-
-  // Collect all public image URLs
   const imageUrls = [...previewUrls, ...artworkUrls].filter(
-    url => url && (url.startsWith('https://') || url.startsWith('http://'))
+    url => url && url.startsWith('http')
   );
 
-  // Derive option definitions from SKUs
+  // Derive option definitions
   const optionSets: { name: string; values: string[] }[] = [];
   for (const key of ['option1', 'option2', 'option3'] as const) {
     const values = [...new Set(selectedSkus.map(s => s[key]).filter(Boolean))] as string[];
@@ -124,7 +150,7 @@ export async function POST(req: NextRequest) {
       const variant: Record<string, unknown> = {
         price: String(sku.price ?? product.retail_price ?? 25),
         sku: sku.sku || undefined,
-        inventory_management: null, // no inventory tracking for MVP
+        inventory_management: null,
       };
       if (sku.option1) variant.option1 = sku.option1;
       if (sku.option2) variant.option2 = sku.option2;
@@ -133,7 +159,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Create product on Shopify
   const shopDomain = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
 
   try {
@@ -159,8 +184,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { product: createdProduct } = await shopifyRes.json();
+    const shopifyVariants: { id: number; sku: string; option1?: string; option2?: string; option3?: string }[] =
+      createdProduct.variants || [];
 
-    // Record channel listing
+    // ── Step 3: Record channel listing ──
     const externalUrl = `https://${shopDomain}/products/${createdProduct.handle}`;
     const { data: listing, error: listingError } = await supabase
       .from('channel_listings')
@@ -177,7 +204,7 @@ export async function POST(req: NextRequest) {
         metadata: {
           shopify_product_id: createdProduct.id,
           shopify_handle: createdProduct.handle,
-          variant_count: createdProduct.variants?.length || 0,
+          variant_count: shopifyVariants.length,
         },
       })
       .select('*')
@@ -185,16 +212,63 @@ export async function POST(req: NextRequest) {
 
     if (listingError) {
       console.error('[Shopify Sync] Failed to save listing:', listingError);
-      // Product was created on Shopify but listing record failed — log but don't fail the request
     }
 
-    // Update product status to listed
+    // ── Step 4: Create channel_listing_variants & map Shopify variant IDs ──
+    if (listing && customSkus && customSkus.length > 0) {
+      const listingVariantRows = customSkus.map(csku => {
+        // Match Shopify variant by option values
+        const shopifyVariant = shopifyVariants.find(sv =>
+          (sv.option1 || null) === (csku.option1 || null) &&
+          (sv.option2 || null) === (csku.option2 || null) &&
+          (sv.option3 || null) === (csku.option3 || null)
+        ) || shopifyVariants.find(sv => sv.sku === csku.sku_code);
+
+        return {
+          channel_listing_id: listing.id,
+          custom_product_sku_id: csku.id,
+          sale_price: csku.sale_price,
+          base_cost_snapshot: csku.base_cost_snapshot,
+          external_variant_id: shopifyVariant ? String(shopifyVariant.id) : null,
+          is_active: true,
+        };
+      });
+
+      const { error: lvError } = await supabase
+        .from('channel_listing_variants')
+        .insert(listingVariantRows);
+
+      if (lvError) {
+        console.error('[Shopify Sync] Failed to save listing variants:', lvError);
+      }
+
+      // Update custom_product_skus with Shopify variant IDs
+      for (const csku of customSkus) {
+        const shopifyVariant = shopifyVariants.find(sv =>
+          (sv.option1 || null) === (csku.option1 || null) &&
+          (sv.option2 || null) === (csku.option2 || null) &&
+          (sv.option3 || null) === (csku.option3 || null)
+        );
+        if (shopifyVariant) {
+          await supabase
+            .from('custom_product_skus')
+            .update({
+              external_variant_ids: {
+                ...(csku.external_variant_ids as Record<string, string> || {}),
+                shopify: String(shopifyVariant.id),
+              },
+            })
+            .eq('id', csku.id);
+        }
+      }
+    }
+
+    // ── Step 5: Update product status ──
     await supabase
       .from('sellable_product_instances')
       .update({ status: 'listed' })
       .eq('id', product_instance_id);
 
-    // Update last_sync_at on the store connection
     await supabase
       .from('creator_store_connections')
       .update({ last_sync_at: new Date().toISOString() })
@@ -205,6 +279,8 @@ export async function POST(req: NextRequest) {
       shopify_product_id: createdProduct.id,
       shopify_url: externalUrl,
       listing_id: listing?.id,
+      custom_skus_created: customSkus?.length || 0,
+      variants_mapped: shopifyVariants.length,
     });
   } catch (err) {
     console.error('[Shopify Sync] Unexpected error:', err);
