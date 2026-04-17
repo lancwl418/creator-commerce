@@ -6,6 +6,14 @@ const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
 const CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
 const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2025-01';
 
+function getBaseUrl(req: NextRequest): string {
+  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
+}
+
+function redirectTo(path: string, req: NextRequest): NextResponse {
+  return NextResponse.redirect(new URL(path, getBaseUrl(req)));
+}
+
 /**
  * GET /api/shopify/callback?code=...&shop=...&state=...&hmac=...
  * Shopify redirects here after merchant approves OAuth.
@@ -22,15 +30,15 @@ export async function GET(req: NextRequest) {
   const creatorId = req.cookies.get('shopify_oauth_creator')?.value;
 
   if (!code || !shop || !state || !hmac) {
-    return NextResponse.redirect(new URL('/dashboard/stores?error=missing_params', req.url));
+    return redirectTo('/dashboard/stores?error=missing_params', req);
   }
 
   if (state !== savedState) {
-    return NextResponse.redirect(new URL('/dashboard/stores?error=invalid_state', req.url));
+    return redirectTo('/dashboard/stores?error=invalid_state', req);
   }
 
   if (!creatorId) {
-    return NextResponse.redirect(new URL('/dashboard/stores?error=session_expired', req.url));
+    return redirectTo('/dashboard/stores?error=session_expired', req);
   }
 
   // Verify HMAC
@@ -46,7 +54,7 @@ export async function GET(req: NextRequest) {
     .digest('hex');
 
   if (hmac !== expectedHmac) {
-    return NextResponse.redirect(new URL('/dashboard/stores?error=invalid_hmac', req.url));
+    return redirectTo('/dashboard/stores?error=invalid_hmac', req);
   }
 
   // Exchange code for access token
@@ -62,7 +70,7 @@ export async function GET(req: NextRequest) {
 
   if (!tokenRes.ok) {
     console.error('[Shopify OAuth] Token exchange failed:', await tokenRes.text());
-    return NextResponse.redirect(new URL('/dashboard/stores?error=token_exchange', req.url));
+    return redirectTo('/dashboard/stores?error=token_exchange', req);
   }
 
   const tokenData = await tokenRes.json();
@@ -107,11 +115,11 @@ export async function GET(req: NextRequest) {
 
   if (upsertError) {
     console.error('[Shopify OAuth] Upsert error:', upsertError);
-    return NextResponse.redirect(new URL('/dashboard/stores?error=save_failed', req.url));
+    return redirectTo('/dashboard/stores?error=save_failed', req);
   }
 
   // Clear OAuth cookies
-  const response = NextResponse.redirect(new URL('/dashboard/stores?connected=shopify', req.url));
+  const response = redirectTo('/dashboard/stores?connected=shopify', req);
   response.cookies.delete('shopify_oauth_state');
   response.cookies.delete('shopify_oauth_creator');
   response.cookies.delete('shopify_oauth_shop');
