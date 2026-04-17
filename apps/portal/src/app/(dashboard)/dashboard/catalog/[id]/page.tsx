@@ -182,7 +182,7 @@ export default function CatalogDetailPage() {
   const option2IsSizes = rawOptions ? looksLikeSizes(rawOptions.option2) : false;
 
   const colorValues = rawOptions
-    ? (option1IsSizes ? rawOptions.option2 : !option2IsSizes ? rawOptions.option1 : [])
+    ? (option1IsSizes ? rawOptions.option2 : rawOptions.option1)
     : [];
   const sizeValues = rawOptions
     ? (option1IsSizes ? rawOptions.option1 : option2IsSizes ? rawOptions.option2 : [])
