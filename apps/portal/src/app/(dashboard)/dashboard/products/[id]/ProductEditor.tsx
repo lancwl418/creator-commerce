@@ -56,10 +56,11 @@ interface ProductEditorProps {
   product: ProductData;
   previewUrl: string | null;
   designTitle: string | null;
+  designArtworkUrls: string[];
   listings: Listing[];
 }
 
-export default function ProductEditor({ product, previewUrl, designTitle, listings }: ProductEditorProps) {
+export default function ProductEditor({ product, previewUrl, designTitle, designArtworkUrls, listings }: ProductEditorProps) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -78,6 +79,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
   // Editable product fields
   const [title, setTitle] = useState(product.title || '');
   const [description, setDescription] = useState(product.description || '');
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // Product-level retail price (default for all variants)
   const [retailPrice, setRetailPrice] = useState(
@@ -276,11 +278,26 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
                 {product.status}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-start">
               <span className="text-gray-500">Design</span>
-              <Link href={`/dashboard/designs/${product.design_id}`} className="text-primary-600 hover:text-primary-700 font-medium">
-                {designTitle || '—'}
-              </Link>
+              <div className="flex items-center gap-2">
+                {designArtworkUrls.length > 0 && (
+                  <div className="flex gap-1.5">
+                    {designArtworkUrls.map((url, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setLightboxUrl(url)}
+                        className="w-9 h-9 rounded-md bg-surface-secondary overflow-hidden border border-border hover:border-primary-400 hover:shadow-sm transition-all"
+                      >
+                        <img src={url} alt="" className="w-full h-full object-contain" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <Link href={`/dashboard/designs/${product.design_id}`} className="text-primary-600 hover:text-primary-700 font-medium">
+                  {designTitle || '—'}
+                </Link>
+              </div>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Created</span>
@@ -514,6 +531,24 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
           </button>
         </div>
       </div>
+
+      {/* Lightbox for design artwork */}
+      {lightboxUrl && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={() => setLightboxUrl(null)}>
+          <div className="relative max-w-2xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setLightboxUrl(null)} className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+              <div className="aspect-square bg-gray-50 flex items-center justify-center">
+                <img src={lightboxUrl} alt="Design artwork" className="max-w-full max-h-full object-contain p-4" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -68,6 +68,7 @@ export default async function ProductDetailPage({
         }}
         previewUrl={previewUrl}
         designTitle={product.designs?.title}
+        designArtworkUrls={(product.design_artwork_urls as string[]) ?? []}
         listings={product.channel_listings ?? []}
       />
     </div>
