@@ -32,6 +32,7 @@ export default function ImportFromEditorPage() {
   const [edits, setEdits] = useState<Record<string, EditState>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [savingAll, setSavingAll] = useState(false);
 
   useEffect(() => {
     saveProducts();
@@ -93,6 +94,14 @@ export default function ImportFromEditorPage() {
         )
       );
     }
+  }
+
+  async function handleSaveAll() {
+    setSavingAll(true);
+    for (const product of createdProducts) {
+      await handleQuickSave(product.id);
+    }
+    setSavingAll(false);
   }
 
   async function saveProducts() {
@@ -400,11 +409,17 @@ export default function ImportFromEditorPage() {
         })}
       </div>
 
-      {/* Sync to stores button */}
-      <div className="mt-8 flex justify-center">
+      {/* Action buttons */}
+      <div className="mt-8 flex justify-center gap-3">
+        <button
+          onClick={handleSaveAll}
+          disabled={savingAll}
+          className="rounded-xl border-2 border-primary-600 px-8 py-3.5 text-sm font-semibold text-primary-600 hover:bg-primary-50 disabled:opacity-50 transition-colors"
+        >
+          {savingAll ? 'Saving...' : 'Save All'}
+        </button>
         <button
           onClick={() => {
-            // TODO: implement store sync flow
             alert('Store sync coming soon! Connect your store first in Settings.');
           }}
           className="rounded-xl bg-primary-600 px-8 py-3.5 text-sm font-semibold text-white hover:bg-primary-500 transition-colors shadow-lg shadow-primary-600/25"

@@ -31,6 +31,7 @@ interface SkuSelection {
   option2: string | null;
   option3: string | null;
   enabled: boolean;
+  price?: number | null;
 }
 
 interface Listing {
@@ -79,14 +80,25 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
     return new Set(saved);
   });
 
+  // Product-level retail price (default for all variants)
   const [retailPrice, setRetailPrice] = useState(
     product.retail_price?.toString() || product.base_price_suggestion?.toString() || '25.00'
   );
+
+  // Per-variant price overrides: sku_id -> price string (empty = use product price)
+  const [variantPrices, setVariantPrices] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const s of product.selected_skus) {
+      if (s.price != null) map[s.sku_id] = s.price.toString();
+    }
+    return map;
+  });
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  // Fetch SKU data (supports both shopify-xxx and erp-xxx template IDs)
+  // Fetch SKU data
   useEffect(() => {
     async function fetchSkus() {
       try {
@@ -99,7 +111,6 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
         setErpSkus(data.skus || []);
         setOptionNames(data.option_names || []);
 
-        // If no saved selections, enable all SKUs by default
         if (product.selected_skus.length === 0 && data.skus?.length > 0) {
           setEnabledSkuIds(new Set(data.skus.map((s: ErpSku) => s.id)));
         }
@@ -112,20 +123,17 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
     fetchSkus();
   }, [product.product_template_id]);
 
-  // Derive unique option values from ERP SKUs
+  // Derive unique option values
   const option1Values = [...new Set(erpSkus.map(s => s.option1).filter(Boolean))] as string[];
   const option2Values = [...new Set(erpSkus.map(s => s.option2).filter(Boolean))] as string[];
   const option3Values = [...new Set(erpSkus.map(s => s.option3).filter(Boolean))] as string[];
-
-  // Determine option labels based on data patterns
   const hasOptions = option1Values.length > 0 || option2Values.length > 0;
 
-  // Active variant selection for preview
+  // Active variant selection for preview image switching
   const [selectedOption1, setSelectedOption1] = useState<string | null>(null);
   const [selectedOption2, setSelectedOption2] = useState<string | null>(null);
   const [selectedOption3, setSelectedOption3] = useState<string | null>(null);
 
-  // Auto-select first options when SKUs load
   useEffect(() => {
     if (erpSkus.length > 0) {
       if (option1Values.length > 0 && !selectedOption1) setSelectedOption1(option1Values[0]);
@@ -134,34 +142,23 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
     }
   }, [erpSkus]);
 
-  // Find the active SKU image based on selected options
   const activePreviewUrl = useMemo(() => {
     if (erpSkus.length === 0) return previewUrl;
-
-    // Find a SKU matching the selected options that has an image
     const matchingSku = erpSkus.find(sku => {
-      const match1 = !selectedOption1 || sku.option1 === selectedOption1;
-      const match2 = !selectedOption2 || sku.option2 === selectedOption2;
-      const match3 = !selectedOption3 || sku.option3 === selectedOption3;
-      return match1 && match2 && match3 && sku.skuImage;
+      const m1 = !selectedOption1 || sku.option1 === selectedOption1;
+      const m2 = !selectedOption2 || sku.option2 === selectedOption2;
+      const m3 = !selectedOption3 || sku.option3 === selectedOption3;
+      return m1 && m2 && m3 && sku.skuImage;
     });
-
-    if (matchingSku?.skuImage) {
-      return erpImg(matchingSku.skuImage);
-    }
-
-    // Fallback: find any SKU with the selected color (option2) that has an image
+    if (matchingSku?.skuImage) return erpImg(matchingSku.skuImage);
     if (selectedOption2) {
-      const colorSku = erpSkus.find(sku => sku.option2 === selectedOption2 && sku.skuImage);
-      if (colorSku?.skuImage) return erpImg(colorSku.skuImage);
+      const s = erpSkus.find(sku => sku.option2 === selectedOption2 && sku.skuImage);
+      if (s?.skuImage) return erpImg(s.skuImage);
     }
-
-    // Fallback: find any SKU with the selected option1 that has an image
     if (selectedOption1) {
-      const opt1Sku = erpSkus.find(sku => sku.option1 === selectedOption1 && sku.skuImage);
-      if (opt1Sku?.skuImage) return erpImg(opt1Sku.skuImage);
+      const s = erpSkus.find(sku => sku.option1 === selectedOption1 && sku.skuImage);
+      if (s?.skuImage) return erpImg(s.skuImage);
     }
-
     return previewUrl;
   }, [erpSkus, selectedOption1, selectedOption2, selectedOption3, previewUrl]);
 
@@ -174,19 +171,31 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
     setSaved(false);
   }, []);
 
-  const selectAll = () => {
-    setEnabledSkuIds(new Set(erpSkus.map(s => s.id)));
-    setSaved(false);
-  };
+  const selectAll = () => { setEnabledSkuIds(new Set(erpSkus.map(s => s.id))); setSaved(false); };
+  const clearAll = () => { setEnabledSkuIds(new Set()); setSaved(false); };
 
-  const clearAll = () => {
-    setEnabledSkuIds(new Set());
+  // Get effective price for a variant
+  const getVariantPrice = useCallback((skuId: string): number => {
+    const override = variantPrices[skuId];
+    if (override !== undefined && override !== '') return parseFloat(override) || 0;
+    return parseFloat(retailPrice) || 0;
+  }, [variantPrices, retailPrice]);
+
+  const setVariantPrice = useCallback((skuId: string, value: string) => {
+    setVariantPrices(prev => ({ ...prev, [skuId]: value }));
     setSaved(false);
-  };
+  }, []);
+
+  // Apply product price to all variants (clear overrides)
+  const applyPriceToAll = useCallback(() => {
+    setVariantPrices({});
+    setSaved(false);
+  }, []);
 
   const priceNum = parseFloat(retailPrice) || 0;
   const profit = priceNum - COST;
   const margin = priceNum > 0 ? ((profit / priceNum) * 100) : 0;
+  const hasCustomPrices = Object.keys(variantPrices).some(k => variantPrices[k] !== '');
 
   async function handleSave() {
     if (priceNum <= 0) {
@@ -206,15 +215,19 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
     setError('');
 
     try {
-      // Build SKU selection entries
-      const skuSelections: SkuSelection[] = erpSkus.map(sku => ({
-        sku_id: sku.id,
-        sku: sku.sku,
-        option1: sku.option1,
-        option2: sku.option2,
-        option3: sku.option3,
-        enabled: enabledSkuIds.has(sku.id),
-      }));
+      const skuSelections: SkuSelection[] = erpSkus.map(sku => {
+        const override = variantPrices[sku.id];
+        const hasOverride = override !== undefined && override !== '';
+        return {
+          sku_id: sku.id,
+          sku: sku.sku,
+          option1: sku.option1,
+          option2: sku.option2,
+          option3: sku.option3,
+          enabled: enabledSkuIds.has(sku.id),
+          price: hasOverride ? (parseFloat(override) || null) : null,
+        };
+      });
 
       const { error: updateError } = await supabase
         .from('sellable_product_instances')
@@ -243,6 +256,10 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
     listed: 'bg-emerald-50 text-emerald-700',
     paused: 'bg-amber-50 text-amber-700',
   };
+
+  // Count how many option columns are active (for grid template)
+  const optCols = (option1Values.length > 0 ? 1 : 0) + (option2Values.length > 0 ? 1 : 0) + (option3Values.length > 0 ? 1 : 0);
+  const gridCols = `44px ${optCols > 0 ? `repeat(${optCols}, 1fr)` : '1fr'} 90px 60px`;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -307,7 +324,57 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
 
       {/* Right: Edit Form */}
       <div className="lg:col-span-3 space-y-5">
-        {/* Variants */}
+        {/* Pricing */}
+        <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Pricing</h3>
+
+          <div className="flex items-start gap-6">
+            {/* Product Price */}
+            <div className="flex-1">
+              <label htmlFor="retail-price" className="block text-xs font-medium text-gray-500 mb-1.5">
+                Product Price (USD)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
+                <input
+                  id="retail-price"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={retailPrice}
+                  onChange={(e) => { setRetailPrice(e.target.value); setSaved(false); }}
+                  className="w-full rounded-xl border border-border pl-8 pr-4 py-2.5 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
+                />
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">Default price for all variants</p>
+            </div>
+
+            {/* Profit summary */}
+            <div className={`rounded-xl px-4 py-3 text-sm ${profit > 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+              <div className="flex items-baseline gap-2">
+                <span className="text-gray-500 text-xs">Profit</span>
+                <span className={`text-lg font-bold ${profit > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  ${profit.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-gray-500 text-xs">Margin</span>
+                <span className={`text-xs font-semibold ${profit > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {margin.toFixed(1)}%
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">Cost: ${COST.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {hasCustomPrices && (
+            <button onClick={applyPriceToAll} className="mt-3 text-xs text-primary-600 hover:text-primary-700 font-medium">
+              Reset all variants to product price
+            </button>
+          )}
+        </div>
+
+        {/* Variants with per-variant pricing */}
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Variants</h3>
@@ -324,7 +391,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
             )}
           </div>
 
-          {/* Clickable variant selectors */}
+          {/* Clickable variant selectors (for preview image switching) */}
           {!loadingSkus && !skuError && hasOptions && (
             <div className="space-y-3 mb-5 pb-5 border-b border-gray-100">
               {option1Values.length > 0 && (
@@ -334,17 +401,10 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {option1Values.map((val) => (
-                      <button
-                        key={val}
-                        onClick={() => setSelectedOption1(val)}
+                      <button key={val} onClick={() => setSelectedOption1(val)}
                         className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
-                          selectedOption1 === val
-                            ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm'
-                            : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {val}
-                      </button>
+                          selectedOption1 === val ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                        }`}>{val}</button>
                     ))}
                   </div>
                 </div>
@@ -356,17 +416,10 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {option2Values.map((val) => (
-                      <button
-                        key={val}
-                        onClick={() => setSelectedOption2(val)}
+                      <button key={val} onClick={() => setSelectedOption2(val)}
                         className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
-                          selectedOption2 === val
-                            ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm'
-                            : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {val}
-                      </button>
+                          selectedOption2 === val ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                        }`}>{val}</button>
                     ))}
                   </div>
                 </div>
@@ -378,17 +431,10 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {option3Values.map((val) => (
-                      <button
-                        key={val}
-                        onClick={() => setSelectedOption3(val)}
+                      <button key={val} onClick={() => setSelectedOption3(val)}
                         className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
-                          selectedOption3 === val
-                            ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm'
-                            : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {val}
-                      </button>
+                          selectedOption3 === val ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                        }`}>{val}</button>
                     ))}
                   </div>
                 </div>
@@ -399,41 +445,46 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
           {loadingSkus ? (
             <div className="flex items-center justify-center py-8">
               <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-gray-500 ml-3">Loading variants from ERP...</span>
+              <span className="text-sm text-gray-500 ml-3">Loading variants...</span>
             </div>
           ) : skuError ? (
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
               <p className="text-sm text-amber-700">{skuError}</p>
-              <p className="text-xs text-amber-500 mt-1">Variants could not be loaded. You can still set pricing.</p>
             </div>
           ) : erpSkus.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4">No variants found for this product.</p>
+            <p className="text-sm text-gray-400 py-4">No variants found.</p>
           ) : (
             <>
               {/* Table header */}
-              <div className="grid grid-cols-[44px_1fr_1fr_1fr_80px] gap-2 px-2 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+              <div className="grid gap-2 px-2 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100"
+                style={{ gridTemplateColumns: gridCols }}>
                 <span></span>
                 {option1Values.length > 0 && <span>{optionNames[0] || 'Option 1'}</span>}
                 {option2Values.length > 0 && <span>{optionNames[1] || 'Option 2'}</span>}
                 {option3Values.length > 0 && <span>{optionNames[2] || 'Option 3'}</span>}
                 {!hasOptions && <span>SKU</span>}
+                <span>Price</span>
                 <span className="text-right">Stock</span>
               </div>
 
               {/* SKU rows */}
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
                 {erpSkus.map((sku) => {
                   const enabled = enabledSkuIds.has(sku.id);
+                  const varPrice = variantPrices[sku.id];
+                  const effectivePrice = getVariantPrice(sku.id);
+                  const isCustom = varPrice !== undefined && varPrice !== '';
+
                   return (
-                    <button
+                    <div
                       key={sku.id}
-                      onClick={() => toggleSku(sku.id)}
-                      className={`w-full grid grid-cols-[44px_1fr_1fr_1fr_80px] gap-2 items-center px-2 py-3 text-left transition-all rounded-lg ${
+                      className={`grid gap-2 items-center px-2 py-2.5 transition-all rounded-lg ${
                         enabled ? 'bg-white' : 'bg-gray-50 opacity-50'
-                      } hover:bg-gray-50`}
+                      }`}
+                      style={{ gridTemplateColumns: gridCols }}
                     >
                       {/* Checkbox */}
-                      <div className="flex justify-center">
+                      <button onClick={() => toggleSku(sku.id)} className="flex justify-center">
                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                           enabled ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
                         }`}>
@@ -443,103 +494,59 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
                             </svg>
                           )}
                         </div>
-                      </div>
+                      </button>
 
                       {/* Options */}
                       {option1Values.length > 0 && (
-                        <span className="text-sm font-semibold text-gray-900">{sku.option1 || '—'}</span>
+                        <span className="text-sm font-semibold text-gray-900 truncate">{sku.option1 || '—'}</span>
                       )}
                       {option2Values.length > 0 && (
-                        <span className="text-sm text-gray-700">{sku.option2 || '—'}</span>
+                        <span className="text-sm text-gray-700 truncate">{sku.option2 || '—'}</span>
                       )}
                       {option3Values.length > 0 && (
-                        <span className="text-sm text-gray-700">{sku.option3 || '—'}</span>
+                        <span className="text-sm text-gray-700 truncate">{sku.option3 || '—'}</span>
                       )}
                       {!hasOptions && (
-                        <span className="text-sm font-mono text-gray-600">{sku.sku}</span>
+                        <span className="text-sm font-mono text-gray-600 truncate">{sku.sku}</span>
                       )}
 
+                      {/* Per-variant price */}
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={isCustom ? varPrice : ''}
+                          placeholder={priceNum.toFixed(2)}
+                          onChange={(e) => setVariantPrice(sku.id, e.target.value)}
+                          className={`w-full rounded-md border pl-5 pr-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/30 focus:border-primary-500 transition-all ${
+                            isCustom ? 'border-primary-300 bg-primary-50/50' : 'border-border bg-white'
+                          }`}
+                        />
+                      </div>
+
                       {/* Stock */}
-                      <span className={`text-sm text-right font-medium ${
+                      <span className={`text-xs text-right font-medium ${
                         sku.inQty > 0 ? 'text-emerald-600' : 'text-red-500'
                       }`}>
                         {sku.inQty > 0 ? sku.inQty : 'Out'}
                       </span>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
 
               <p className="text-xs text-gray-400 mt-3 pt-2 border-t border-gray-100">
                 {enabledSkuIds.size} of {erpSkus.length} variants selected
+                {hasCustomPrices && (
+                  <span className="ml-2 text-primary-500">
+                    · {Object.values(variantPrices).filter(v => v !== '').length} custom price{Object.values(variantPrices).filter(v => v !== '').length > 1 ? 's' : ''}
+                  </span>
+                )}
               </p>
             </>
           )}
-        </div>
-
-        {/* Pricing */}
-        <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Pricing</h3>
-
-          <div className="space-y-4">
-            {/* Cost */}
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <div>
-                <p className="text-sm font-medium text-gray-700">Production Cost</p>
-                <p className="text-xs text-gray-400">Fixed cost per unit</p>
-              </div>
-              <p className="text-lg font-bold text-gray-900">${COST.toFixed(2)}</p>
-            </div>
-
-            {/* Retail Price Input */}
-            <div>
-              <label htmlFor="retail-price" className="block text-sm font-medium text-gray-700 mb-2">
-                Your Selling Price (USD)
-              </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-lg">$</span>
-                <input
-                  id="retail-price"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={retailPrice}
-                  onChange={(e) => { setRetailPrice(e.target.value); setSaved(false); }}
-                  className="w-full rounded-xl border border-border pl-9 pr-4 py-3 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Profit Breakdown */}
-            <div className={`rounded-xl p-5 ${profit > 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-gray-600">Your Profit per Unit</span>
-                <span className={`text-2xl font-bold ${profit > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                  ${profit.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Margin</span>
-                <span className={`text-sm font-semibold ${profit > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {margin.toFixed(1)}%
-                </span>
-              </div>
-              <div className="mt-3 pt-3 border-t border-gray-200/50 text-xs text-gray-500 space-y-1">
-                <div className="flex justify-between">
-                  <span>Selling Price</span>
-                  <span>${priceNum.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>- Production Cost</span>
-                  <span>-${COST.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-semibold text-gray-700 pt-1">
-                  <span>= You Earn</span>
-                  <span>${profit.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Error */}
@@ -554,16 +561,15 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-50 transition-all shadow-md shadow-primary-600/25"
+            className="flex-1 rounded-xl border-2 border-primary-600 px-6 py-3 text-sm font-semibold text-primary-600 hover:bg-primary-50 disabled:opacity-50 transition-all"
           >
-            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Product'}
+            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save All'}
           </button>
           <button
             onClick={() => {
-              // TODO: implement store sync flow
               alert('Store sync coming soon! Connect your store first in Settings.');
             }}
-            className="flex-1 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-500 transition-all shadow-md shadow-emerald-600/25"
+            className="flex-1 rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-500 transition-all shadow-md shadow-primary-600/25"
           >
             Sync to Your Stores
           </button>
