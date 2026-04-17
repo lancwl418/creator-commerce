@@ -4,7 +4,7 @@ import crypto from 'crypto';
 
 const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
 const CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
-const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2025-01';
+const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
 
 function getBaseUrl(req: NextRequest): string {
   return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;

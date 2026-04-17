@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2025-01';
+const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
 const COST = 10.00; // MVP hardcoded cost
 
 interface SkuSelection {
