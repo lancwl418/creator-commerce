@@ -6,7 +6,8 @@ const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
 const SCOPES = process.env.SHOPIFY_SCOPES ?? 'write_products,read_products';
 
 function getAppUrl(req: NextRequest): string {
-  return process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
+  // APP_URL (runtime) takes priority, then NEXT_PUBLIC_APP_URL (build-time inline)
+  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 }
 
 /**
