@@ -33,12 +33,14 @@ CREATE TABLE custom_product_skus (
     erp_synced_at           TIMESTAMPTZ,
     -- 渠道同步状态（同步到 Shopify 等外部平台后记录外部 variant ID）
     external_variant_ids    JSONB DEFAULT '{}',  -- { "shopify": "variant_id", "etsy": "listing_id" }
+    -- 关联到哪个 store connection（不同店铺各建一条 SKU）
+    creator_store_connection_id UUID REFERENCES creator_store_connections(id),
     -- 是否启用
     is_active               BOOLEAN NOT NULL DEFAULT true,
     created_at              TIMESTAMPTZ DEFAULT now(),
     updated_at              TIMESTAMPTZ DEFAULT now(),
-    -- 同一产品 + 同一 blank SKU 只能有一条定制 SKU
-    UNIQUE(sellable_product_instance_id, erp_sku_id)
+    -- 同一产品 + 同一 blank SKU + 同一店铺 = 唯一
+    UNIQUE(sellable_product_instance_id, erp_sku_id, creator_store_connection_id)
 );
 
 CREATE TRIGGER custom_product_skus_updated_at

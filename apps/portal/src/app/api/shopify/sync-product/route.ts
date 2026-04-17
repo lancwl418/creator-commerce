@@ -104,13 +104,14 @@ export async function POST(req: NextRequest) {
     option3: sku.option3,
     sale_price: sku.price ?? product.retail_price ?? 25,
     base_cost_snapshot: COST,
+    creator_store_connection_id: store_connection_id,
     is_active: true,
     erp_sync_status: 'pending',
   }));
 
   const { data: customSkus, error: skuError } = await supabase
     .from('custom_product_skus')
-    .upsert(customSkuRows, { onConflict: 'sellable_product_instance_id,erp_sku_id' })
+    .upsert(customSkuRows, { onConflict: 'sellable_product_instance_id,erp_sku_id,creator_store_connection_id' })
     .select('*');
 
   if (skuError) {
