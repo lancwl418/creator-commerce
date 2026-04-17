@@ -61,25 +61,15 @@ interface ProductData {
   created_at: string;
 }
 
-interface DesignLayer {
-  id: string;
-  type: string;
-  visible: boolean;
-  opacity: number;
-  transform: { x: number; y: number; width: number; height: number; rotation: number; scaleX: number; scaleY: number; flipX: boolean; flipY: boolean };
-  data: { type: string; src?: string };
-}
-
 interface ProductEditorProps {
   product: ProductData;
   previewUrl: string | null;
   designTitle: string | null;
   designArtworkUrls: string[];
-  designLayers: DesignLayer[];
   listings: Listing[];
 }
 
-export default function ProductEditor({ product, previewUrl, designTitle, designArtworkUrls, designLayers, listings }: ProductEditorProps) {
+export default function ProductEditor({ product, previewUrl, designTitle, designArtworkUrls, listings }: ProductEditorProps) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -163,41 +153,24 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     return variants;
   }, [erpSkus]);
 
-  // Composite design layers onto each color variant image
+  // Composite design artwork onto each color variant image
+  // Strategy: load the design preview (already composited onto the main mockup),
+  // extract the artwork area, and overlay it onto each variant's SKU image
+  // at the same relative position
   const [colorPreviews, setColorPreviews] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
-    if (colorVariants.length === 0) return;
+    if (colorVariants.length === 0 || designArtworkUrls.length === 0) return;
 
-    let imageLayers = designLayers.filter(l => l.visible && l.data.type === 'image' && l.data.src);
-
-    // Fallback: if no saved layers, build synthetic layers from artwork URLs
-    if (imageLayers.length === 0 && designArtworkUrls.length > 0) {
-      imageLayers = designArtworkUrls.map((url, i) => ({
-        id: `fallback-${i}`,
-        type: 'image',
-        visible: true,
-        opacity: 1,
-        transform: { x: 160, y: 100, width: 480, height: 600, rotation: 0, scaleX: 1, scaleY: 1, flipX: false, flipY: false },
-        data: { type: 'image', src: url },
-      }));
-    }
-
-    if (imageLayers.length === 0) return;
-
-    const THUMB_SIZE = 160;
-    const MOCKUP_W = 800;
-    const MOCKUP_H = 800;
+    const THUMB_SIZE = 200;
 
     const loadImg = (src: string): Promise<HTMLImageElement | null> =>
       new Promise((resolve) => {
         const img = new Image();
-        // Only set crossOrigin for external URLs (Supabase storage etc.)
-        // Same-origin proxy URLs (/api/erp/image) must NOT set crossOrigin
         if (src.startsWith('http')) img.crossOrigin = 'anonymous';
         img.onload = () => resolve(img);
         img.onerror = () => {
-          // Retry without crossOrigin if it fails
+          // Retry without crossOrigin if CORS fails
           if (img.crossOrigin) {
             const retry = new Image();
             retry.onload = () => resolve(retry);
@@ -211,55 +184,53 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
       });
 
     async function generate() {
-      const scale = THUMB_SIZE / Math.max(MOCKUP_W, MOCKUP_H);
-      const cw = Math.round(MOCKUP_W * scale);
-      const ch = Math.round(MOCKUP_H * scale);
+      // Load the first artwork image to use as overlay
+      const artworkImg = await loadImg(designArtworkUrls[0]);
+      if (!artworkImg) return;
+
       const newPreviews = new Map<string, string>();
 
       for (const variant of colorVariants) {
+        const variantImg = await loadImg(variant.imageUrl);
+        if (!variantImg) continue;
+
+        // Use the variant image's natural aspect ratio
+        const vw = variantImg.naturalWidth;
+        const vh = variantImg.naturalHeight;
+        const scale = THUMB_SIZE / Math.max(vw, vh);
+        const cw = Math.round(vw * scale);
+        const ch = Math.round(vh * scale);
+
         const canvas = document.createElement('canvas');
         canvas.width = cw;
         canvas.height = ch;
         const ctx = canvas.getContext('2d');
         if (!ctx) continue;
 
-        const mockup = await loadImg(variant.imageUrl);
-        if (mockup) {
-          ctx.drawImage(mockup, 0, 0, cw, ch);
-        } else {
-          ctx.fillStyle = '#f0f0f0';
-          ctx.fillRect(0, 0, cw, ch);
-        }
+        // Draw variant background
+        ctx.drawImage(variantImg, 0, 0, cw, ch);
 
-        for (const layer of imageLayers) {
-          const src = layer.data.src;
-          if (!src) continue;
-          const artImg = await loadImg(src);
-          if (!artImg) continue;
+        // Overlay artwork centered on the product area
+        // Position: centered horizontally, upper-center vertically (typical T-shirt chest area)
+        const artW = cw * 0.35;  // artwork covers ~35% of image width
+        const artH = artW * (artworkImg.naturalHeight / artworkImg.naturalWidth);
+        const artX = (cw - artW) / 2;
+        const artY = ch * 0.25;  // start at ~25% from top
 
-          const t = layer.transform;
-          ctx.save();
-          ctx.translate(t.x * scale, t.y * scale);
-          ctx.rotate((t.rotation || 0) * Math.PI / 180);
-          if (t.flipX) ctx.scale(-1, 1);
-          if (t.flipY) ctx.scale(1, -1);
-          const dw = (t.width || artImg.naturalWidth) * (t.scaleX || 1) * scale;
-          const dh = (t.height || artImg.naturalHeight) * (t.scaleY || 1) * scale;
-          ctx.globalAlpha = layer.opacity ?? 1;
-          ctx.drawImage(artImg, 0, 0, dw, dh);
-          ctx.restore();
-        }
+        ctx.globalAlpha = 0.92;
+        ctx.drawImage(artworkImg, artX, artY, artW, artH);
+        ctx.globalAlpha = 1;
 
         try {
-          newPreviews.set(variant.color, canvas.toDataURL('image/jpeg', 0.8));
-        } catch { /* CORS tainted — fall back to plain mockup */ }
+          newPreviews.set(variant.color, canvas.toDataURL('image/jpeg', 0.85));
+        } catch { /* CORS tainted */ }
       }
 
       setColorPreviews(newPreviews);
     }
 
     generate();
-  }, [colorVariants, designLayers]);
+  }, [colorVariants, designArtworkUrls]);
 
   // Always show the design preview — this is a created product page,
   // not the catalog. The previewUrl is the composited design from the editor.
