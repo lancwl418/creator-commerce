@@ -17,7 +17,7 @@ export default async function ProductsPage() {
     .select(`
       *,
       designs (id, title),
-      channel_listings (id, channel_type, status, price, currency)
+      channel_listings (id, channel_type, creator_store_connection_id, status, price, currency, creator_store_connections (platform))
     `)
     .eq('creator_id', creator!.id)
     .order('created_at', { ascending: false });
@@ -69,7 +69,9 @@ export default async function ProductsPage() {
             {products.map((product) => {
               const previewUrl = (product.preview_urls as string[])?.[0];
               const artworkUrls = (product.design_artwork_urls as string[]) ?? [];
-              const listing = product.channel_listings?.[0];
+              const listings = (product.channel_listings ?? []) as { id: string; channel_type: string; status: string; price: number; currency: string; creator_store_connections?: { platform: string } }[];
+              const activeListings = listings.filter((l) => l.status === 'active');
+              const displayPrice = product.retail_price ?? activeListings[0]?.price;
 
               return (
                 <Link
@@ -118,8 +120,12 @@ export default async function ProductsPage() {
 
                   {/* Channel */}
                   <div>
-                    {listing ? (
-                      <ChannelBadge channelType={listing.channel_type} />
+                    {activeListings.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {activeListings.map((l) => (
+                          <ChannelBadge key={l.id} channelType={l.creator_store_connections?.platform || l.channel_type} />
+                        ))}
+                      </div>
                     ) : (
                       <span className="text-xs text-gray-400">—</span>
                     )}
@@ -127,9 +133,9 @@ export default async function ProductsPage() {
 
                   {/* Price */}
                   <div>
-                    {listing ? (
+                    {displayPrice ? (
                       <span className="text-sm font-semibold text-gray-900">
-                        ${Number(listing.price).toFixed(2)}
+                        ${Number(displayPrice).toFixed(2)}
                       </span>
                     ) : (
                       <span className="text-xs text-gray-400">—</span>
@@ -181,18 +187,25 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function ChannelBadge({ channelType }: { channelType: string }) {
-  const labels: Record<string, string> = {
-    our_shopify: 'Marketplace',
-    creator_shopify: 'Shopify',
-    creator_etsy: 'Etsy',
-    creator_tiktok: 'TikTok',
-    distributor_shopify: 'Shopify',
-    distributor_etsy: 'Etsy',
+  const config: Record<string, { label: string; style: string }> = {
+    marketplace: { label: 'Marketplace', style: 'bg-blue-50 text-blue-700' },
+    our_shopify: { label: 'Marketplace', style: 'bg-blue-50 text-blue-700' },
+    shopify: { label: 'Shopify', style: 'bg-[#96bf48]/10 text-[#6a8a2e]' },
+    etsy: { label: 'Etsy', style: 'bg-orange-50 text-orange-700' },
+    tiktok_shop: { label: 'TikTok', style: 'bg-gray-900 text-white' },
+    creator_store: { label: 'Shopify', style: 'bg-[#96bf48]/10 text-[#6a8a2e]' },
+    creator_shopify: { label: 'Shopify', style: 'bg-[#96bf48]/10 text-[#6a8a2e]' },
+    creator_etsy: { label: 'Etsy', style: 'bg-orange-50 text-orange-700' },
+    creator_tiktok: { label: 'TikTok', style: 'bg-gray-900 text-white' },
+    distributor_shopify: { label: 'Shopify', style: 'bg-[#96bf48]/10 text-[#6a8a2e]' },
+    distributor_etsy: { label: 'Etsy', style: 'bg-orange-50 text-orange-700' },
   };
 
+  const c = config[channelType] || { label: channelType, style: 'bg-gray-100 text-gray-600' };
+
   return (
-    <span className="inline-block rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
-      {labels[channelType] || channelType}
+    <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${c.style}`}>
+      {c.label}
     </span>
   );
 }

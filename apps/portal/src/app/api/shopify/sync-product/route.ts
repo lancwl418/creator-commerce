@@ -174,6 +174,8 @@ export async function POST(req: NextRequest) {
   const shopifyProduct: Record<string, unknown> = {
     title: product.title || 'Untitled',
     body_html: product.description || '',
+    vendor: 'ideamax',
+    tags: 'ideamax',
     images: imageUrls.map(url => ({ src: url })),
     status: 'active',
   };
@@ -185,7 +187,7 @@ export async function POST(req: NextRequest) {
   if (selectedSkus.length > 0) {
     shopifyProduct.variants = selectedSkus.map(sku => {
       const variant: Record<string, unknown> = {
-        price: String(sku.price ?? product.retail_price ?? 25),
+        price: Number(sku.price ?? product.retail_price ?? 25).toFixed(2),
         sku: sku.sku || undefined,
         inventory_management: null,
       };
