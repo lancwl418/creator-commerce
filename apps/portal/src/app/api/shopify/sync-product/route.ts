@@ -125,9 +125,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Product is already synced to this store', listing: existingListing }, { status: 409 });
   }
 
-  // ── Step 1: Create custom_product_skus ──
-  const selectedSkus = ((product.selected_skus as SkuSelection[]) || []).filter(s => s.enabled);
+  // ── Step 1: Resolve variants ──
+  let selectedSkus = ((product.selected_skus as SkuSelection[]) || []).filter(s => s.enabled);
   const erpProductId = (product.product_template_id as string)?.replace('erp-', '').replace('shopify-', '') || '';
+
+  // If no saved variants, auto-fetch from ERP/Shopify and enable all
+  if (selectedSkus.length === 0) {
+    try {
+      const skuRes = await fetch(
+        `${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/erp/product-skus?template_id=${encodeURIComponent(product.product_template_id)}`,
+      );
+      if (skuRes.ok) {
+        const skuData = await skuRes.json();
+        const erpSkus = (skuData.skus || []) as Array<{
+          id: string; sku: string; option1: string | null; option2: string | null; option3: string | null; price: number;
+        }>;
+        selectedSkus = erpSkus.map(s => ({
+          sku_id: s.id,
+          sku: s.sku,
+          option1: s.option1,
+          option2: s.option2,
+          option3: s.option3,
+          enabled: true,
+          price: null,
+        }));
+
+        // Also save to product so next time we don't need to re-fetch
+        const retailPrice = product.retail_price ?? product.base_price_suggestion ?? (erpSkus[0]?.price ? erpSkus[0].price * 2.5 : 25);
+        await supabase.from('sellable_product_instances').update({
+          selected_skus: selectedSkus,
+          retail_price: retailPrice,
+        }).eq('id', product_instance_id);
+        product.retail_price = retailPrice;
+      }
+    } catch (err) {
+      console.error('[Sync] Failed to auto-fetch SKUs:', err);
+    }
+  }
+
+  // Use base_price_suggestion as fallback for retail_price
+  if (!product.retail_price && product.base_price_suggestion) {
+    product.retail_price = product.base_price_suggestion;
+    await supabase.from('sellable_product_instances').update({
+      retail_price: product.retail_price,
+    }).eq('id', product_instance_id);
+  }
 
   // Upsert custom SKUs for each enabled variant
   const customSkuRows = selectedSkus.map(sku => ({
