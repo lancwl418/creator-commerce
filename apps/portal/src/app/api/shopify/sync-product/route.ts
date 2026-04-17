@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
+const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
+const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
 const COST = 10.00; // MVP hardcoded cost
 
 interface SkuSelection {
@@ -75,6 +77,40 @@ export async function POST(req: NextRequest) {
 
   if (connection.status !== 'connected' || !connection.access_token) {
     return NextResponse.json({ error: 'Store is not connected. Please reconnect.' }, { status: 400 });
+  }
+
+  // Refresh token if expired
+  let accessToken = connection.access_token;
+  if (connection.token_expires_at && new Date(connection.token_expires_at) <= new Date()) {
+    if (!connection.refresh_token) {
+      return NextResponse.json({ error: 'Token expired and no refresh token. Please reconnect.' }, { status: 400 });
+    }
+    const shopDomainForRefresh = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
+    const refreshRes = await fetch(`https://${shopDomainForRefresh}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: SHOPIFY_CLIENT_ID,
+        client_secret: SHOPIFY_CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: connection.refresh_token,
+      }),
+    });
+    if (!refreshRes.ok) {
+      console.error('[Shopify Sync] Token refresh failed:', await refreshRes.text());
+      await supabase.from('creator_store_connections').update({ status: 'expired' }).eq('id', store_connection_id);
+      return NextResponse.json({ error: 'Token refresh failed. Please reconnect your store.' }, { status: 401 });
+    }
+    const refreshData = await refreshRes.json();
+    accessToken = refreshData.access_token;
+    // Save new tokens
+    await supabase.from('creator_store_connections').update({
+      access_token: refreshData.access_token,
+      refresh_token: refreshData.refresh_token || connection.refresh_token,
+      token_expires_at: refreshData.expires_in
+        ? new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+        : connection.token_expires_at,
+    }).eq('id', store_connection_id);
   }
 
   // Check if already synced
@@ -169,7 +205,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': connection.access_token,
+          'X-Shopify-Access-Token': accessToken,
         },
         body: JSON.stringify({ product: shopifyProduct }),
       }

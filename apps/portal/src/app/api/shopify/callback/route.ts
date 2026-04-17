@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     return redirectTo('/dashboard/stores?error=invalid_hmac', req);
   }
 
-  // Exchange code for access token
+  // Exchange code for expiring offline access token
   const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
       client_id: CLIENT_ID,
       client_secret: CLIENT_SECRET,
       code,
+      expiring: 1, // Request expiring token (required since 2025)
     }),
   });
 
@@ -74,9 +75,10 @@ export async function GET(req: NextRequest) {
   }
 
   const tokenData = await tokenRes.json();
-  const { access_token, scope } = tokenData;
-  // Shopify now returns expiring offline tokens with expires_in (seconds)
+  const { access_token, scope, refresh_token } = tokenData;
+  // Expiring tokens: access_token ~1h, refresh_token ~90 days
   const expiresIn = tokenData.expires_in as number | undefined;
+  const refreshTokenExpiresIn = tokenData.refresh_token_expires_in as number | undefined;
   const tokenExpiresAt = expiresIn
     ? new Date(Date.now() + expiresIn * 1000).toISOString()
     : null;
@@ -104,10 +106,15 @@ export async function GET(req: NextRequest) {
         store_name: storeName,
         store_url: `https://${shop}`,
         access_token,
+        refresh_token: refresh_token || null,
         scopes: scope?.split(',') || [],
         status: 'connected',
         token_expires_at: tokenExpiresAt,
-        metadata: { expires_in: expiresIn, token_type: expiresIn ? 'expiring' : 'legacy' },
+        metadata: {
+          expires_in: expiresIn,
+          refresh_token_expires_in: refreshTokenExpiresIn,
+          token_type: 'expiring',
+        },
         connected_at: new Date().toISOString(),
       },
       { onConflict: 'creator_id,platform' }
