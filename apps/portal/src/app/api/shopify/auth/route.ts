@@ -53,6 +53,10 @@ export async function GET(req: NextRequest) {
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `state=${state}`;
 
+  console.log('[Shopify OAuth] Auth URL:', authUrl);
+  console.log('[Shopify OAuth] Scopes:', SCOPES);
+  console.log('[Shopify OAuth] Redirect URI:', redirectUri);
+
   const response = NextResponse.redirect(authUrl);
 
   // Store state and creator_id in cookies for callback verification
