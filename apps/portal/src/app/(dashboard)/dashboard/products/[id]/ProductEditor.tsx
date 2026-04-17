@@ -165,7 +165,20 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   useEffect(() => {
     if (colorVariants.length === 0) return;
 
-    const imageLayers = designLayers.filter(l => l.visible && l.data.type === 'image' && l.data.src);
+    let imageLayers = designLayers.filter(l => l.visible && l.data.type === 'image' && l.data.src);
+
+    // Fallback: if no saved layers, build synthetic layers from artwork URLs
+    if (imageLayers.length === 0 && designArtworkUrls.length > 0) {
+      imageLayers = designArtworkUrls.map((url, i) => ({
+        id: `fallback-${i}`,
+        type: 'image',
+        visible: true,
+        opacity: 1,
+        transform: { x: 160, y: 100, width: 480, height: 600, rotation: 0, scaleX: 1, scaleY: 1, flipX: false, flipY: false },
+        data: { type: 'image', src: url },
+      }));
+    }
+
     if (imageLayers.length === 0) return;
 
     const THUMB_SIZE = 160;
@@ -175,9 +188,21 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     const loadImg = (src: string): Promise<HTMLImageElement | null> =>
       new Promise((resolve) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        // Only set crossOrigin for external URLs (Supabase storage etc.)
+        // Same-origin proxy URLs (/api/erp/image) must NOT set crossOrigin
+        if (src.startsWith('http')) img.crossOrigin = 'anonymous';
         img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
+        img.onerror = () => {
+          // Retry without crossOrigin if it fails
+          if (img.crossOrigin) {
+            const retry = new Image();
+            retry.onload = () => resolve(retry);
+            retry.onerror = () => resolve(null);
+            retry.src = src;
+          } else {
+            resolve(null);
+          }
+        };
         img.src = src;
       });
 
