@@ -1,17 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 const COST = 10.00; // Hardcoded production cost for MVP
-
-function erpImg(path: string): string {
-  if (!path) return '';
-  if (path.startsWith('http') || path.startsWith('/api/')) return path;
-  return `/api/erp/image?path=${encodeURIComponent(path)}`;
-}
 
 interface ErpSku {
   id: string;
@@ -134,38 +128,9 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
   const option3Values = [...new Set(erpSkus.map(s => s.option3).filter(Boolean))] as string[];
   const hasOptions = option1Values.length > 0 || option2Values.length > 0;
 
-  // Active variant selection for preview image switching
-  const [selectedOption1, setSelectedOption1] = useState<string | null>(null);
-  const [selectedOption2, setSelectedOption2] = useState<string | null>(null);
-  const [selectedOption3, setSelectedOption3] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (erpSkus.length > 0) {
-      if (option1Values.length > 0 && !selectedOption1) setSelectedOption1(option1Values[0]);
-      if (option2Values.length > 0 && !selectedOption2) setSelectedOption2(option2Values[0]);
-      if (option3Values.length > 0 && !selectedOption3) setSelectedOption3(option3Values[0]);
-    }
-  }, [erpSkus]);
-
-  const activePreviewUrl = useMemo(() => {
-    if (erpSkus.length === 0) return previewUrl;
-    const matchingSku = erpSkus.find(sku => {
-      const m1 = !selectedOption1 || sku.option1 === selectedOption1;
-      const m2 = !selectedOption2 || sku.option2 === selectedOption2;
-      const m3 = !selectedOption3 || sku.option3 === selectedOption3;
-      return m1 && m2 && m3 && sku.skuImage;
-    });
-    if (matchingSku?.skuImage) return erpImg(matchingSku.skuImage);
-    if (selectedOption2) {
-      const s = erpSkus.find(sku => sku.option2 === selectedOption2 && sku.skuImage);
-      if (s?.skuImage) return erpImg(s.skuImage);
-    }
-    if (selectedOption1) {
-      const s = erpSkus.find(sku => sku.option1 === selectedOption1 && sku.skuImage);
-      if (s?.skuImage) return erpImg(s.skuImage);
-    }
-    return previewUrl;
-  }, [erpSkus, selectedOption1, selectedOption2, selectedOption3, previewUrl]);
+  // Always show the design preview — this is a created product page,
+  // not the catalog. The previewUrl is the composited design from the editor.
+  const activePreviewUrl = previewUrl;
 
   const toggleSku = useCallback((skuId: string) => {
     setEnabledSkuIds(prev => {
@@ -415,57 +380,6 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
               </div>
             )}
           </div>
-
-          {/* Clickable variant selectors (for preview image switching) */}
-          {!loadingSkus && !skuError && hasOptions && (
-            <div className="space-y-3 mb-5 pb-5 border-b border-gray-100">
-              {option1Values.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    {optionNames[0] || 'Option 1'}
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {option1Values.map((val) => (
-                      <button key={val} onClick={() => setSelectedOption1(val)}
-                        className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
-                          selectedOption1 === val ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                        }`}>{val}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {option2Values.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    {optionNames[1] || 'Option 2'}
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {option2Values.map((val) => (
-                      <button key={val} onClick={() => setSelectedOption2(val)}
-                        className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
-                          selectedOption2 === val ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                        }`}>{val}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {option3Values.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    {optionNames[2] || 'Option 3'}
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {option3Values.map((val) => (
-                      <button key={val} onClick={() => setSelectedOption3(val)}
-                        className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
-                          selectedOption3 === val ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-border bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                        }`}>{val}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           {loadingSkus ? (
             <div className="flex items-center justify-center py-8">
