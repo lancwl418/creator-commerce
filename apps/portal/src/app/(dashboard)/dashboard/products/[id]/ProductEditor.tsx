@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import SyncModal from './SyncModal';
 
 const COST = 10.00; // Hardcoded production cost for MVP
 
@@ -37,6 +38,8 @@ interface SkuSelection {
 interface Listing {
   id: string;
   channel_type: string;
+  creator_store_connection_id?: string;
+  external_listing_url?: string;
   price: number;
   currency: string;
   status: string;
@@ -96,6 +99,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const [title, setTitle] = useState(product.title || '');
   const [description, setDescription] = useState(product.description || '');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [showSyncModal, setShowSyncModal] = useState(false);
 
   // Product-level retail price (default for all variants)
   const [retailPrice, setRetailPrice] = useState(
@@ -675,9 +679,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save All'}
           </button>
           <button
-            onClick={() => {
-              alert('Store sync coming soon! Connect your store first in Settings.');
-            }}
+            onClick={() => setShowSyncModal(true)}
             className="flex-1 rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-500 transition-all shadow-md shadow-primary-600/25"
           >
             Sync to Your Stores
@@ -701,6 +703,15 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
             </div>
           </div>
         </div>
+      )}
+
+      {showSyncModal && (
+        <SyncModal
+          productId={product.id}
+          listings={listings}
+          onClose={() => setShowSyncModal(false)}
+          onSynced={() => router.refresh()}
+        />
       )}
     </div>
   );

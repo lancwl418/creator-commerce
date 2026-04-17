@@ -61,6 +61,8 @@ export default function StoresPage() {
   const [connections, setConnections] = useState<StoreConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
+  const [shopDomain, setShopDomain] = useState('');
 
   useEffect(() => {
     loadConnections();
@@ -92,9 +94,26 @@ export default function StoresPage() {
     return connections.find(c => c.platform === platformId);
   }
 
-  async function handleConnect(platformId: string) {
-    // TODO: implement OAuth flow for each platform
-    alert(`${platformId} connection coming soon! OAuth integration is in development.`);
+  function handleConnect(platformId: string) {
+    if (platformId === 'shopify') {
+      setConnectingPlatform('shopify');
+      setShopDomain('');
+    } else {
+      alert(`${platformId} connection coming soon!`);
+    }
+  }
+
+  function handleShopifyOAuth() {
+    let domain = shopDomain.trim();
+    // Normalize: add .myshopify.com if user just typed store name
+    if (domain && !domain.includes('.')) {
+      domain = `${domain}.myshopify.com`;
+    }
+    if (!domain.endsWith('.myshopify.com')) {
+      alert('Please enter a valid Shopify domain (e.g., mystore.myshopify.com)');
+      return;
+    }
+    window.location.href = `/api/shopify/auth?shop=${encodeURIComponent(domain)}`;
   }
 
   async function handleDisconnect(connectionId: string) {
@@ -217,6 +236,35 @@ export default function StoresPage() {
                   )}
                 </div>
               </div>
+
+              {/* Shopify domain input */}
+              {connectingPlatform === platform.id && platform.id === 'shopify' && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-sm text-gray-600 mb-2">Enter your Shopify store domain:</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={shopDomain}
+                      onChange={(e) => setShopDomain(e.target.value)}
+                      placeholder="mystore.myshopify.com"
+                      className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
+                      onKeyDown={(e) => e.key === 'Enter' && handleShopifyOAuth()}
+                    />
+                    <button
+                      onClick={handleShopifyOAuth}
+                      className="rounded-xl bg-[#96bf48] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#7ea73d] transition-all shrink-0"
+                    >
+                      Continue to Shopify
+                    </button>
+                    <button
+                      onClick={() => setConnectingPlatform(null)}
+                      className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shrink-0"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
