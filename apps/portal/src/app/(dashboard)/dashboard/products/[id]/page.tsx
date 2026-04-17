@@ -55,6 +55,7 @@ export default async function ProductDetailPage({
         product={{
           id: product.id,
           title: product.title,
+          description: product.description ?? '',
           status: product.status,
           cost: product.cost ?? 10,
           retail_price: product.retail_price,

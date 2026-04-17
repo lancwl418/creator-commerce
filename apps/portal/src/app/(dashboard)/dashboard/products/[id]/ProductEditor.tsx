@@ -46,6 +46,7 @@ interface Listing {
 interface ProductData {
   id: string;
   title: string;
+  description: string;
   status: string;
   cost: number;
   retail_price: number | null;
@@ -79,6 +80,10 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
     const saved = product.selected_skus.filter(s => s.enabled).map(s => s.sku_id);
     return new Set(saved);
   });
+
+  // Editable product fields
+  const [title, setTitle] = useState(product.title || '');
+  const [description, setDescription] = useState(product.description || '');
 
   // Product-level retail price (default for all variants)
   const [retailPrice, setRetailPrice] = useState(
@@ -232,6 +237,8 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
       const { error: updateError } = await supabase
         .from('sellable_product_instances')
         .update({
+          title: title.trim() || product.title,
+          description: description.trim(),
           selected_skus: skuSelections,
           retail_price: priceNum,
           cost: COST,
@@ -277,9 +284,27 @@ export default function ProductEditor({ product, previewUrl, designTitle, listin
         </div>
 
         {/* Product Info Card */}
-        <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">{product.title || 'Untitled'}</h2>
-          <div className="space-y-2.5 text-sm">
+        <div className="rounded-2xl border border-border bg-white p-5 shadow-sm space-y-3">
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Product Name</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => { setTitle(e.target.value); setSaved(false); }}
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => { setDescription(e.target.value); setSaved(false); }}
+              rows={3}
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all resize-none"
+              placeholder="Product description..."
+            />
+          </div>
+          <div className="space-y-2 text-sm pt-1">
             <div className="flex justify-between">
               <span className="text-gray-500">Status</span>
               <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusStyles[product.status] || statusStyles.draft}`}>
