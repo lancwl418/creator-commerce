@@ -12,8 +12,7 @@ RUN pnpm install --frozen-lockfile
 # --- Build ---
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/portal/node_modules ./apps/portal/node_modules
+COPY --from=deps /app/ ./
 COPY . .
 WORKDIR /app/apps/portal
 # Render passes env vars as build-time ARGs for Docker builds
