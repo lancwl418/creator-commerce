@@ -1,11 +1,17 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 const COST = 10.00; // Hardcoded production cost for MVP
+
+function erpImg(path: string): string {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('/api/')) return path;
+  return `/api/erp/image?path=${encodeURIComponent(path)}`;
+}
 
 interface ErpSku {
   id: string;
@@ -129,6 +135,19 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const option2Values = [...new Set(erpSkus.map(s => s.option2).filter(Boolean))] as string[];
   const option3Values = [...new Set(erpSkus.map(s => s.option3).filter(Boolean))] as string[];
   const hasOptions = option1Values.length > 0 || option2Values.length > 0;
+
+  // Extract unique color variants with images (one per color)
+  const colorVariants = useMemo(() => {
+    const seen = new Set<string>();
+    const variants: { color: string; imageUrl: string }[] = [];
+    for (const sku of erpSkus) {
+      const color = sku.option1 || sku.option2;
+      if (!color || !sku.skuImage || seen.has(color)) continue;
+      seen.add(color);
+      variants.push({ color, imageUrl: erpImg(sku.skuImage) });
+    }
+    return variants;
+  }, [erpSkus]);
 
   // Always show the design preview — this is a created product page,
   // not the catalog. The previewUrl is the composited design from the editor.
@@ -382,6 +401,27 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
             </button>
           )}
         </div>
+
+        {/* Color variant previews */}
+        {colorVariants.length > 0 && (
+          <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Colors</h3>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {colorVariants.map((v) => (
+                <button
+                  key={v.color}
+                  onClick={() => setLightboxUrl(v.imageUrl)}
+                  className="shrink-0 text-center group"
+                >
+                  <div className="w-20 h-20 rounded-lg border border-border bg-gray-50 overflow-hidden transition-all group-hover:border-primary-400 group-hover:shadow-sm">
+                    <img src={v.imageUrl} alt={v.color} className="w-full h-full object-contain p-1" />
+                  </div>
+                  <span className="text-[10px] text-gray-500 mt-1 block truncate w-20">{v.color}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Variants with per-variant pricing */}
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
