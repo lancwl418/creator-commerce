@@ -58,15 +58,25 @@ interface ProductData {
   created_at: string;
 }
 
+interface DesignLayer {
+  id: string;
+  type: string;
+  visible: boolean;
+  opacity: number;
+  transform: { x: number; y: number; width: number; height: number; rotation: number; scaleX: number; scaleY: number; flipX: boolean; flipY: boolean };
+  data: { type: string; src?: string };
+}
+
 interface ProductEditorProps {
   product: ProductData;
   previewUrl: string | null;
   designTitle: string | null;
   designArtworkUrls: string[];
+  designLayers: DesignLayer[];
   listings: Listing[];
 }
 
-export default function ProductEditor({ product, previewUrl, designTitle, designArtworkUrls, listings }: ProductEditorProps) {
+export default function ProductEditor({ product, previewUrl, designTitle, designArtworkUrls, designLayers, listings }: ProductEditorProps) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -148,6 +158,79 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     }
     return variants;
   }, [erpSkus]);
+
+  // Composite design layers onto each color variant image
+  const [colorPreviews, setColorPreviews] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    if (colorVariants.length === 0) return;
+
+    const imageLayers = designLayers.filter(l => l.visible && l.data.type === 'image' && l.data.src);
+    if (imageLayers.length === 0) return;
+
+    const THUMB_SIZE = 160;
+    const MOCKUP_W = 800;
+    const MOCKUP_H = 800;
+
+    const loadImg = (src: string): Promise<HTMLImageElement | null> =>
+      new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
+      });
+
+    async function generate() {
+      const scale = THUMB_SIZE / Math.max(MOCKUP_W, MOCKUP_H);
+      const cw = Math.round(MOCKUP_W * scale);
+      const ch = Math.round(MOCKUP_H * scale);
+      const newPreviews = new Map<string, string>();
+
+      for (const variant of colorVariants) {
+        const canvas = document.createElement('canvas');
+        canvas.width = cw;
+        canvas.height = ch;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) continue;
+
+        const mockup = await loadImg(variant.imageUrl);
+        if (mockup) {
+          ctx.drawImage(mockup, 0, 0, cw, ch);
+        } else {
+          ctx.fillStyle = '#f0f0f0';
+          ctx.fillRect(0, 0, cw, ch);
+        }
+
+        for (const layer of imageLayers) {
+          const src = layer.data.src;
+          if (!src) continue;
+          const artImg = await loadImg(src);
+          if (!artImg) continue;
+
+          const t = layer.transform;
+          ctx.save();
+          ctx.translate(t.x * scale, t.y * scale);
+          ctx.rotate((t.rotation || 0) * Math.PI / 180);
+          if (t.flipX) ctx.scale(-1, 1);
+          if (t.flipY) ctx.scale(1, -1);
+          const dw = (t.width || artImg.naturalWidth) * (t.scaleX || 1) * scale;
+          const dh = (t.height || artImg.naturalHeight) * (t.scaleY || 1) * scale;
+          ctx.globalAlpha = layer.opacity ?? 1;
+          ctx.drawImage(artImg, 0, 0, dw, dh);
+          ctx.restore();
+        }
+
+        try {
+          newPreviews.set(variant.color, canvas.toDataURL('image/jpeg', 0.8));
+        } catch { /* CORS tainted — fall back to plain mockup */ }
+      }
+
+      setColorPreviews(newPreviews);
+    }
+
+    generate();
+  }, [colorVariants, designLayers]);
 
   // Always show the design preview — this is a created product page,
   // not the catalog. The previewUrl is the composited design from the editor.
@@ -402,23 +485,26 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           )}
         </div>
 
-        {/* Color variant previews */}
+        {/* Color variant previews with design composited */}
         {colorVariants.length > 0 && (
           <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Colors</h3>
             <div className="flex gap-3 overflow-x-auto pb-1">
-              {colorVariants.map((v) => (
-                <button
-                  key={v.color}
-                  onClick={() => setLightboxUrl(v.imageUrl)}
-                  className="shrink-0 text-center group"
-                >
-                  <div className="w-20 h-20 rounded-lg border border-border bg-gray-50 overflow-hidden transition-all group-hover:border-primary-400 group-hover:shadow-sm">
-                    <img src={v.imageUrl} alt={v.color} className="w-full h-full object-contain p-1" />
-                  </div>
-                  <span className="text-[10px] text-gray-500 mt-1 block truncate w-20">{v.color}</span>
-                </button>
-              ))}
+              {colorVariants.map((v) => {
+                const composite = colorPreviews.get(v.color);
+                return (
+                  <button
+                    key={v.color}
+                    onClick={() => setLightboxUrl(composite || v.imageUrl)}
+                    className="shrink-0 text-center group"
+                  >
+                    <div className="w-20 h-20 rounded-lg border border-border bg-gray-50 overflow-hidden transition-all group-hover:border-primary-400 group-hover:shadow-sm">
+                      <img src={composite || v.imageUrl} alt={v.color} className="w-full h-full object-contain p-1" />
+                    </div>
+                    <span className="text-[10px] text-gray-500 mt-1 block truncate w-20">{v.color}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
