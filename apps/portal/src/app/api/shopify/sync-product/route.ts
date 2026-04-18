@@ -503,9 +503,8 @@ export async function POST(req: NextRequest) {
 
   const previewUrls = (product.preview_urls as string[]) || [];
   const artworkUrls = (product.design_artwork_urls as string[]) || [];
-  // Filter to only valid, accessible image URLs (skip broken Supabase URLs etc.)
   const imageUrls = [...previewUrls, ...artworkUrls].filter(
-    url => url && url.startsWith('http') && !url.includes('supabase.co/storage')
+    url => url && url.startsWith('http')
   );
 
   // Use design preview images for variants if available (from R2),

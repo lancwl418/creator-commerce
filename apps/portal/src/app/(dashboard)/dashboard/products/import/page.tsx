@@ -148,19 +148,18 @@ export default function ImportFromEditorPage() {
         const rawDesc = product.description || '';
         const cleanDesc = rawDesc.replace(/<[^>]*>/g, '').trim();
 
+        // Upload preview and artwork images to R2
         let previewUrls: string[] = [];
         if (product.thumbnail && product.thumbnail.startsWith('data:')) {
           try {
-            const base64 = product.thumbnail.split(',')[1];
-            const mimeMatch = product.thumbnail.match(/data:([^;]+);/);
-            const mime = mimeMatch?.[1] || 'image/jpeg';
-            const ext = mime === 'image/png' ? 'png' : 'jpg';
-            const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-            const filePath = `${creator.id}/previews/${crypto.randomUUID()}.${ext}`;
-            const { error: uploadError } = await supabase.storage.from('design-assets').upload(filePath, bytes, { contentType: mime });
-            if (!uploadError) {
-              const { data: urlData } = supabase.storage.from('design-assets').getPublicUrl(filePath);
-              previewUrls = [urlData.publicUrl];
+            const res = await fetch('/api/upload-r2', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ data_url: product.thumbnail, folder: 'previews' }),
+            });
+            if (res.ok) {
+              const { url } = await res.json();
+              previewUrls = [url];
             }
           } catch (e) { console.error('Preview upload failed:', e); }
         } else if (product.thumbnail) {
@@ -178,16 +177,14 @@ export default function ImportFromEditorPage() {
         for (const artUrl of designArtworkUrls) {
           if (artUrl.startsWith('data:')) {
             try {
-              const b64 = artUrl.split(',')[1];
-              const mMatch = artUrl.match(/data:([^;]+);/);
-              const m = mMatch?.[1] || 'image/png';
-              const e = m === 'image/png' ? 'png' : 'jpg';
-              const bts = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-              const fp = `${creator.id}/artworks/${crypto.randomUUID()}.${e}`;
-              const { error: upErr } = await supabase.storage.from('design-assets').upload(fp, bts, { contentType: m });
-              if (!upErr) {
-                const { data: ud } = supabase.storage.from('design-assets').getPublicUrl(fp);
-                storedArtworkUrls.push(ud.publicUrl);
+              const res = await fetch('/api/upload-r2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data_url: artUrl, folder: 'artworks' }),
+              });
+              if (res.ok) {
+                const { url } = await res.json();
+                storedArtworkUrls.push(url);
               }
             } catch { /* skip */ }
           } else if (artUrl && !artUrl.startsWith('blob:')) {
