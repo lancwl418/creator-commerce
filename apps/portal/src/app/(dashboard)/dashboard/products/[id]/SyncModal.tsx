@@ -25,6 +25,7 @@ interface SyncModalProps {
   listings: Listing[];
   onClose: () => void;
   onSynced: () => void;
+  onBeforeSync?: () => Promise<void>;
 }
 
 const platformIcons: Record<string, { name: string; color: string }> = {
@@ -33,7 +34,7 @@ const platformIcons: Record<string, { name: string; color: string }> = {
   tiktok_shop: { name: 'TikTok Shop', color: 'bg-black' },
 };
 
-export default function SyncModal({ productId, listings, onClose, onSynced }: SyncModalProps) {
+export default function SyncModal({ productId, listings, onClose, onSynced, onBeforeSync }: SyncModalProps) {
   const supabase = createClient();
   const [stores, setStores] = useState<StoreConnection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +77,11 @@ export default function SyncModal({ productId, listings, onClose, onSynced }: Sy
     setError('');
 
     try {
+      // Auto-save current variant selections before syncing
+      if (onBeforeSync) {
+        await onBeforeSync();
+      }
+
       const res = await fetch('/api/shopify/sync-product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

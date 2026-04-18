@@ -311,54 +311,48 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const margin = priceNum > 0 ? ((profit / priceNum) * 100) : 0;
   const hasCustomPrices = Object.keys(variantPrices).some(k => variantPrices[k] !== '');
 
-  async function handleSave() {
-    if (priceNum <= 0) {
-      setError('Please enter a valid price');
-      return;
-    }
-    if (priceNum <= COST) {
-      setError(`Price must be higher than cost ($${COST.toFixed(2)})`);
-      return;
-    }
-    if (enabledSkuIds.size === 0) {
-      setError('Please select at least one variant');
-      return;
-    }
+  // Core save logic — returns true on success, throws on failure
+  const saveProduct = useCallback(async () => {
+    if (priceNum <= 0) throw new Error('Please enter a valid price');
+    if (priceNum <= COST) throw new Error(`Price must be higher than cost ($${COST.toFixed(2)})`);
+    if (enabledSkuIds.size === 0) throw new Error('Please select at least one variant');
 
+    const skuSelections: SkuSelection[] = erpSkus.map(sku => {
+      const override = variantPrices[sku.id];
+      const hasOverride = override !== undefined && override !== '';
+      return {
+        sku_id: sku.id,
+        sku: sku.sku,
+        option1: sku.option1,
+        option2: sku.option2,
+        option3: sku.option3,
+        enabled: enabledSkuIds.has(sku.id),
+        price: hasOverride ? (parseFloat(override) || null) : null,
+        skuImage: sku.skuImage || null,
+      };
+    });
+
+    const { error: updateError } = await supabase
+      .from('sellable_product_instances')
+      .update({
+        title: title.trim() || product.title,
+        description: description.trim(),
+        selected_skus: skuSelections,
+        option_names: optionNames,
+        retail_price: priceNum,
+        cost: COST,
+        status: product.status === 'draft' ? 'ready' : product.status,
+      })
+      .eq('id', product.id);
+
+    if (updateError) throw updateError;
+  }, [erpSkus, enabledSkuIds, variantPrices, priceNum, title, description, optionNames, product, supabase]);
+
+  async function handleSave() {
     setSaving(true);
     setError('');
-
     try {
-      const skuSelections: SkuSelection[] = erpSkus.map(sku => {
-        const override = variantPrices[sku.id];
-        const hasOverride = override !== undefined && override !== '';
-        return {
-          sku_id: sku.id,
-          sku: sku.sku,
-          option1: sku.option1,
-          option2: sku.option2,
-          option3: sku.option3,
-          enabled: enabledSkuIds.has(sku.id),
-          price: hasOverride ? (parseFloat(override) || null) : null,
-          skuImage: sku.skuImage || null,
-        };
-      });
-
-      const { error: updateError } = await supabase
-        .from('sellable_product_instances')
-        .update({
-          title: title.trim() || product.title,
-          description: description.trim(),
-          selected_skus: skuSelections,
-          option_names: optionNames,
-          retail_price: priceNum,
-          cost: COST,
-          status: product.status === 'draft' ? 'ready' : product.status,
-        })
-        .eq('id', product.id);
-
-      if (updateError) throw updateError;
-
+      await saveProduct();
       setSaved(true);
       router.refresh();
     } catch (err) {
@@ -818,6 +812,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           listings={listings}
           onClose={() => setShowSyncModal(false)}
           onSynced={() => router.refresh()}
+          onBeforeSync={saveProduct}
         />
       )}
     </div>

@@ -6,8 +6,6 @@ const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
 const COST = 10.00; // MVP hardcoded cost
 
-// Always use GraphQL — REST API fails for >100 variants and GraphQL works for any count
-const SHOPIFY_REST_VARIANT_LIMIT = 0;
 
 interface SkuSelection {
   sku_id: string;
@@ -416,10 +414,6 @@ export async function POST(req: NextRequest) {
     status: 'active',
   };
 
-  if (optionSets.length > 0) {
-    shopifyProduct.options = optionSets.map(o => ({ name: o.name }));
-  }
-
   // Build a price lookup from custom_product_skus (per-variant sale_price is the source of truth)
   const skuPriceMap = new Map<string, number>();
   if (customSkus) {
@@ -428,64 +422,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (selectedSkus.length > 0) {
-    shopifyProduct.variants = selectedSkus.map(sku => {
-      const variant: Record<string, unknown> = {
-        price: (skuPriceMap.get(sku.sku_id) ?? Number(sku.price ?? product.retail_price ?? 25)).toFixed(2),
-        sku: sku.sku || undefined,
-        inventory_management: null,
-      };
-      if (sku.option1) variant.option1 = sku.option1;
-      if (sku.option2) variant.option2 = sku.option2;
-      if (sku.option3) variant.option3 = sku.option3;
-      return variant;
-    });
-  }
-
   const shopDomain = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
-  const useGraphQL = selectedSkus.length > SHOPIFY_REST_VARIANT_LIMIT;
 
   try {
-    let createdProduct: ShopifyCreatedProduct;
-
-    if (useGraphQL) {
-      // Use GraphQL API for products with >100 variants
-      console.log(`[Shopify Sync] Using GraphQL API for ${selectedSkus.length} variants`);
-      createdProduct = await createProductViaGraphQL(
-        shopDomain!,
-        accessToken,
-        shopifyProduct,
-        selectedSkus,
-        optionSets,
-        product.retail_price ?? 25,
-        skuPriceMap,
-      );
-    } else {
-      // Use REST API for ≤100 variants
-      const shopifyRes = await fetch(
-        `https://${shopDomain}/admin/api/${API_VERSION}/products.json`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Shopify-Access-Token': accessToken,
-          },
-          body: JSON.stringify({ product: shopifyProduct }),
-        }
-      );
-
-      if (!shopifyRes.ok) {
-        const errorBody = await shopifyRes.text();
-        console.error('[Shopify Sync] Create product failed:', shopifyRes.status, errorBody);
-        return NextResponse.json(
-          { error: `Shopify API error (${shopifyRes.status}): ${errorBody}` },
-          { status: shopifyRes.status }
-        );
-      }
-
-      const restResult = await shopifyRes.json();
-      createdProduct = restResult.product;
-    }
+    console.log(`[Shopify Sync] Creating product with ${selectedSkus.length} variants via GraphQL`);
+    const createdProduct = await createProductViaGraphQL(
+      shopDomain!,
+      accessToken,
+      shopifyProduct,
+      selectedSkus,
+      optionSets,
+      product.retail_price ?? 25,
+      skuPriceMap,
+    );
 
     const shopifyVariants: { id: number | string; sku: string; option1?: string; option2?: string; option3?: string }[] =
       createdProduct.variants || [];
