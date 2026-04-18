@@ -371,11 +371,21 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Step 2: Build & send Shopify product ──
-  const ERP_IMAGE_BASE = 'http://118.195.245.201:8081/ideamax/sys/common/static/';
-  const toFullUrl = (path: string) => {
+  // ERP images are on an HTTP internal server that Shopify can't access.
+  // Proxy them through our app's /api/erp/image endpoint (public HTTPS).
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+  const toPublicUrl = (path: string) => {
     if (!path) return '';
-    if (path.startsWith('http')) return path;
-    return `${ERP_IMAGE_BASE}${path}`;
+    if (path.startsWith('https://')) return path;
+    // For ERP relative paths or HTTP URLs, proxy through our app
+    if (path.startsWith('http://')) {
+      // Already a full HTTP URL — extract the relative path for the proxy
+      const match = path.match(/\/sys\/common\/static\/(.+)$/);
+      if (match) path = match[1];
+      else return ''; // Can't proxy unknown HTTP URLs
+    }
+    return `${appUrl}/api/erp/image?path=${encodeURIComponent(path)}`;
   };
 
   const previewUrls = (product.preview_urls as string[]) || [];
@@ -384,11 +394,11 @@ export async function POST(req: NextRequest) {
     url => url && url.startsWith('http')
   );
 
-  // Collect unique variant images from SKUs
+  // Collect unique variant images from SKUs, proxied through our HTTPS endpoint
   const variantImageUrls = [...new Set(
     selectedSkus
-      .map(s => s.skuImage ? toFullUrl(s.skuImage) : '')
-      .filter(url => url && url.startsWith('http'))
+      .map(s => s.skuImage ? toPublicUrl(s.skuImage) : '')
+      .filter(Boolean)
   )];
 
   // Merge: product images first, then variant images (deduplicated)
