@@ -289,10 +289,14 @@ function EditorPageInner() {
             if (!thumbnail) {
               thumbnail = await compositePreview(entry.template, entry.design) || artworkUrl;
             }
+            const defaultView = entry.template.views.find(v => v.id === entry.template.defaultViewId) || entry.template.views[0];
             const allLayers = Object.values(entry.design.views).flatMap((v) => v.layers);
             const artworkUrls = allLayers
               .filter((l) => l.type === 'image' && l.data.type === 'image')
               .map((l) => (l.data as { src: string }).src);
+            // Extract artwork original dimensions for DPI calculation
+            const artworkLayers = allLayers.filter((l) => l.type === 'image' && l.data.type === 'image');
+            const primaryArtwork = artworkLayers[0]?.data as { originalWidth?: number; originalHeight?: number } | undefined;
             return {
               template_id: entry.template.id,
               name: entry.template.name,
@@ -301,14 +305,34 @@ function EditorPageInner() {
               thumbnail,
               layers: allLayers,
               artwork_urls: artworkUrls,
+              print_area_snapshot: defaultView ? {
+                x: defaultView.printableArea.x,
+                y: defaultView.printableArea.y,
+                width: defaultView.printableArea.width,
+                height: defaultView.printableArea.height,
+                physicalWidthInches: defaultView.printableArea.physicalWidthInches,
+                physicalHeightInches: defaultView.printableArea.physicalHeightInches,
+                minDPI: defaultView.printableArea.minDPI,
+                shape: defaultView.printableArea.shape,
+              } : null,
+              design_metadata: {
+                mockupWidth: defaultView?.mockupWidth ?? null,
+                mockupHeight: defaultView?.mockupHeight ?? null,
+                artworkOriginalWidth: primaryArtwork?.originalWidth ?? null,
+                artworkOriginalHeight: primaryArtwork?.originalHeight ?? null,
+                viewId: defaultView?.id ?? null,
+              },
             };
           })
         );
       } else {
+        const defaultView = selectedTemplate?.views.find(v => v.id === selectedTemplate.defaultViewId) || selectedTemplate?.views[0];
         const allLayers = Object.values(currentDesign.views).flatMap((v) => v.layers);
         const artworkUrls = allLayers
           .filter((l) => l.type === 'image' && l.data.type === 'image')
           .map((l) => (l.data as { src: string }).src);
+        const artworkLayers = allLayers.filter((l) => l.type === 'image' && l.data.type === 'image');
+        const primaryArtwork = artworkLayers[0]?.data as { originalWidth?: number; originalHeight?: number } | undefined;
         productsToSave = [{
           template_id: selectedTemplate?.id ?? '',
           name: selectedTemplate?.name ?? '',
@@ -317,6 +341,23 @@ function EditorPageInner() {
           thumbnail: currentMockup || artworkUrl,
           layers: allLayers,
           artwork_urls: artworkUrls,
+          print_area_snapshot: defaultView ? {
+            x: defaultView.printableArea.x,
+            y: defaultView.printableArea.y,
+            width: defaultView.printableArea.width,
+            height: defaultView.printableArea.height,
+            physicalWidthInches: defaultView.printableArea.physicalWidthInches,
+            physicalHeightInches: defaultView.printableArea.physicalHeightInches,
+            minDPI: defaultView.printableArea.minDPI,
+            shape: defaultView.printableArea.shape,
+          } : null,
+          design_metadata: {
+            mockupWidth: defaultView?.mockupWidth ?? null,
+            mockupHeight: defaultView?.mockupHeight ?? null,
+            artworkOriginalWidth: primaryArtwork?.originalWidth ?? null,
+            artworkOriginalHeight: primaryArtwork?.originalHeight ?? null,
+            viewId: defaultView?.id ?? null,
+          },
         }];
       }
 
@@ -342,6 +383,9 @@ function EditorPageInner() {
           base_cost: portalMatch?.base_cost || p.base_cost,
           thumbnail: p.thumbnail || portalMatch?.thumbnail,
           layers: p.layers,
+          artwork_urls: p.artwork_urls,
+          print_area_snapshot: p.print_area_snapshot,
+          design_metadata: p.design_metadata,
         };
       });
 

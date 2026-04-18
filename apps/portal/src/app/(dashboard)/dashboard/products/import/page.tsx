@@ -223,6 +223,8 @@ export default function ImportFromEditorPage() {
             design_version_id: designVersionId || '00000000-0000-0000-0000-000000000000',
             product_template_id: product.template_id,
             layers: product.layers,
+            print_area_snapshot: product.print_area_snapshot || null,
+            design_metadata: product.design_metadata || null,
           });
         }
 
