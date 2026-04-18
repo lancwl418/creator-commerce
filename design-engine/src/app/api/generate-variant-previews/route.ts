@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Fetch an image from URL, handling data URLs, ERP relative paths, etc.
+ * Fetch an image from URL, handling data URLs, ERP proxy paths, relative paths, etc.
  */
 async function fetchImage(url: string): Promise<Buffer | null> {
   try {
@@ -141,14 +141,28 @@ async function fetchImage(url: string): Promise<Buffer | null> {
     }
 
     let fetchUrl = url;
-    if (!url.startsWith('http')) {
+
+    // Handle /api/erp-image?path=xxx (design-engine proxy URLs used in browser)
+    // Convert to direct ERP URL for server-side fetching
+    if (url.startsWith('/api/erp-image')) {
+      const pathMatch = url.match(/[?&]path=([^&]+)/);
+      if (pathMatch) {
+        const erpPath = decodeURIComponent(pathMatch[1]);
+        fetchUrl = erpPath.startsWith('http') ? erpPath : `${ERP_IMAGE_BASE}${erpPath}`;
+      }
+    } else if (!url.startsWith('http')) {
       fetchUrl = `${ERP_IMAGE_BASE}${url}`;
     }
+
     const res = await fetch(fetchUrl);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[fetchImage] Failed ${res.status} for: ${fetchUrl.substring(0, 100)}`);
+      return null;
+    }
     const arrayBuffer = await res.arrayBuffer();
     return Buffer.from(arrayBuffer);
-  } catch {
+  } catch (err) {
+    console.error(`[fetchImage] Error fetching: ${url.substring(0, 100)}`, err);
     return null;
   }
 }
