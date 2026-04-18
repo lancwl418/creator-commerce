@@ -219,14 +219,14 @@ export default function ImportFromEditorPage() {
         if (instanceError) { console.error('Failed to create product:', instanceError); continue; }
 
         if (product.layers?.length > 0) {
-          await supabase.from('product_configurations').insert({
+          await supabase.from('product_configurations').upsert({
             sellable_product_instance_id: instance.id,
             design_version_id: designVersionId || '00000000-0000-0000-0000-000000000000',
             product_template_id: product.template_id,
             layers: product.layers,
             print_area_snapshot: product.print_area_snapshot || null,
             design_metadata: product.design_metadata || null,
-          });
+          }, { onConflict: 'sellable_product_instance_id' });
         }
 
         created.push(instance);
