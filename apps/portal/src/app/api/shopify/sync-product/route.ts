@@ -17,6 +17,7 @@ interface SkuSelection {
   option3: string | null;
   enabled: boolean;
   price?: number | null;
+  skuImage?: string | null;
 }
 
 interface ShopifyCreatedProduct {
@@ -44,6 +45,7 @@ async function createProductViaGraphQL(
   selectedSkus: SkuSelection[],
   optionSets: { name: string; values: string[] }[],
   retailPrice: number,
+  skuPriceMap?: Map<string, number>,
 ): Promise<ShopifyCreatedProduct> {
   const graphqlUrl = `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`;
 
@@ -55,9 +57,12 @@ async function createProductViaGraphQL(
     if (sku.option2 && optionSets[1]) optionValues.push({ optionName: optionSets[1].name, name: sku.option2 });
     if (sku.option3 && optionSets[2]) optionValues.push({ optionName: optionSets[2].name, name: sku.option3 });
 
+    // Use per-variant price from custom_product_skus, fallback to sku override, then product price
+    const variantPrice = skuPriceMap?.get(sku.sku_id) ?? Number(sku.price ?? retailPrice ?? 25);
+
     return {
       optionValues: optionValues.length > 0 ? optionValues : [{ optionName: optionSets[0]?.name || 'Title', name: 'Default Title' }],
-      price: Number(sku.price ?? retailPrice ?? 25).toFixed(2),
+      price: variantPrice.toFixed(2),
       sku: sku.sku || undefined,
     };
   });
@@ -368,11 +373,28 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Step 2: Build & send Shopify product ──
+  const ERP_IMAGE_BASE = 'http://118.195.245.201:8081/ideamax/sys/common/static/';
+  const toFullUrl = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    return `${ERP_IMAGE_BASE}${path}`;
+  };
+
   const previewUrls = (product.preview_urls as string[]) || [];
   const artworkUrls = (product.design_artwork_urls as string[]) || [];
   const imageUrls = [...previewUrls, ...artworkUrls].filter(
     url => url && url.startsWith('http')
   );
+
+  // Collect unique variant images from SKUs
+  const variantImageUrls = [...new Set(
+    selectedSkus
+      .map(s => s.skuImage ? toFullUrl(s.skuImage) : '')
+      .filter(url => url && url.startsWith('http'))
+  )];
+
+  // Merge: product images first, then variant images (deduplicated)
+  const allImageUrls = [...new Set([...imageUrls, ...variantImageUrls])];
 
   // Derive option definitions using real names from ERP (e.g. "Color", "Size")
   const optionSets: { name: string; values: string[] }[] = [];
@@ -390,7 +412,7 @@ export async function POST(req: NextRequest) {
     body_html: product.description || '',
     vendor: 'ideamax',
     tags: 'ideamax',
-    images: imageUrls.map(url => ({ src: url })),
+    images: allImageUrls.map(url => ({ src: url })),
     status: 'active',
   };
 
@@ -398,10 +420,18 @@ export async function POST(req: NextRequest) {
     shopifyProduct.options = optionSets.map(o => ({ name: o.name }));
   }
 
+  // Build a price lookup from custom_product_skus (per-variant sale_price is the source of truth)
+  const skuPriceMap = new Map<string, number>();
+  if (customSkus) {
+    for (const csku of customSkus) {
+      skuPriceMap.set(csku.erp_sku_id, Number(csku.sale_price));
+    }
+  }
+
   if (selectedSkus.length > 0) {
     shopifyProduct.variants = selectedSkus.map(sku => {
       const variant: Record<string, unknown> = {
-        price: Number(sku.price ?? product.retail_price ?? 25).toFixed(2),
+        price: (skuPriceMap.get(sku.sku_id) ?? Number(sku.price ?? product.retail_price ?? 25)).toFixed(2),
         sku: sku.sku || undefined,
         inventory_management: null,
       };
@@ -428,6 +458,7 @@ export async function POST(req: NextRequest) {
         selectedSkus,
         optionSets,
         product.retail_price ?? 25,
+        skuPriceMap,
       );
     } else {
       // Use REST API for ≤100 variants

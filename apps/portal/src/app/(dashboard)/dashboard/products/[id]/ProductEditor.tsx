@@ -33,6 +33,7 @@ interface SkuSelection {
   option3: string | null;
   enabled: boolean;
   price?: number | null;
+  skuImage?: string | null;
 }
 
 interface Listing {
@@ -339,6 +340,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           option3: sku.option3,
           enabled: enabledSkuIds.has(sku.id),
           price: hasOverride ? (parseFloat(override) || null) : null,
+          skuImage: sku.skuImage || null,
         };
       });
 
