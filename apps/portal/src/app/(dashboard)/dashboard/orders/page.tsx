@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import SyncOrdersButton from './SyncOrdersButton';
 
@@ -130,10 +131,12 @@ export default async function OrdersPage() {
                 return (
                   <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-3.5">
-                      <p className="text-sm font-semibold text-gray-900">{order.shopify_order_name || `#${order.shopify_order_number}`}</p>
-                      {order.customer_name && (
-                        <p className="text-xs text-gray-400 mt-0.5">{order.customer_name}</p>
-                      )}
+                      <Link href={`/dashboard/orders/${order.id}`} className="block">
+                        <p className="text-sm font-semibold text-primary-600 hover:text-primary-700">{order.shopify_order_name || `#${order.shopify_order_number}`}</p>
+                        {order.customer_name && (
+                          <p className="text-xs text-gray-400 mt-0.5">{order.customer_name}</p>
+                        )}
+                      </Link>
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="text-sm text-gray-700">{store?.store_name || store?.platform || '—'}</span>
