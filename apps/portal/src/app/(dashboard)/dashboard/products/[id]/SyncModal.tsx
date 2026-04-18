@@ -41,6 +41,8 @@ export default function SyncModal({ productId, listings, onClose, onSynced, onBe
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<{ url: string; storeName: string } | null>(null);
+  // Per-store publish status: 'active' = published to online store, 'draft' = hidden
+  const [storeStatuses, setStoreStatuses] = useState<Record<string, 'active' | 'draft'>>({});
 
   useEffect(() => {
     loadStores();
@@ -88,6 +90,7 @@ export default function SyncModal({ productId, listings, onClose, onSynced, onBe
         body: JSON.stringify({
           product_instance_id: productId,
           store_connection_id: store.id,
+          publish_status: storeStatuses[store.id] || 'active',
         }),
       });
 
@@ -213,13 +216,23 @@ export default function SyncModal({ productId, listings, onClose, onSynced, onBe
                         )}
                       </div>
                     ) : (
-                      <button
-                        onClick={() => handleSync(store)}
-                        disabled={isSyncing || syncingId !== null}
-                        className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-50 transition-all"
-                      >
-                        {isSyncing ? 'Syncing...' : 'Sync'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={storeStatuses[store.id] || 'active'}
+                          onChange={(e) => setStoreStatuses(prev => ({ ...prev, [store.id]: e.target.value as 'active' | 'draft' }))}
+                          className="rounded-lg border border-border px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        >
+                          <option value="active">Active</option>
+                          <option value="draft">Draft</option>
+                        </select>
+                        <button
+                          onClick={() => handleSync(store)}
+                          disabled={isSyncing || syncingId !== null}
+                          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-50 transition-all"
+                        >
+                          {isSyncing ? 'Syncing...' : 'Sync'}
+                        </button>
+                      </div>
                     )}
                   </div>
                 );

@@ -77,7 +77,7 @@ async function createProductViaGraphQL(
     descriptionHtml: shopifyProduct.body_html || '',
     vendor: (shopifyProduct.vendor as string) || undefined,
     tags: typeof shopifyProduct.tags === 'string' ? shopifyProduct.tags.split(',').map((t: string) => t.trim()) : [],
-    status: 'ACTIVE',
+    status: (shopifyProduct.status as string) === 'draft' ? 'DRAFT' : 'ACTIVE',
     productOptions: optionSets.map(o => ({
       name: o.name,
       values: o.values.map(v => ({ name: v })),
@@ -340,7 +340,8 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { product_instance_id, store_connection_id } = body;
+  const { product_instance_id, store_connection_id, publish_status } = body;
+  const shopifyStatus = publish_status === 'draft' ? 'draft' : 'active';
 
   if (!product_instance_id || !store_connection_id) {
     return NextResponse.json({ error: 'Missing product_instance_id or store_connection_id' }, { status: 400 });
@@ -524,7 +525,7 @@ export async function POST(req: NextRequest) {
     vendor: 'ideamax',
     tags: 'ideamax',
     images: allImageUrls.map(url => ({ src: url })),
-    status: 'active',
+    status: shopifyStatus,
   };
 
   // Build a price lookup from custom_product_skus (per-variant sale_price is the source of truth)
