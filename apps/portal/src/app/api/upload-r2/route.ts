@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
     mime = match[1];
     const base64 = match[2];
-    bytes = Uint8Array.from(atob(base64), (c: string) => c.charCodeAt(0));
+    bytes = new Uint8Array(Buffer.from(base64, 'base64'));
     if (bytes.length > MAX_BYTES) {
       return NextResponse.json({ error: 'File too large' }, { status: 400 });
     }
