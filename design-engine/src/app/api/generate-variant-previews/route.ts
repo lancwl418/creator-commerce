@@ -129,10 +129,17 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Fetch an image from URL, handling ERP relative paths.
+ * Fetch an image from URL, handling data URLs, ERP relative paths, etc.
  */
 async function fetchImage(url: string): Promise<Buffer | null> {
   try {
+    // Handle base64 data URLs directly
+    if (url.startsWith('data:')) {
+      const match = url.match(/^data:[^;]+;base64,(.+)$/);
+      if (!match) return null;
+      return Buffer.from(match[1], 'base64');
+    }
+
     let fetchUrl = url;
     if (!url.startsWith('http')) {
       fetchUrl = `${ERP_IMAGE_BASE}${url}`;
