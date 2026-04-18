@@ -10,16 +10,20 @@ const DEFAULT_MIN_DPI = 150;
 const PRINTABLE_AREA_RATIO = 0.6;
 
 /** Extract unique color variants with their mockup images from SKU list */
-function extractColorVariants(product: ErpProduct): { color: string; imageUrl: string }[] {
+function extractColorVariants(product: ErpProduct): { color: string; imageUrl: string; rawImagePath: string }[] {
   const seen = new Set<string>();
-  const variants: { color: string; imageUrl: string }[] = [];
+  const variants: { color: string; imageUrl: string; rawImagePath: string }[] = [];
 
   for (const sku of product.prodSkuList ?? []) {
     // Try option1 first (often color), then option2
     const color = sku.option1 || sku.option2;
     if (!color || !sku.skuImage || seen.has(color)) continue;
     seen.add(color);
-    variants.push({ color, imageUrl: resolveErpImageUrl(sku.skuImage) });
+    variants.push({
+      color,
+      imageUrl: resolveErpImageUrl(sku.skuImage),  // Browser proxy URL (for CORS)
+      rawImagePath: sku.skuImage,                   // Original ERP path (for server-side fetch)
+    });
   }
 
   return variants;

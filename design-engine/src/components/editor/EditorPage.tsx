@@ -396,7 +396,7 @@ function EditorPageInner() {
           const template = multiStore.isMultiProduct
             ? updatedProducts.find(e => e.template.id === product.template_id)?.template
             : selectedTemplate;
-          const variants = (template?.metadata?.colorVariants ?? []) as { color: string; imageUrl: string }[];
+          const variants = (template?.metadata?.colorVariants ?? []) as { color: string; imageUrl: string; rawImagePath?: string }[];
           const printArea = product.print_area_snapshot;
           const meta = product.design_metadata;
 
@@ -422,7 +422,7 @@ function EditorPageInner() {
                   mockup_height: meta.mockupHeight,
                   variants: variants.map((v) => ({
                     id: v.color,
-                    mockup_url: v.imageUrl,
+                    mockup_url: v.rawImagePath || v.imageUrl,
                     label: v.color,
                   })),
                 }),
