@@ -510,6 +510,14 @@ export async function POST(req: NextRequest) {
   // Merge: product images first, then variant images (deduplicated)
   const allImageUrls = [...new Set([...imageUrls, ...variantImageUrls])];
 
+  console.log('[Shopify Sync] Images debug:', {
+    previewUrls: previewUrls.length,
+    artworkUrls: artworkUrls.length,
+    variantImageUrls: variantImageUrls.length,
+    allImageUrls: allImageUrls.length,
+    firstImage: allImageUrls[0]?.substring(0, 80),
+  });
+
   // Derive option definitions using real names from ERP (e.g. "Color", "Size")
   const optionSets: { name: string; values: string[] }[] = [];
   const optionKeys = ['option1', 'option2', 'option3'] as const;
