@@ -48,14 +48,15 @@ async function createProductViaGraphQL(
   const graphqlUrl = `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`;
 
   // Build productSet input
+  // Shopify VariantOptionValueInput uses { optionName: "Color", name: "Red" }
   const variants = selectedSkus.map(sku => {
-    const optionValues: { name: string; value: string }[] = [];
-    if (sku.option1 && optionSets[0]) optionValues.push({ name: optionSets[0].name, value: sku.option1 });
-    if (sku.option2 && optionSets[1]) optionValues.push({ name: optionSets[1].name, value: sku.option2 });
-    if (sku.option3 && optionSets[2]) optionValues.push({ name: optionSets[2].name, value: sku.option3 });
+    const optionValues: { optionName: string; name: string }[] = [];
+    if (sku.option1 && optionSets[0]) optionValues.push({ optionName: optionSets[0].name, name: sku.option1 });
+    if (sku.option2 && optionSets[1]) optionValues.push({ optionName: optionSets[1].name, name: sku.option2 });
+    if (sku.option3 && optionSets[2]) optionValues.push({ optionName: optionSets[2].name, name: sku.option3 });
 
     return {
-      optionValues: optionValues.length > 0 ? optionValues : [{ name: optionSets[0]?.name || 'Title', value: 'Default Title' }],
+      optionValues: optionValues.length > 0 ? optionValues : [{ optionName: optionSets[0]?.name || 'Title', name: 'Default Title' }],
       price: Number(sku.price ?? retailPrice ?? 25).toFixed(2),
       sku: sku.sku || undefined,
     };
