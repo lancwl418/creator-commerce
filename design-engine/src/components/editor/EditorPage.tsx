@@ -400,8 +400,17 @@ function EditorPageInner() {
           const printArea = product.print_area_snapshot;
           const meta = product.design_metadata;
 
+          console.log('[Save] Variant preview check:', {
+            variantsCount: variants.length,
+            hasPrintArea: !!printArea,
+            mockupWidth: meta?.mockupWidth,
+            artworkUrlsCount: product.artwork_urls?.length ?? 0,
+            firstArtworkUrl: product.artwork_urls?.[0]?.substring(0, 80),
+          });
+
           if (variants.length > 0 && printArea && meta?.mockupWidth && product.artwork_urls?.length > 0) {
             try {
+              console.log('[Save] Calling generate-variant-previews API...');
               const res = await fetch('/api/generate-variant-previews', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -418,12 +427,15 @@ function EditorPageInner() {
                   })),
                 }),
               });
+              const resText = await res.text();
+              console.log('[Save] Variant preview API response:', res.status, resText.substring(0, 200));
               if (res.ok) {
-                const data = await res.json();
+                const data = JSON.parse(resText);
                 (product as Record<string, unknown>).variant_previews = data.previews || {};
+                console.log('[Save] Variant previews generated:', Object.keys(data.previews || {}).length);
               }
             } catch (err) {
-              console.warn('[Save] Variant preview generation failed:', err);
+              console.error('[Save] Variant preview generation failed:', err);
               // Non-blocking — continue without variant previews
             }
           }
