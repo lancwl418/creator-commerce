@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import SyncOrdersButton from './SyncOrdersButton';
 
 const statusColors: Record<string, string> = {
   paid: 'bg-emerald-50 text-emerald-700',
@@ -58,9 +59,12 @@ export default async function OrdersPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Orders</h2>
-        <p className="text-gray-500 text-sm mt-1">Orders from your connected stores</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Orders</h2>
+          <p className="text-gray-500 text-sm mt-1">Orders from your connected stores</p>
+        </div>
+        <SyncOrdersButton stores={stores} />
       </div>
 
       {/* Summary Cards */}
