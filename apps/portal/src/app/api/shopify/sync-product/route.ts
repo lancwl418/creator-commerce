@@ -442,6 +442,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Upsert custom SKUs for each enabled variant
+  const variantPreviewMap = (product.variant_preview_urls as Record<string, string>) || {};
   const customSkuRows = selectedSkus.map(sku => ({
     sellable_product_instance_id: product_instance_id,
     erp_product_id: erpProductId,
@@ -450,6 +451,8 @@ export async function POST(req: NextRequest) {
     option1: sku.option1,
     option2: sku.option2,
     option3: sku.option3,
+    // R2 design preview for this variant (design composited on this color)
+    preview_image_url: (sku.option1 ? variantPreviewMap[sku.option1] : null) || null,
     sale_price: sku.price ?? product.retail_price ?? 25,
     base_cost_snapshot: COST,
     creator_store_connection_id: store_connection_id,

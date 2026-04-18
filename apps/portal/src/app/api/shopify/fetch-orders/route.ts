@@ -183,7 +183,18 @@ export async function POST(req: NextRequest) {
           ? `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
           : null,
         shipping_address: shippingAddress
-          ? { country: shippingAddress.country, province: shippingAddress.province, city: shippingAddress.city }
+          ? {
+              name: shippingAddress.name,
+              address1: shippingAddress.address1,
+              address2: shippingAddress.address2,
+              city: shippingAddress.city,
+              province: shippingAddress.province,
+              province_code: shippingAddress.province_code,
+              country: shippingAddress.country,
+              country_code: shippingAddress.country_code,
+              zip: shippingAddress.zip,
+              phone: shippingAddress.phone,
+            }
           : {},
         order_placed_at: order.created_at ? String(order.created_at) : new Date().toISOString(),
       }, { onConflict: 'shopify_order_id,creator_store_connection_id' })
