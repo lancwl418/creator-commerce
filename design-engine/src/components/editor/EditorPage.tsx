@@ -390,9 +390,46 @@ function EditorPageInner() {
       });
 
       if (callbackUrl) {
+        // Generate server-side variant previews for each product (upload to R2)
+        for (const product of mergedProducts) {
+          const colorVariants = productsToSave.find(p => p.template_id === product.template_id);
+          const template = multiStore.isMultiProduct
+            ? updatedProducts.find(e => e.template.id === product.template_id)?.template
+            : selectedTemplate;
+          const variants = (template?.metadata?.colorVariants ?? []) as { color: string; imageUrl: string }[];
+          const printArea = product.print_area_snapshot;
+          const meta = product.design_metadata;
+
+          if (variants.length > 0 && printArea && meta?.mockupWidth && product.artwork_urls?.length > 0) {
+            try {
+              const res = await fetch('/api/generate-variant-previews', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  product_id: product.template_id,
+                  artwork_url: product.artwork_urls[0],
+                  print_area: { x: printArea.x, y: printArea.y, width: printArea.width, height: printArea.height },
+                  mockup_width: meta.mockupWidth,
+                  mockup_height: meta.mockupHeight,
+                  variants: variants.map((v) => ({
+                    id: v.color,
+                    mockup_url: v.imageUrl,
+                    label: v.color,
+                  })),
+                }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                (product as Record<string, unknown>).variant_previews = data.previews || {};
+              }
+            } catch (err) {
+              console.warn('[Save] Variant preview generation failed:', err);
+              // Non-blocking — continue without variant previews
+            }
+          }
+        }
+
         // Redirect to Portal's import page with data in URL hash
-        // This avoids CORS issues — the Portal page runs client-side
-        // with auth cookies and saves to DB directly
         const payload = encodeURIComponent(JSON.stringify({
           design_id: editorConfig.designId,
           products: mergedProducts,

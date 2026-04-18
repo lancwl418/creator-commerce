@@ -394,10 +394,17 @@ export async function POST(req: NextRequest) {
     url => url && url.startsWith('http')
   );
 
-  // Collect unique variant images from SKUs, proxied through our HTTPS endpoint
+  // Use design preview images for variants if available (from R2),
+  // fallback to ERP SKU images proxied through our HTTPS endpoint
+  const variantPreviewMap = (product.variant_preview_urls as Record<string, string>) || {};
   const variantImageUrls = [...new Set(
     selectedSkus
-      .map(s => s.skuImage ? toPublicUrl(s.skuImage) : '')
+      .map(s => {
+        // Try design preview by color (option1), then fallback to raw SKU image
+        const designPreview = s.option1 ? variantPreviewMap[s.option1] : null;
+        if (designPreview) return designPreview; // Already HTTPS R2 URL
+        return s.skuImage ? toPublicUrl(s.skuImage) : '';
+      })
       .filter(Boolean)
   )];
 

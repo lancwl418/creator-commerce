@@ -23,3 +23,8 @@ ALTER TABLE product_configurations
 --   "colorMode": "RGB",
 --   "viewId": "front"
 -- }
+
+-- Per-variant design preview URLs (R2), keyed by color name
+-- e.g. {"Black": "https://r2.dev/.../black.jpg", "White": "https://r2.dev/.../white.jpg"}
+ALTER TABLE sellable_product_instances
+  ADD COLUMN IF NOT EXISTS variant_preview_urls JSONB DEFAULT NULL;

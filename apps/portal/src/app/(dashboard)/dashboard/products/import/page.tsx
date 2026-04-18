@@ -211,6 +211,7 @@ export default function ImportFromEditorPage() {
             base_price_suggestion: basePriceSuggestion,
             preview_urls: previewUrls,
             design_artwork_urls: storedArtworkUrls,
+            variant_preview_urls: product.variant_previews || null,
           })
           .select('*')
           .single();
