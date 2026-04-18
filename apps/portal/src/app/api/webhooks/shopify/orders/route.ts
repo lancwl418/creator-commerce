@@ -67,10 +67,57 @@ async function processOrder(
   order: Record<string, unknown>,
 ) {
   const shopifyOrderId = String(order.id);
+  const lineItems = (order.line_items || []) as Record<string, unknown>[];
+
+  // First pass: match line items to our products, skip orders with no matches
+  const matchedItems: {
+    item: Record<string, unknown>;
+    variant: { id: string; sale_price: number; base_cost_snapshot: number };
+  }[] = [];
+
+  for (const item of lineItems) {
+    const shopifyVariantId = item.variant_id ? String(item.variant_id) : null;
+    if (!shopifyVariantId) continue;
+
+    const { data } = await supabase
+      .from('channel_listing_variants')
+      .select('id, sale_price, base_cost_snapshot, channel_listing_id')
+      .eq('external_variant_id', shopifyVariantId)
+      .limit(5);
+
+    if (!data || data.length === 0) continue;
+
+    for (const v of data) {
+      const { data: listing } = await supabase
+        .from('channel_listings')
+        .select('creator_store_connection_id')
+        .eq('id', v.channel_listing_id)
+        .single();
+
+      if (listing?.creator_store_connection_id === connection.id) {
+        matchedItems.push({
+          item,
+          variant: {
+            id: v.id,
+            sale_price: Number(v.sale_price),
+            base_cost_snapshot: Number(v.base_cost_snapshot),
+          },
+        });
+        break;
+      }
+    }
+  }
+
+  // No matched products → skip this order entirely
+  if (matchedItems.length === 0) {
+    console.log(`[Webhook] Order ${order.name} has no platform products, skipping`);
+    return;
+  }
+
+  // Create/update the order (only for orders containing our products)
   const customer = order.customer as Record<string, unknown> | null;
   const shippingAddress = order.shipping_address as Record<string, unknown> | null;
 
-  // Upsert the order
   const { data: creatorOrder, error: orderError } = await supabase
     .from('creator_orders')
     .upsert({
@@ -102,55 +149,12 @@ async function processOrder(
     return;
   }
 
-  // Process line items
-  const lineItems = (order.line_items || []) as Record<string, unknown>[];
-
-  for (const item of lineItems) {
-    const shopifyVariantId = item.variant_id ? String(item.variant_id) : null;
-    const shopifyProductId = item.product_id ? String(item.product_id) : null;
+  // Insert only matched line items (our products only)
+  for (const { item, variant } of matchedItems) {
     const quantity = Number(item.quantity) || 1;
     const unitPrice = parseFloat(String(item.price)) || 0;
+    const earningsAmount = (variant.sale_price - variant.base_cost_snapshot) * quantity;
 
-    // Match to our channel_listing_variants
-    let matchedVariant: {
-      id: string;
-      sale_price: number;
-      base_cost_snapshot: number;
-    } | null = null;
-
-    if (shopifyVariantId) {
-      const { data } = await supabase
-        .from('channel_listing_variants')
-        .select('id, sale_price, base_cost_snapshot, channel_listing_id')
-        .eq('external_variant_id', shopifyVariantId)
-        .limit(5);
-
-      if (data && data.length > 0) {
-        // Verify it belongs to this store connection
-        for (const v of data) {
-          const { data: listing } = await supabase
-            .from('channel_listings')
-            .select('creator_store_connection_id')
-            .eq('id', v.channel_listing_id)
-            .single();
-
-          if (listing?.creator_store_connection_id === connection.id) {
-            matchedVariant = {
-              id: v.id,
-              sale_price: Number(v.sale_price),
-              base_cost_snapshot: Number(v.base_cost_snapshot),
-            };
-            break;
-          }
-        }
-      }
-    }
-
-    const earningsAmount = matchedVariant
-      ? (matchedVariant.sale_price - matchedVariant.base_cost_snapshot) * quantity
-      : null;
-
-    // Check if line item already exists
     const lineItemId = item.id ? String(item.id) : null;
     if (lineItemId) {
       const { data: existing } = await supabase
@@ -160,26 +164,26 @@ async function processOrder(
         .eq('shopify_line_item_id', lineItemId)
         .single();
 
-      if (existing) continue; // Already processed
+      if (existing) continue;
     }
 
     await supabase.from('creator_order_items').insert({
       creator_order_id: creatorOrder.id,
-      channel_listing_variant_id: matchedVariant?.id || null,
+      channel_listing_variant_id: variant.id,
       shopify_line_item_id: lineItemId,
-      shopify_variant_id: shopifyVariantId,
-      shopify_product_id: shopifyProductId,
+      shopify_variant_id: item.variant_id ? String(item.variant_id) : null,
+      shopify_product_id: item.product_id ? String(item.product_id) : null,
       title: String(item.title || ''),
       variant_title: item.variant_title ? String(item.variant_title) : null,
       sku: item.sku ? String(item.sku) : null,
       quantity,
       unit_price: unitPrice,
       total_price: unitPrice * quantity,
-      sale_price_snapshot: matchedVariant?.sale_price ?? null,
-      base_cost_snapshot: matchedVariant?.base_cost_snapshot ?? null,
+      sale_price_snapshot: variant.sale_price,
+      base_cost_snapshot: variant.base_cost_snapshot,
       earnings_amount: earningsAmount,
     });
   }
 
-  console.log(`[Webhook] Processed order ${order.name} — ${lineItems.length} items, creator ${connection.creator_id}`);
+  console.log(`[Webhook] Processed order ${order.name} — ${matchedItems.length}/${lineItems.length} matched items, creator ${connection.creator_id}`);
 }
