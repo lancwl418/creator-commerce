@@ -496,7 +496,6 @@ export async function POST(req: NextRequest) {
 
   // Use design preview images for variants if available (from R2),
   // fallback to ERP SKU images proxied through our HTTPS endpoint
-  const variantPreviewMap = (product.variant_preview_urls as Record<string, string>) || {};
   const variantImageUrls = [...new Set(
     selectedSkus
       .map(s => {
