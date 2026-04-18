@@ -189,11 +189,24 @@ async function createProductViaGraphQL(
         }
       }
     `;
+    console.log(`[Shopify Sync] Uploading ${media.length} media items to product ${gqlProduct.id}`);
     const mediaRes = await fetch(graphqlUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
       body: JSON.stringify({ query: mediaMutation, variables: { productId: gqlProduct.id, media } }),
     });
+
+    if (mediaRes.ok) {
+      const mediaResult = await mediaRes.json();
+      const mediaErrors = mediaResult.data?.productCreateMedia?.mediaUserErrors || [];
+      if (mediaErrors.length > 0) {
+        console.error('[Shopify Sync] Media upload errors:', JSON.stringify(mediaErrors));
+      } else {
+        console.log('[Shopify Sync] Media uploaded successfully');
+      }
+    } else {
+      console.error('[Shopify Sync] Media upload HTTP error:', mediaRes.status, await mediaRes.text());
+    }
 
     // Associate variant images if we have a color→image mapping
     if (variantImageMap && variantImageMap.size > 0 && mediaRes.ok) {
