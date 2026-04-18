@@ -89,7 +89,8 @@ export async function POST(req: NextRequest) {
   let pageUrl: string | null = `https://${shopDomain}/admin/api/${API_VERSION}/orders.json?status=any&limit=250`;
 
   while (pageUrl) {
-    const res = await fetch(pageUrl, {
+    const currentUrl = pageUrl;
+    const res = await fetch(currentUrl, {
       headers: { 'X-Shopify-Access-Token': accessToken },
     });
 
