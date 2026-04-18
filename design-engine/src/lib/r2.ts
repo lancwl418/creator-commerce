@@ -41,3 +41,26 @@ export async function uploadMockup(
   );
   return { url: `${publicBase!.replace(/\/$/, '')}/${key}`, key };
 }
+
+/**
+ * Upload a variant preview image to R2.
+ * Stored under variant-previews/{productId}/{variantId}.jpg
+ */
+export async function uploadVariantPreview(
+  bytes: Uint8Array,
+  productId: string,
+  variantId: string,
+): Promise<{ url: string; key: string }> {
+  const client = getClient();
+  const key = `variant-previews/${productId}/${variantId}_${nanoid(8)}.jpg`;
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket!,
+      Key: key,
+      Body: bytes,
+      ContentType: 'image/jpeg',
+      CacheControl: 'public, max-age=31536000, immutable',
+    }),
+  );
+  return { url: `${publicBase!.replace(/\/$/, '')}/${key}`, key };
+}
