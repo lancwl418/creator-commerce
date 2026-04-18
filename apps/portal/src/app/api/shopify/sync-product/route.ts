@@ -6,6 +6,8 @@ const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
 const COST = 10.00; // MVP hardcoded cost
 
+const SHOPIFY_REST_VARIANT_LIMIT = 100;
+
 interface SkuSelection {
   sku_id: string;
   sku: string;
@@ -14,6 +16,198 @@ interface SkuSelection {
   option3: string | null;
   enabled: boolean;
   price?: number | null;
+}
+
+interface ShopifyCreatedProduct {
+  id: number | string;
+  handle: string;
+  variants: { id: number | string; sku: string; option1?: string; option2?: string; option3?: string }[];
+}
+
+/**
+ * Extract numeric Shopify ID from a GID string like "gid://shopify/Product/123"
+ */
+function gidToId(gid: string): string {
+  const match = gid.match(/(\d+)$/);
+  return match ? match[1] : gid;
+}
+
+/**
+ * Create a Shopify product via GraphQL Admin API (supports >100 variants).
+ * Uses the productSet mutation available in API version 2024-04+.
+ */
+async function createProductViaGraphQL(
+  shopDomain: string,
+  accessToken: string,
+  shopifyProduct: Record<string, unknown>,
+  selectedSkus: SkuSelection[],
+  optionSets: { name: string; values: string[] }[],
+  retailPrice: number,
+): Promise<ShopifyCreatedProduct> {
+  const graphqlUrl = `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`;
+
+  // Build productSet input
+  const variants = selectedSkus.map(sku => {
+    const optionValues: { name: string; value: string }[] = [];
+    if (sku.option1 && optionSets[0]) optionValues.push({ name: optionSets[0].name, value: sku.option1 });
+    if (sku.option2 && optionSets[1]) optionValues.push({ name: optionSets[1].name, value: sku.option2 });
+    if (sku.option3 && optionSets[2]) optionValues.push({ name: optionSets[2].name, value: sku.option3 });
+
+    return {
+      optionValues: optionValues.length > 0 ? optionValues : [{ name: optionSets[0]?.name || 'Title', value: 'Default Title' }],
+      price: Number(sku.price ?? retailPrice ?? 25).toFixed(2),
+      sku: sku.sku || undefined,
+    };
+  });
+
+  const images = shopifyProduct.images as { src: string }[] | undefined;
+  const media = images?.map(img => ({
+    originalSource: img.src,
+    mediaContentType: 'IMAGE',
+  })) || [];
+
+  const productSetInput: Record<string, unknown> = {
+    title: shopifyProduct.title || 'Untitled',
+    descriptionHtml: shopifyProduct.body_html || '',
+    vendor: (shopifyProduct.vendor as string) || undefined,
+    tags: typeof shopifyProduct.tags === 'string' ? shopifyProduct.tags.split(',').map((t: string) => t.trim()) : [],
+    status: 'ACTIVE',
+    productOptions: optionSets.map(o => ({
+      name: o.name,
+      values: o.values.map(v => ({ name: v })),
+    })),
+    variants,
+  };
+
+  const mutation = `
+    mutation productSet($input: ProductSetInput!) {
+      productSet(input: $input) {
+        product {
+          id
+          handle
+          variants(first: 250) {
+            edges {
+              node {
+                id
+                sku
+                selectedOptions {
+                  name
+                  value
+                }
+              }
+            }
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  // productSet may need pagination for >250 variants; for now handle up to 250 in first response
+  const res = await fetch(graphqlUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': accessToken,
+    },
+    body: JSON.stringify({
+      query: mutation,
+      variables: { input: productSetInput },
+    }),
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Shopify GraphQL HTTP error (${res.status}): ${errorBody}`);
+  }
+
+  const gqlResponse = await res.json();
+
+  if (gqlResponse.errors) {
+    throw new Error(`Shopify GraphQL errors: ${JSON.stringify(gqlResponse.errors)}`);
+  }
+
+  const productSet = gqlResponse.data?.productSet;
+  if (productSet?.userErrors?.length > 0) {
+    throw new Error(`Shopify productSet errors: ${JSON.stringify(productSet.userErrors)}`);
+  }
+
+  const gqlProduct = productSet?.product;
+  if (!gqlProduct) {
+    throw new Error('Shopify GraphQL returned no product');
+  }
+
+  // Fetch remaining variants if >250
+  let allVariantEdges = gqlProduct.variants.edges;
+  let hasNextPage = gqlProduct.variants.edges.length === 250;
+  let cursor = allVariantEdges[allVariantEdges.length - 1]?.cursor;
+
+  while (hasNextPage && cursor) {
+    const paginationQuery = `
+      query getVariants($productId: ID!, $cursor: String!) {
+        product(id: $productId) {
+          variants(first: 250, after: $cursor) {
+            edges {
+              node { id sku selectedOptions { name value } }
+              cursor
+            }
+            pageInfo { hasNextPage }
+          }
+        }
+      }
+    `;
+    const pageRes = await fetch(graphqlUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+      body: JSON.stringify({ query: paginationQuery, variables: { productId: gqlProduct.id, cursor } }),
+    });
+    if (!pageRes.ok) break;
+    const pageData = await pageRes.json();
+    const pageVariants = pageData.data?.product?.variants;
+    if (!pageVariants) break;
+    allVariantEdges = [...allVariantEdges, ...pageVariants.edges];
+    hasNextPage = pageVariants.pageInfo?.hasNextPage;
+    cursor = pageVariants.edges[pageVariants.edges.length - 1]?.cursor;
+  }
+
+  // Map media after product creation
+  if (media.length > 0) {
+    const mediaMutation = `
+      mutation productCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
+        productCreateMedia(productId: $productId, media: $media) {
+          mediaUserErrors { field message }
+        }
+      }
+    `;
+    await fetch(graphqlUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+      body: JSON.stringify({ query: mediaMutation, variables: { productId: gqlProduct.id, media } }),
+    });
+  }
+
+  // Convert GQL variant format to match REST format for downstream compatibility
+  const mappedVariants = allVariantEdges.map((edge: { node: { id: string; sku: string; selectedOptions: { name: string; value: string }[] } }) => {
+    const node = edge.node;
+    const opts: Record<string, string> = {};
+    node.selectedOptions.forEach((opt: { name: string; value: string }, i: number) => {
+      opts[`option${i + 1}`] = opt.value;
+    });
+    return {
+      id: Number(gidToId(node.id)),
+      sku: node.sku || '',
+      ...opts,
+    };
+  });
+
+  return {
+    id: Number(gidToId(gqlProduct.id)),
+    handle: gqlProduct.handle,
+    variants: mappedVariants,
+  };
 }
 
 /**
@@ -128,6 +322,7 @@ export async function POST(req: NextRequest) {
   // ── Step 1: Resolve variants ──
   let selectedSkus = ((product.selected_skus as SkuSelection[]) || []).filter(s => s.enabled);
   const erpProductId = (product.product_template_id as string)?.replace('erp-', '').replace('shopify-', '') || '';
+  let savedOptionNames: string[] = (product.option_names as string[]) || [];
 
   // If no saved variants, auto-fetch from ERP/Shopify and enable all
   if (selectedSkus.length === 0) {
@@ -149,12 +344,14 @@ export async function POST(req: NextRequest) {
           enabled: true,
           price: null,
         }));
+        savedOptionNames = (skuData.option_names as string[]) || [];
 
         // Also save to product so next time we don't need to re-fetch
         const retailPrice = product.retail_price ?? product.base_price_suggestion ?? (erpSkus[0]?.price ? erpSkus[0].price * 2.5 : 25);
         await supabase.from('sellable_product_instances').update({
           selected_skus: selectedSkus,
           retail_price: retailPrice,
+          option_names: savedOptionNames,
         }).eq('id', product_instance_id);
         product.retail_price = retailPrice;
       }
@@ -204,12 +401,14 @@ export async function POST(req: NextRequest) {
     url => url && url.startsWith('http')
   );
 
-  // Derive option definitions
+  // Derive option definitions using real names from ERP (e.g. "Color", "Size")
   const optionSets: { name: string; values: string[] }[] = [];
-  for (const key of ['option1', 'option2', 'option3'] as const) {
+  const optionKeys = ['option1', 'option2', 'option3'] as const;
+  for (let i = 0; i < optionKeys.length; i++) {
+    const key = optionKeys[i];
     const values = [...new Set(selectedSkus.map(s => s[key]).filter(Boolean))] as string[];
     if (values.length > 0) {
-      optionSets.push({ name: `Option ${key.slice(-1)}`, values });
+      optionSets.push({ name: savedOptionNames[i] || `Option ${i + 1}`, values });
     }
   }
 
@@ -241,31 +440,50 @@ export async function POST(req: NextRequest) {
   }
 
   const shopDomain = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
+  const useGraphQL = selectedSkus.length > SHOPIFY_REST_VARIANT_LIMIT;
 
   try {
-    const shopifyRes = await fetch(
-      `https://${shopDomain}/admin/api/${API_VERSION}/products.json`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': accessToken,
-        },
-        body: JSON.stringify({ product: shopifyProduct }),
-      }
-    );
+    let createdProduct: ShopifyCreatedProduct;
 
-    if (!shopifyRes.ok) {
-      const errorBody = await shopifyRes.text();
-      console.error('[Shopify Sync] Create product failed:', shopifyRes.status, errorBody);
-      return NextResponse.json(
-        { error: `Shopify API error (${shopifyRes.status}): ${errorBody}` },
-        { status: shopifyRes.status }
+    if (useGraphQL) {
+      // Use GraphQL API for products with >100 variants
+      console.log(`[Shopify Sync] Using GraphQL API for ${selectedSkus.length} variants`);
+      createdProduct = await createProductViaGraphQL(
+        shopDomain!,
+        accessToken,
+        shopifyProduct,
+        selectedSkus,
+        optionSets,
+        product.retail_price ?? 25,
       );
+    } else {
+      // Use REST API for ≤100 variants
+      const shopifyRes = await fetch(
+        `https://${shopDomain}/admin/api/${API_VERSION}/products.json`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': accessToken,
+          },
+          body: JSON.stringify({ product: shopifyProduct }),
+        }
+      );
+
+      if (!shopifyRes.ok) {
+        const errorBody = await shopifyRes.text();
+        console.error('[Shopify Sync] Create product failed:', shopifyRes.status, errorBody);
+        return NextResponse.json(
+          { error: `Shopify API error (${shopifyRes.status}): ${errorBody}` },
+          { status: shopifyRes.status }
+        );
+      }
+
+      const restResult = await shopifyRes.json();
+      createdProduct = restResult.product;
     }
 
-    const { product: createdProduct } = await shopifyRes.json();
-    const shopifyVariants: { id: number; sku: string; option1?: string; option2?: string; option3?: string }[] =
+    const shopifyVariants: { id: number | string; sku: string; option1?: string; option2?: string; option3?: string }[] =
       createdProduct.variants || [];
 
     // ── Step 3: Record channel listing ──

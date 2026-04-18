@@ -169,11 +169,20 @@ async function fetchErpSkus(erpProductId: string): Promise<NextResponse> {
     skuImage: sku.skuImage || null,
   }));
 
+  // Extract option names from ERP product (e.g. "Color", "Size", "material")
+  const erpOptionNames: string[] = [];
+  if (product.option1Name) erpOptionNames.push(product.option1Name);
+  else if (skus.some((s: SkuResult) => s.option1)) erpOptionNames.push('Color');
+  if (product.option2Name) erpOptionNames.push(product.option2Name);
+  else if (skus.some((s: SkuResult) => s.option2)) erpOptionNames.push('Size');
+  if (product.option3Name) erpOptionNames.push(product.option3Name);
+  else if (skus.some((s: SkuResult) => s.option3)) erpOptionNames.push('Option 3');
+
   return NextResponse.json({
     product_id: product.id,
     name: product.itemCnName || product.title,
     source: 'erp',
-    option_names: [],
+    option_names: erpOptionNames,
     skus,
   });
 }

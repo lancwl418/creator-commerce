@@ -248,6 +248,45 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const selectAll = () => { setEnabledSkuIds(new Set(erpSkus.map(s => s.id))); setSaved(false); };
   const clearAll = () => { setEnabledSkuIds(new Set()); setSaved(false); };
 
+  // Toggle all variants for a given color (option1 value)
+  const toggleColor = useCallback((colorValue: string) => {
+    const skusForColor = erpSkus.filter(s => s.option1 === colorValue);
+    const allEnabled = skusForColor.every(s => enabledSkuIds.has(s.id));
+    setEnabledSkuIds(prev => {
+      const next = new Set(prev);
+      for (const s of skusForColor) {
+        if (allEnabled) next.delete(s.id); else next.add(s.id);
+      }
+      return next;
+    });
+    setSaved(false);
+  }, [erpSkus, enabledSkuIds]);
+
+  // Check if all variants for a color are enabled
+  const isColorFullyEnabled = useCallback((colorValue: string) => {
+    return erpSkus.filter(s => s.option1 === colorValue).every(s => enabledSkuIds.has(s.id));
+  }, [erpSkus, enabledSkuIds]);
+
+  // Check if some (but not all) variants for a color are enabled
+  const isColorPartiallyEnabled = useCallback((colorValue: string) => {
+    const skusForColor = erpSkus.filter(s => s.option1 === colorValue);
+    const enabledCount = skusForColor.filter(s => enabledSkuIds.has(s.id)).length;
+    return enabledCount > 0 && enabledCount < skusForColor.length;
+  }, [erpSkus, enabledSkuIds]);
+
+  // Group SKUs by option1 (Color) for grouped display
+  const skusByColor = useMemo(() => {
+    if (option1Values.length === 0) return null;
+    const groups: { color: string; skus: ErpSku[] }[] = [];
+    for (const color of option1Values) {
+      groups.push({ color, skus: erpSkus.filter(s => s.option1 === color) });
+    }
+    // Also include SKUs with no option1
+    const noColor = erpSkus.filter(s => !s.option1);
+    if (noColor.length > 0) groups.push({ color: '', skus: noColor });
+    return groups;
+  }, [erpSkus, option1Values]);
+
   // Get effective price for a variant
   const getVariantPrice = useCallback((skuId: string): number => {
     const override = variantPrices[skuId];
@@ -309,6 +348,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           title: title.trim() || product.title,
           description: description.trim(),
           selected_skus: skuSelections,
+          option_names: optionNames,
           retail_price: priceNum,
           cost: COST,
           status: product.status === 'draft' ? 'ready' : product.status,
@@ -543,82 +583,176 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
               <div className="grid gap-2 px-2 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100"
                 style={{ gridTemplateColumns: gridCols }}>
                 <span></span>
-                {option1Values.length > 0 && <span>{optionNames[0] || 'Option 1'}</span>}
-                {option2Values.length > 0 && <span>{optionNames[1] || 'Option 2'}</span>}
+                {option1Values.length > 0 && <span>{optionNames[0] || 'Color'}</span>}
+                {option2Values.length > 0 && <span>{optionNames[1] || 'Size'}</span>}
                 {option3Values.length > 0 && <span>{optionNames[2] || 'Option 3'}</span>}
                 {!hasOptions && <span>SKU</span>}
                 <span>Price</span>
                 <span className="text-right">Stock</span>
               </div>
 
-              {/* SKU rows */}
-              <div className="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
-                {erpSkus.map((sku) => {
-                  const enabled = enabledSkuIds.has(sku.id);
-                  const varPrice = variantPrices[sku.id];
-                  const effectivePrice = getVariantPrice(sku.id);
-                  const isCustom = varPrice !== undefined && varPrice !== '';
+              {/* SKU rows — grouped by color (option1) when available */}
+              <div className="max-h-[400px] overflow-y-auto">
+                {skusByColor ? (
+                  skusByColor.map((group) => {
+                    const colorLabel = group.color || 'Other';
+                    const allEnabled = isColorFullyEnabled(group.color);
+                    const partial = isColorPartiallyEnabled(group.color);
+                    const enabledCount = group.skus.filter(s => enabledSkuIds.has(s.id)).length;
 
-                  return (
-                    <div
-                      key={sku.id}
-                      className={`grid gap-2 items-center px-2 py-2.5 transition-all rounded-lg ${
-                        enabled ? 'bg-white' : 'bg-gray-50 opacity-50'
-                      }`}
-                      style={{ gridTemplateColumns: gridCols }}
-                    >
-                      {/* Checkbox */}
-                      <button onClick={() => toggleSku(sku.id)} className="flex justify-center">
-                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                          enabled ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
-                        }`}>
-                          {enabled && (
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
-                          )}
-                        </div>
-                      </button>
-
-                      {/* Options */}
-                      {option1Values.length > 0 && (
-                        <span className="text-sm font-semibold text-gray-900 truncate">{sku.option1 || '—'}</span>
-                      )}
-                      {option2Values.length > 0 && (
-                        <span className="text-sm text-gray-700 truncate">{sku.option2 || '—'}</span>
-                      )}
-                      {option3Values.length > 0 && (
-                        <span className="text-sm text-gray-700 truncate">{sku.option3 || '—'}</span>
-                      )}
-                      {!hasOptions && (
-                        <span className="text-sm font-mono text-gray-600 truncate">{sku.sku}</span>
-                      )}
-
-                      {/* Per-variant price */}
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={isCustom ? varPrice : ''}
-                          placeholder={priceNum.toFixed(2)}
-                          onChange={(e) => setVariantPrice(sku.id, e.target.value)}
-                          className={`w-full rounded-md border pl-5 pr-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/30 focus:border-primary-500 transition-all ${
-                            isCustom ? 'border-primary-300 bg-primary-50/50' : 'border-border bg-white'
+                    return (
+                      <div key={group.color} className="mb-1">
+                        {/* Color group header */}
+                        <button
+                          onClick={() => toggleColor(group.color)}
+                          className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg transition-all hover:bg-gray-50 ${
+                            !allEnabled && !partial ? 'opacity-60' : ''
                           }`}
-                        />
-                      </div>
+                        >
+                          <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
+                            allEnabled ? 'bg-primary-600 border-primary-600' : partial ? 'border-primary-400 bg-primary-100' : 'border-gray-300'
+                          }`}>
+                            {allEnabled && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                              </svg>
+                            )}
+                            {partial && (
+                              <svg className="w-3 h-3 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
+                              </svg>
+                            )}
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900">{colorLabel}</span>
+                          <span className="text-[11px] text-gray-400 ml-auto">
+                            {enabledCount}/{group.skus.length}
+                          </span>
+                        </button>
 
-                      {/* Stock */}
-                      <span className={`text-xs text-right font-medium ${
-                        sku.inQty > 0 ? 'text-emerald-600' : 'text-red-500'
-                      }`}>
-                        {sku.inQty > 0 ? sku.inQty : 'Out'}
-                      </span>
-                    </div>
-                  );
-                })}
+                        {/* Individual SKU rows under this color */}
+                        <div className="divide-y divide-gray-50 ml-4 border-l border-gray-100 pl-2">
+                          {group.skus.map((sku) => {
+                            const enabled = enabledSkuIds.has(sku.id);
+                            const varPrice = variantPrices[sku.id];
+                            const isCustom = varPrice !== undefined && varPrice !== '';
+
+                            // For grouped view, skip option1 column since it's shown in the header
+                            const innerGridCols = `44px ${
+                              (option2Values.length > 0 ? '1fr ' : '') +
+                              (option3Values.length > 0 ? '1fr ' : '')
+                            }90px 60px`.trim();
+
+                            return (
+                              <div
+                                key={sku.id}
+                                className={`grid gap-2 items-center px-2 py-2 transition-all rounded-lg ${
+                                  enabled ? 'bg-white' : 'bg-gray-50 opacity-50'
+                                }`}
+                                style={{ gridTemplateColumns: innerGridCols }}
+                              >
+                                <button onClick={() => toggleSku(sku.id)} className="flex justify-center">
+                                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                                    enabled ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
+                                  }`}>
+                                    {enabled && (
+                                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                </button>
+                                {option2Values.length > 0 && (
+                                  <span className="text-sm text-gray-700 truncate">{sku.option2 || '—'}</span>
+                                )}
+                                {option3Values.length > 0 && (
+                                  <span className="text-sm text-gray-700 truncate">{sku.option3 || '—'}</span>
+                                )}
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={isCustom ? varPrice : ''}
+                                    placeholder={priceNum.toFixed(2)}
+                                    onChange={(e) => setVariantPrice(sku.id, e.target.value)}
+                                    className={`w-full rounded-md border pl-5 pr-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/30 focus:border-primary-500 transition-all ${
+                                      isCustom ? 'border-primary-300 bg-primary-50/50' : 'border-border bg-white'
+                                    }`}
+                                  />
+                                </div>
+                                <span className={`text-xs text-right font-medium ${
+                                  sku.inQty > 0 ? 'text-emerald-600' : 'text-red-500'
+                                }`}>
+                                  {sku.inQty > 0 ? sku.inQty : 'Out'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  /* Flat list when no option1 grouping */
+                  <div className="divide-y divide-gray-50">
+                    {erpSkus.map((sku) => {
+                      const enabled = enabledSkuIds.has(sku.id);
+                      const varPrice = variantPrices[sku.id];
+                      const isCustom = varPrice !== undefined && varPrice !== '';
+
+                      return (
+                        <div
+                          key={sku.id}
+                          className={`grid gap-2 items-center px-2 py-2.5 transition-all rounded-lg ${
+                            enabled ? 'bg-white' : 'bg-gray-50 opacity-50'
+                          }`}
+                          style={{ gridTemplateColumns: gridCols }}
+                        >
+                          <button onClick={() => toggleSku(sku.id)} className="flex justify-center">
+                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                              enabled ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
+                            }`}>
+                              {enabled && (
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                          {option2Values.length > 0 && (
+                            <span className="text-sm text-gray-700 truncate">{sku.option2 || '—'}</span>
+                          )}
+                          {option3Values.length > 0 && (
+                            <span className="text-sm text-gray-700 truncate">{sku.option3 || '—'}</span>
+                          )}
+                          {!hasOptions && (
+                            <span className="text-sm font-mono text-gray-600 truncate">{sku.sku}</span>
+                          )}
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={isCustom ? varPrice : ''}
+                              placeholder={priceNum.toFixed(2)}
+                              onChange={(e) => setVariantPrice(sku.id, e.target.value)}
+                              className={`w-full rounded-md border pl-5 pr-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500/30 focus:border-primary-500 transition-all ${
+                                isCustom ? 'border-primary-300 bg-primary-50/50' : 'border-border bg-white'
+                              }`}
+                            />
+                          </div>
+                          <span className={`text-xs text-right font-medium ${
+                            sku.inQty > 0 ? 'text-emerald-600' : 'text-red-500'
+                          }`}>
+                            {sku.inQty > 0 ? sku.inQty : 'Out'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <p className="text-xs text-gray-400 mt-3 pt-2 border-t border-gray-100">
