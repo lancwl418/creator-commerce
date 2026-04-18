@@ -199,10 +199,53 @@ async function createProductViaGraphQL(
     if (mediaRes.ok) {
       const mediaResult = await mediaRes.json();
       const mediaErrors = mediaResult.data?.productCreateMedia?.mediaUserErrors || [];
+      const createdMedia = mediaResult.data?.productCreateMedia?.media || [];
       if (mediaErrors.length > 0) {
         console.error('[Shopify Sync] Media upload errors:', JSON.stringify(mediaErrors));
-      } else {
-        console.log('[Shopify Sync] Media uploaded successfully');
+      }
+      console.log('[Shopify Sync] Media create response:', JSON.stringify({
+        created: createdMedia.length,
+        errors: mediaErrors.length,
+        mediaIds: createdMedia.map((m: { id: string }) => m.id),
+      }));
+
+      // Wait for processing then check status
+      await new Promise(r => setTimeout(r, 3000));
+      const statusQuery = `
+        query getMediaStatus($productId: ID!) {
+          product(id: $productId) {
+            media(first: 20) {
+              edges {
+                node {
+                  ... on MediaImage {
+                    id
+                    status
+                    image { url }
+                    mediaErrors { code details message }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+      const statusRes = await fetch(graphqlUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+        body: JSON.stringify({ query: statusQuery, variables: { productId: gqlProduct.id } }),
+      });
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        const mediaEdges = statusData.data?.product?.media?.edges || [];
+        for (const edge of mediaEdges) {
+          const node = edge.node;
+          if (node?.mediaErrors?.length > 0) {
+            console.error('[Shopify Sync] Media processing error:', JSON.stringify(node.mediaErrors), 'for', node.id);
+          }
+        }
+        console.log('[Shopify Sync] Media statuses:', mediaEdges.map((e: { node: { id: string; status: string } }) =>
+          `${e.node?.status || 'unknown'}`
+        ).join(', '));
       }
     } else {
       console.error('[Shopify Sync] Media upload HTTP error:', mediaRes.status, await mediaRes.text());
