@@ -88,9 +88,9 @@ export async function POST(req: NextRequest) {
   let allOrders: Record<string, unknown>[] = [];
   let pageUrl: string | null = `https://${shopDomain}/admin/api/${API_VERSION}/orders.json?status=any&limit=250`;
 
-  while (pageUrl) {
-    const currentUrl = pageUrl;
-    const res = await fetch(currentUrl, {
+  for (;;) {
+    if (!pageUrl) break;
+    const res: Response = await fetch(pageUrl, {
       headers: { 'X-Shopify-Access-Token': accessToken },
     });
 
