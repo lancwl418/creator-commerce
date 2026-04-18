@@ -59,6 +59,7 @@ interface ProductData {
   design_version_id: string;
   product_template_id: string;
   base_price_suggestion: number | null;
+  variant_preview_urls: Record<string, string> | null;
   created_at: string;
 }
 
@@ -142,96 +143,24 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const hasOptions = option1Values.length > 0 || option2Values.length > 0;
 
   // Extract unique color variants with images (one per color)
+  // Use R2 design previews if available, fallback to ERP SKU images
   const colorVariants = useMemo(() => {
     const seen = new Set<string>();
     const variants: { color: string; imageUrl: string }[] = [];
+    const variantPreviews = product.variant_preview_urls || {};
     for (const sku of erpSkus) {
       const color = sku.option1 || sku.option2;
-      if (!color || !sku.skuImage || seen.has(color)) continue;
+      if (!color || seen.has(color)) continue;
       seen.add(color);
-      variants.push({ color, imageUrl: erpImg(sku.skuImage) });
+      // Prefer R2 design preview (has design composited), fallback to raw SKU image
+      const previewFromR2 = variantPreviews[color];
+      const fallbackImage = sku.skuImage ? erpImg(sku.skuImage) : '';
+      if (previewFromR2 || fallbackImage) {
+        variants.push({ color, imageUrl: previewFromR2 || fallbackImage });
+      }
     }
     return variants;
-  }, [erpSkus]);
-
-  // Composite design onto each color variant by using the existing preview
-  // image (which has the design at the correct position on the main mockup)
-  // as a "multiply" overlay onto each variant's SKU image.
-  // Both images show the same product in the same pose, just different colors.
-  const [colorPreviews, setColorPreviews] = useState<Map<string, string>>(new Map());
-
-  useEffect(() => {
-    if (colorVariants.length === 0 || !previewUrl) return;
-
-    const THUMB_SIZE = 200;
-
-    const loadImg = (src: string): Promise<HTMLImageElement | null> =>
-      new Promise((resolve) => {
-        const img = new Image();
-        if (src.startsWith('http')) img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
-        img.onerror = () => {
-          if (img.crossOrigin) {
-            const retry = new Image();
-            retry.onload = () => resolve(retry);
-            retry.onerror = () => resolve(null);
-            retry.src = src;
-          } else {
-            resolve(null);
-          }
-        };
-        img.src = src;
-      });
-
-    async function generate() {
-      // Load the design preview (design already composited on main mockup)
-      const previewImg = await loadImg(previewUrl!);
-      if (!previewImg) return;
-
-      const newPreviews = new Map<string, string>();
-
-      for (const variant of colorVariants) {
-        const variantImg = await loadImg(variant.imageUrl);
-        if (!variantImg) continue;
-
-        // Use consistent canvas size
-        const vw = variantImg.naturalWidth;
-        const vh = variantImg.naturalHeight;
-        const scale = THUMB_SIZE / Math.max(vw, vh);
-        const cw = Math.round(vw * scale);
-        const ch = Math.round(vh * scale);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = cw;
-        canvas.height = ch;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) continue;
-
-        // Step 1: Draw the variant's base color image
-        ctx.drawImage(variantImg, 0, 0, cw, ch);
-
-        // Step 2: Overlay the design preview using "multiply" blend mode
-        // This keeps the variant's color while applying the design's dark ink
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.drawImage(previewImg, 0, 0, cw, ch);
-
-        // Step 3: Restore and re-draw the variant lightly to preserve
-        // the original brightness in non-design areas
-        ctx.globalCompositeOperation = 'destination-in';
-        ctx.drawImage(variantImg, 0, 0, cw, ch);
-
-        ctx.globalCompositeOperation = 'source-over';
-
-        try {
-          newPreviews.set(variant.color, canvas.toDataURL('image/jpeg', 0.85));
-        } catch { /* CORS tainted */ }
-      }
-
-      setColorPreviews(newPreviews);
-    }
-
-    generate();
-  }, [colorVariants, previewUrl]);
+  }, [erpSkus, product.variant_preview_urls]);
 
   // Always show the design preview — this is a created product page,
   // not the catalog. The previewUrl is the composited design from the editor.
@@ -526,21 +455,18 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Colors</h3>
             <div className="flex gap-3 overflow-x-auto pb-1">
-              {colorVariants.map((v) => {
-                const composite = colorPreviews.get(v.color);
-                return (
-                  <button
-                    key={v.color}
-                    onClick={() => setLightboxUrl(composite || v.imageUrl)}
-                    className="shrink-0 text-center group"
-                  >
-                    <div className="w-20 h-20 rounded-lg border border-border bg-gray-50 overflow-hidden transition-all group-hover:border-primary-400 group-hover:shadow-sm">
-                      <img src={composite || v.imageUrl} alt={v.color} className="w-full h-full object-contain p-1" />
-                    </div>
-                    <span className="text-[10px] text-gray-500 mt-1 block truncate w-20">{v.color}</span>
-                  </button>
-                );
-              })}
+              {colorVariants.map((v) => (
+                <button
+                  key={v.color}
+                  onClick={() => setLightboxUrl(v.imageUrl)}
+                  className="shrink-0 text-center group"
+                >
+                  <div className="w-20 h-20 rounded-lg border border-border bg-gray-50 overflow-hidden transition-all group-hover:border-primary-400 group-hover:shadow-sm">
+                    <img src={v.imageUrl} alt={v.color} className="w-full h-full object-contain p-1" />
+                  </div>
+                  <span className="text-[10px] text-gray-500 mt-1 block truncate w-20">{v.color}</span>
+                </button>
+              ))}
             </div>
           </div>
         )}
