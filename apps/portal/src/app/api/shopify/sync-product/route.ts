@@ -6,7 +6,8 @@ const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
 const COST = 10.00; // MVP hardcoded cost
 
-const SHOPIFY_REST_VARIANT_LIMIT = 100;
+// Always use GraphQL — REST API fails for >100 variants and GraphQL works for any count
+const SHOPIFY_REST_VARIANT_LIMIT = 0;
 
 interface SkuSelection {
   sku_id: string;
