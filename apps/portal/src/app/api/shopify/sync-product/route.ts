@@ -44,6 +44,7 @@ async function createProductViaGraphQL(
   optionSets: { name: string; values: string[] }[],
   retailPrice: number,
   skuPriceMap?: Map<string, number>,
+  variantImageMap?: Map<string, string>,
 ): Promise<ShopifyCreatedProduct> {
   const graphqlUrl = `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`;
 
@@ -178,20 +179,115 @@ async function createProductViaGraphQL(
     cursor = pageVariants.edges[pageVariants.edges.length - 1]?.cursor;
   }
 
-  // Map media after product creation
+  // Upload media and associate variant images
   if (media.length > 0) {
     const mediaMutation = `
       mutation productCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
         productCreateMedia(productId: $productId, media: $media) {
+          media { id originalSource { url } }
           mediaUserErrors { field message }
         }
       }
     `;
-    await fetch(graphqlUrl, {
+    const mediaRes = await fetch(graphqlUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
       body: JSON.stringify({ query: mediaMutation, variables: { productId: gqlProduct.id, media } }),
     });
+
+    // Associate variant images if we have a color→image mapping
+    if (variantImageMap && variantImageMap.size > 0 && mediaRes.ok) {
+      // Wait briefly for Shopify to process media
+      await new Promise(r => setTimeout(r, 2000));
+
+      // Query product media to get IDs
+      const mediaQuery = `
+        query getProductMedia($productId: ID!) {
+          product(id: $productId) {
+            media(first: 100) {
+              edges {
+                node {
+                  ... on MediaImage {
+                    id
+                    image { url }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+      const mediaQueryRes = await fetch(graphqlUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+        body: JSON.stringify({ query: mediaQuery, variables: { productId: gqlProduct.id } }),
+      });
+
+      if (mediaQueryRes.ok) {
+        const mediaData = await mediaQueryRes.json();
+        const mediaEdges = mediaData.data?.product?.media?.edges || [];
+
+        // Build URL→mediaId lookup (Shopify may change the URL slightly, match by filename)
+        const mediaIdByFilename = new Map<string, string>();
+        for (const edge of mediaEdges) {
+          const node = edge.node;
+          if (node?.id && node?.image?.url) {
+            // Extract filename from Shopify CDN URL for matching
+            const filename = node.image.url.split('/').pop()?.split('?')[0] || '';
+            mediaIdByFilename.set(filename, node.id);
+            // Also store full URL for exact match
+            mediaIdByFilename.set(node.image.url.split('?')[0], node.id);
+          }
+        }
+
+        // Build variant update input: match each variant's color to its image
+        const variantUpdates: { id: string; mediaId: string }[] = [];
+        for (const edge of allVariantEdges) {
+          const node = edge.node;
+          // Get color from option1 (first option, typically Color)
+          const colorOpt = node.selectedOptions?.[0]?.value;
+          if (!colorOpt) continue;
+
+          const imageUrl = variantImageMap.get(colorOpt);
+          if (!imageUrl) continue;
+
+          // Try to find matching media by filename
+          const imageFilename = imageUrl.split('/').pop()?.split('?')[0] || '';
+          const mediaId = mediaIdByFilename.get(imageFilename)
+            || mediaIdByFilename.get(imageUrl.split('?')[0]);
+
+          if (mediaId) {
+            variantUpdates.push({ id: node.id, mediaId });
+          }
+        }
+
+        // Batch update variants with their images
+        if (variantUpdates.length > 0) {
+          const variantMediaMutation = `
+            mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+              productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                userErrors { field message }
+              }
+            }
+          `;
+          await fetch(graphqlUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+            body: JSON.stringify({
+              query: variantMediaMutation,
+              variables: {
+                productId: gqlProduct.id,
+                variants: variantUpdates.map(v => ({
+                  id: v.id,
+                  mediaId: v.mediaId,
+                })),
+              },
+            }),
+          });
+          console.log(`[Shopify Sync] Associated ${variantUpdates.length} variant images`);
+        }
+      }
+    }
   }
 
   // Convert GQL variant format to match REST format for downstream compatibility
@@ -442,7 +538,20 @@ export async function POST(req: NextRequest) {
   const shopDomain = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
 
   try {
-    console.log(`[Shopify Sync] Creating product with ${selectedSkus.length} variants via GraphQL`);
+    // Build color → image URL map for variant image association
+    const variantImageMap = new Map<string, string>();
+    for (const sku of selectedSkus) {
+      if (!sku.option1) continue;
+      if (variantImageMap.has(sku.option1)) continue;
+      const designPreview = variantPreviewMap[sku.option1];
+      if (designPreview) {
+        variantImageMap.set(sku.option1, designPreview);
+      } else if (sku.skuImage) {
+        variantImageMap.set(sku.option1, toPublicUrl(sku.skuImage));
+      }
+    }
+
+    console.log(`[Shopify Sync] Creating product with ${selectedSkus.length} variants via GraphQL, ${variantImageMap.size} variant images`);
     const createdProduct = await createProductViaGraphQL(
       shopDomain!,
       accessToken,
@@ -451,6 +560,7 @@ export async function POST(req: NextRequest) {
       optionSets,
       product.retail_price ?? 25,
       skuPriceMap,
+      variantImageMap,
     );
 
     const shopifyVariants: { id: number | string; sku: string; option1?: string; option2?: string; option3?: string }[] =
