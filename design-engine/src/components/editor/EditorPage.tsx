@@ -400,24 +400,19 @@ function EditorPageInner() {
           const printArea = product.print_area_snapshot;
           const meta = product.design_metadata;
 
-          console.log('[Save] Variant preview check:', {
-            variantsCount: variants.length,
-            hasPrintArea: !!printArea,
-            mockupWidth: meta?.mockupWidth,
-            artworkUrlsCount: product.artwork_urls?.length ?? 0,
-            firstArtworkUrl: product.artwork_urls?.[0]?.substring(0, 80),
-          });
-
-          if (variants.length > 0 && printArea && meta?.mockupWidth && product.artwork_urls?.length > 0) {
+          if (variants.length > 0 && meta?.mockupWidth && product.layers?.length > 0) {
             try {
-              console.log('[Save] Calling generate-variant-previews API...');
+              console.log('[Save] Calling generate-variant-previews API...', {
+                variantsCount: variants.length,
+                layersCount: product.layers.length,
+                mockupSize: `${meta.mockupWidth}x${meta.mockupHeight}`,
+              });
               const res = await fetch('/api/generate-variant-previews', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   product_id: product.template_id,
-                  artwork_url: product.artwork_urls[0],
-                  print_area: { x: printArea.x, y: printArea.y, width: printArea.width, height: printArea.height },
+                  layers: product.layers,
                   mockup_width: meta.mockupWidth,
                   mockup_height: meta.mockupHeight,
                   variants: variants.map((v) => ({

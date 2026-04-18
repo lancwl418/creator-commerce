@@ -10,17 +10,32 @@ interface VariantInput {
   label?: string;
 }
 
-interface PrintArea {
+interface LayerTransform {
   x: number;
   y: number;
   width: number;
   height: number;
+  scaleX: number;
+  scaleY: number;
+  rotation: number;
+  flipX?: boolean;
+  flipY?: boolean;
+}
+
+interface LayerInput {
+  type: string;
+  visible: boolean;
+  opacity?: number;
+  transform: LayerTransform;
+  data: {
+    type: string;
+    src?: string;
+  };
 }
 
 interface RequestBody {
   product_id: string;
-  artwork_url: string;
-  print_area: PrintArea;
+  layers: LayerInput[];
   mockup_width: number;
   mockup_height: number;
   variants: VariantInput[];
@@ -29,37 +44,54 @@ interface RequestBody {
 /**
  * POST /api/generate-variant-previews
  *
- * Server-side composite: artwork + each variant's mockup → JPEG → R2
- * Returns a map of variant_id → R2 public URL.
- *
- * All variants share the same design parameters (position, scale).
- * Only the mockup base image differs per variant (different colors).
+ * Server-side composite: artwork layers + each variant's mockup → JPEG → R2
+ * Uses exact layer transforms (x, y, width, height, scaleX, scaleY) to match
+ * what the user sees in the editor.
  */
 export async function POST(req: NextRequest) {
   try {
     const body: RequestBody = await req.json();
-    const { product_id, artwork_url, print_area, mockup_width, mockup_height, variants } = body;
+    const { product_id, layers, mockup_width, mockup_height, variants } = body;
 
-    if (!product_id || !artwork_url || !print_area || !variants?.length) {
+    if (!product_id || !layers?.length || !variants?.length) {
       return NextResponse.json(
-        { error: 'Missing required fields: product_id, artwork_url, print_area, variants' },
+        { error: 'Missing required fields: product_id, layers, variants' },
         { status: 400 },
       );
     }
 
-    // Fetch the artwork image once (shared across all variants)
-    const artworkBuffer = await fetchImage(artwork_url);
-    if (!artworkBuffer) {
-      return NextResponse.json({ error: 'Failed to fetch artwork image' }, { status: 502 });
+    // Prepare artwork layers: fetch each image once and resize per transform
+    const artworkLayers: { buffer: Buffer; transform: LayerTransform; opacity: number }[] = [];
+    for (const layer of layers) {
+      if (!layer.visible || layer.data.type !== 'image' || !layer.data.src) continue;
+
+      const imgBuffer = await fetchImage(layer.data.src);
+      if (!imgBuffer) {
+        console.warn(`[Variant Preview] Failed to fetch layer image: ${layer.data.src.substring(0, 80)}`);
+        continue;
+      }
+
+      // Resize artwork to its rendered size on the mockup (width * scaleX, height * scaleY)
+      const renderW = Math.round((layer.transform.width || 100) * (layer.transform.scaleX || 1));
+      const renderH = Math.round((layer.transform.height || 100) * (layer.transform.scaleY || 1));
+
+      const resized = await sharp(imgBuffer)
+        .resize(renderW, renderH, { fit: 'fill' })
+        .png()
+        .toBuffer();
+
+      artworkLayers.push({
+        buffer: resized,
+        transform: layer.transform,
+        opacity: layer.opacity ?? 1,
+      });
     }
 
-    // Resize artwork to fit the print area
-    const artworkResized = await sharp(artworkBuffer)
-      .resize(Math.round(print_area.width), Math.round(print_area.height), { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .png()
-      .toBuffer();
+    if (artworkLayers.length === 0) {
+      return NextResponse.json({ error: 'No valid artwork layers found' }, { status: 400 });
+    }
 
-    // Process each variant in parallel (limited concurrency)
+    // Process each variant
     const CONCURRENCY = 5;
     const results: Record<string, string> = {};
     const errors: Record<string, string> = {};
@@ -79,17 +111,18 @@ export async function POST(req: NextRequest) {
             .png()
             .toBuffer();
 
-          // Composite: mockup base + artwork at print_area position
+          // Composite all artwork layers onto mockup at their exact positions
+          const compositeInputs = artworkLayers.map((layer) => ({
+            input: layer.buffer,
+            left: Math.round(layer.transform.x),
+            top: Math.round(layer.transform.y),
+          }));
+
           const composite = await sharp(mockupResized)
-            .composite([{
-              input: artworkResized,
-              left: Math.round(print_area.x),
-              top: Math.round(print_area.y),
-            }])
+            .composite(compositeInputs)
             .jpeg({ quality: 85 })
             .toBuffer();
 
-          // Upload to R2
           const { url } = await uploadVariantPreview(
             new Uint8Array(composite),
             product_id,
