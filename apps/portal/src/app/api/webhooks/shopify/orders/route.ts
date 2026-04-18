@@ -1,0 +1,185 @@
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { createServiceClient } from '@/lib/supabase/service';
+
+const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
+
+/**
+ * POST /api/webhooks/shopify/orders
+ *
+ * Receives Shopify order webhooks (orders/create, orders/paid, orders/updated).
+ * Verifies HMAC signature, matches line items to our channel_listing_variants,
+ * calculates earnings, and stores in creator_orders + creator_order_items.
+ */
+export async function POST(req: NextRequest) {
+  // Read raw body for HMAC verification
+  const rawBody = await req.text();
+
+  // Verify HMAC
+  const hmacHeader = req.headers.get('x-shopify-hmac-sha256') || '';
+  const expectedHmac = crypto
+    .createHmac('sha256', SHOPIFY_CLIENT_SECRET)
+    .update(rawBody, 'utf8')
+    .digest('base64');
+
+  if (hmacHeader !== expectedHmac) {
+    console.error('[Webhook] HMAC verification failed');
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  const topic = req.headers.get('x-shopify-topic') || '';
+  const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
+
+  console.log(`[Webhook] Received ${topic} from ${shopDomain}`);
+
+  try {
+    const order = JSON.parse(rawBody);
+    const supabase = createServiceClient();
+
+    // Find the store connection by shop domain
+    const { data: connection } = await supabase
+      .from('creator_store_connections')
+      .select('id, creator_id')
+      .or(`store_url.eq.https://${shopDomain},store_url.eq.https://${shopDomain}/`)
+      .eq('status', 'connected')
+      .single();
+
+    if (!connection) {
+      console.warn(`[Webhook] No store connection found for ${shopDomain}`);
+      return new NextResponse('OK', { status: 200 });
+    }
+
+    if (topic === 'orders/create' || topic === 'orders/paid' || topic === 'orders/updated') {
+      await processOrder(supabase, connection, order);
+    }
+
+    return new NextResponse('OK', { status: 200 });
+  } catch (err) {
+    console.error('[Webhook] Processing error:', err);
+    // Return 200 to prevent Shopify from retrying on our logic errors
+    return new NextResponse('OK', { status: 200 });
+  }
+}
+
+async function processOrder(
+  supabase: ReturnType<typeof createServiceClient>,
+  connection: { id: string; creator_id: string },
+  order: Record<string, unknown>,
+) {
+  const shopifyOrderId = String(order.id);
+  const customer = order.customer as Record<string, unknown> | null;
+  const shippingAddress = order.shipping_address as Record<string, unknown> | null;
+
+  // Upsert the order
+  const { data: creatorOrder, error: orderError } = await supabase
+    .from('creator_orders')
+    .upsert({
+      creator_id: connection.creator_id,
+      creator_store_connection_id: connection.id,
+      shopify_order_id: shopifyOrderId,
+      shopify_order_number: String(order.order_number || ''),
+      shopify_order_name: String(order.name || ''),
+      financial_status: String(order.financial_status || 'pending'),
+      fulfillment_status: order.fulfillment_status ? String(order.fulfillment_status) : null,
+      total_price: parseFloat(String(order.total_price)) || 0,
+      subtotal_price: parseFloat(String(order.subtotal_price)) || 0,
+      total_tax: parseFloat(String(order.total_tax)) || 0,
+      currency: String(order.currency || 'USD'),
+      customer_email: customer?.email ? String(customer.email) : null,
+      customer_name: customer
+        ? `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
+        : null,
+      shipping_address: shippingAddress
+        ? { country: shippingAddress.country, province: shippingAddress.province, city: shippingAddress.city }
+        : {},
+      order_placed_at: order.created_at ? String(order.created_at) : new Date().toISOString(),
+    }, { onConflict: 'shopify_order_id,creator_store_connection_id' })
+    .select('id')
+    .single();
+
+  if (orderError || !creatorOrder) {
+    console.error('[Webhook] Failed to upsert order:', orderError);
+    return;
+  }
+
+  // Process line items
+  const lineItems = (order.line_items || []) as Record<string, unknown>[];
+
+  for (const item of lineItems) {
+    const shopifyVariantId = item.variant_id ? String(item.variant_id) : null;
+    const shopifyProductId = item.product_id ? String(item.product_id) : null;
+    const quantity = Number(item.quantity) || 1;
+    const unitPrice = parseFloat(String(item.price)) || 0;
+
+    // Match to our channel_listing_variants
+    let matchedVariant: {
+      id: string;
+      sale_price: number;
+      base_cost_snapshot: number;
+    } | null = null;
+
+    if (shopifyVariantId) {
+      const { data } = await supabase
+        .from('channel_listing_variants')
+        .select('id, sale_price, base_cost_snapshot, channel_listing_id')
+        .eq('external_variant_id', shopifyVariantId)
+        .limit(5);
+
+      if (data && data.length > 0) {
+        // Verify it belongs to this store connection
+        for (const v of data) {
+          const { data: listing } = await supabase
+            .from('channel_listings')
+            .select('creator_store_connection_id')
+            .eq('id', v.channel_listing_id)
+            .single();
+
+          if (listing?.creator_store_connection_id === connection.id) {
+            matchedVariant = {
+              id: v.id,
+              sale_price: Number(v.sale_price),
+              base_cost_snapshot: Number(v.base_cost_snapshot),
+            };
+            break;
+          }
+        }
+      }
+    }
+
+    const earningsAmount = matchedVariant
+      ? (matchedVariant.sale_price - matchedVariant.base_cost_snapshot) * quantity
+      : null;
+
+    // Check if line item already exists
+    const lineItemId = item.id ? String(item.id) : null;
+    if (lineItemId) {
+      const { data: existing } = await supabase
+        .from('creator_order_items')
+        .select('id')
+        .eq('creator_order_id', creatorOrder.id)
+        .eq('shopify_line_item_id', lineItemId)
+        .single();
+
+      if (existing) continue; // Already processed
+    }
+
+    await supabase.from('creator_order_items').insert({
+      creator_order_id: creatorOrder.id,
+      channel_listing_variant_id: matchedVariant?.id || null,
+      shopify_line_item_id: lineItemId,
+      shopify_variant_id: shopifyVariantId,
+      shopify_product_id: shopifyProductId,
+      title: String(item.title || ''),
+      variant_title: item.variant_title ? String(item.variant_title) : null,
+      sku: item.sku ? String(item.sku) : null,
+      quantity,
+      unit_price: unitPrice,
+      total_price: unitPrice * quantity,
+      sale_price_snapshot: matchedVariant?.sale_price ?? null,
+      base_cost_snapshot: matchedVariant?.base_cost_snapshot ?? null,
+      earnings_amount: earningsAmount,
+    });
+  }
+
+  console.log(`[Webhook] Processed order ${order.name} — ${lineItems.length} items, creator ${connection.creator_id}`);
+}

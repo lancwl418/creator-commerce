@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import crypto from 'crypto';
 
 const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
-const SCOPES = process.env.SHOPIFY_SCOPES ?? 'write_products,read_products';
+const SCOPES = process.env.SHOPIFY_SCOPES ?? 'write_products,read_products,read_orders';
 
 function getAppUrl(req: NextRequest): string {
   // APP_URL (runtime) takes priority, then NEXT_PUBLIC_APP_URL (build-time inline)

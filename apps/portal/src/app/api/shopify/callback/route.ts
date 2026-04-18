@@ -125,6 +125,36 @@ export async function GET(req: NextRequest) {
     return redirectTo('/dashboard/stores?error=save_failed', req);
   }
 
+  // Register order webhooks (best-effort, don't fail OAuth on error)
+  try {
+    const webhookAddress = `${getBaseUrl(req)}/api/webhooks/shopify/orders`;
+    const topics = ['orders/create', 'orders/paid'];
+
+    for (const topic of topics) {
+      const whRes = await fetch(
+        `https://${shop}/admin/api/${API_VERSION}/webhooks.json`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': access_token,
+          },
+          body: JSON.stringify({
+            webhook: { topic, address: webhookAddress, format: 'json' },
+          }),
+        },
+      );
+      if (!whRes.ok) {
+        const errText = await whRes.text();
+        console.warn(`[Shopify OAuth] Webhook ${topic} registration failed:`, whRes.status, errText);
+      } else {
+        console.log(`[Shopify OAuth] Registered webhook: ${topic}`);
+      }
+    }
+  } catch (e) {
+    console.error('[Shopify OAuth] Webhook registration error:', e);
+  }
+
   // Clear OAuth cookies
   const response = redirectTo('/dashboard/stores?connected=shopify', req);
   response.cookies.delete('shopify_oauth_state');
