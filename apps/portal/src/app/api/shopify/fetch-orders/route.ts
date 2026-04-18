@@ -52,12 +52,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Refresh token if expired
+  const shopDomain = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
   let accessToken = connection.access_token;
   if (connection.token_expires_at && new Date(connection.token_expires_at) <= new Date()) {
     if (!connection.refresh_token) {
       return NextResponse.json({ error: 'Token expired, please reconnect' }, { status: 401 });
     }
-    const shopDomain = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
     const refreshRes = await fetch(`https://${shopDomain}/admin/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -82,7 +82,6 @@ export async function POST(req: NextRequest) {
     }).eq('id', store_connection_id);
   }
 
-  const shopDomain = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
   const serviceSupabase = createServiceClient();
 
   // Fetch orders from Shopify (paginated, up to 250 per page)
