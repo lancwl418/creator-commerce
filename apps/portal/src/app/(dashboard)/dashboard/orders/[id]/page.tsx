@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import OrderActions from './OrderActions';
 
 const statusColors: Record<string, string> = {
   paid: 'bg-emerald-50 text-emerald-700',
@@ -264,6 +265,21 @@ export default async function OrderDetailPage({
               </div>
             </div>
           </div>
+
+          {/* Actions: Edit + Resync */}
+          <OrderActions
+            orderId={order.id}
+            shopifyOrderId={order.shopify_order_id}
+            storeConnectionId={order.creator_store_connection_id}
+            currentData={{
+              customer_name: order.customer_name,
+              customer_email: order.customer_email,
+              shipping_address: order.shipping_address as Record<string, string> | null,
+              financial_status: order.financial_status,
+              fulfillment_status: order.fulfillment_status,
+              notes: order.notes,
+            }}
+          />
 
           {/* Financial breakdown */}
           <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">

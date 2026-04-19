@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
   }
 
-  const { store_connection_id } = await req.json();
+  const { store_connection_id, single_order_id } = await req.json();
   if (!store_connection_id) {
     return NextResponse.json({ error: 'Missing store_connection_id' }, { status: 400 });
   }
@@ -84,9 +84,24 @@ export async function POST(req: NextRequest) {
 
   const serviceSupabase = createServiceClient();
 
-  // Fetch orders from Shopify (paginated, up to 250 per page)
+  // Fetch orders from Shopify
   let allOrders: Record<string, unknown>[] = [];
-  let pageUrl: string | null = `https://${shopDomain}/admin/api/${API_VERSION}/orders.json?status=any&limit=250`;
+
+  // Single order resync or fetch all
+  if (single_order_id) {
+    const singleRes: Response = await fetch(
+      `https://${shopDomain}/admin/api/${API_VERSION}/orders/${single_order_id}.json`,
+      { headers: { 'X-Shopify-Access-Token': accessToken } },
+    );
+    if (singleRes.ok) {
+      const singleData = await singleRes.json();
+      if (singleData.order) allOrders = [singleData.order];
+    } else {
+      return NextResponse.json({ error: `Order not found: ${single_order_id}` }, { status: 404 });
+    }
+  }
+
+  let pageUrl: string | null = single_order_id ? null : `https://${shopDomain}/admin/api/${API_VERSION}/orders.json?status=any&limit=250`;
 
   for (;;) {
     if (!pageUrl) break;
