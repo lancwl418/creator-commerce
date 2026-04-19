@@ -137,6 +137,7 @@ export default async function OrderDetailPage({
                   id: string; title: string; variant_title: string | null; sku: string | null;
                   quantity: number; unit_price: number; total_price: number;
                   base_cost_snapshot: number | null; earnings_amount: number | null;
+                  shopify_product_id: string | null; shopify_variant_id: string | null;
                   channel_listing_variants: {
                     id: string; external_variant_id: string;
                     custom_product_skus: {
@@ -168,15 +169,19 @@ export default async function OrderDetailPage({
                     <td className="px-6 py-3.5">
                       <div className="space-y-1">
                         <p className="text-xs font-mono text-gray-600">{item.sku || '—'}</p>
-                        {customSku && (
-                          <div className="text-[10px] text-gray-400 space-y-0.5">
-                            <p>Ideamax Product: {customSku.erp_product_id}</p>
-                            <p>Ideamax SKU: {customSku.erp_sku_id}</p>
-                            {customSku.erp_synced_sku_id && (
-                              <p>Custom SKU: {customSku.erp_synced_sku_id}</p>
-                            )}
-                          </div>
-                        )}
+                        <div className="text-[10px] text-gray-400 space-y-0.5">
+                          {item.shopify_product_id && <p>Shopify Product: {item.shopify_product_id}</p>}
+                          {item.shopify_variant_id && <p>Shopify Variant: {item.shopify_variant_id}</p>}
+                          {customSku && (
+                            <>
+                              <p>Ideamax Product: {customSku.erp_product_id}</p>
+                              <p>Ideamax SKU: {customSku.erp_sku_id}</p>
+                              {customSku.erp_synced_sku_id && (
+                                <p>Custom SKU: {customSku.erp_synced_sku_id}</p>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-3.5 text-center">
