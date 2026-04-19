@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getOrderById } from '@/lib/queries/orders';
 import { ORDER_STATUS_COLORS, FULFILLMENT_STATUS_COLORS } from '@/lib/constants';
 import { ResyncButton, EditSection, FulfillSection } from './OrderActions';
 
@@ -10,33 +10,8 @@ export default async function OrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  const { data: order } = await supabase
-    .from('creator_orders')
-    .select(`
-      *,
-      creator_store_connections (id, platform, store_name, store_url),
-      creator_order_logs (id, action, source, changes, note, created_by, created_at),
-      creator_order_fulfillments (id, tracking_number, tracking_url, carrier, status, fulfilled_at),
-      creator_order_items (
-        id, title, variant_title, sku, quantity,
-        unit_price, total_price, sale_price_snapshot,
-        base_cost_snapshot, earnings_amount,
-        shopify_product_id, shopify_variant_id,
-        channel_listing_variant_id,
-        channel_listing_variants (
-          id, external_variant_id,
-          custom_product_skus (
-            id, erp_product_id, erp_sku_id, sku_code,
-            erp_synced_sku_id, erp_sync_status, preview_image_url
-          )
-        )
-      )
-    `)
-    .eq('id', id)
-    .single();
-
+  const order = await getOrderById(id);
   if (!order) notFound();
 
   const items = order.creator_order_items || [];

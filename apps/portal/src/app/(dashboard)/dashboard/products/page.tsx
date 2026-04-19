@@ -1,26 +1,17 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { requireCreator } from '@/lib/server/auth';
+import { getProducts } from '@/lib/queries/products';
 
 export default async function ProductsPage() {
-  const supabase = await createClient();
+  let creator;
+  try {
+    ({ creator } = await requireCreator());
+  } catch {
+    redirect('/login');
+  }
 
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: creator } = await supabase
-    .from('creators')
-    .select('id')
-    .eq('auth_user_id', user!.id)
-    .single();
-
-  const { data: products } = await supabase
-    .from('sellable_product_instances')
-    .select(`
-      *,
-      designs (id, title),
-      channel_listings (id, channel_type, creator_store_connection_id, status, price, currency, creator_store_connections (platform))
-    `)
-    .eq('creator_id', creator!.id)
-    .order('created_at', { ascending: false });
+  const products = await getProducts(creator.id);
 
   return (
     <div>

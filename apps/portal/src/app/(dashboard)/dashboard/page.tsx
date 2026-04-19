@@ -1,53 +1,41 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { requireCreator } from '@/lib/server/auth';
+import { getOrders } from '@/lib/queries/orders';
+import { aggregateOrderTotals } from '@/lib/utils';
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
+  let supabase, creator;
+  try {
+    const auth = await requireCreator();
+    supabase = auth.supabase;
+    creator = auth.creator;
+  } catch {
+    redirect('/login');
+  }
 
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: creator } = await supabase
+  const { data: profile } = await supabase
     .from('creators')
     .select('*, creator_profiles(*)')
-    .eq('auth_user_id', user!.id)
+    .eq('id', creator.id)
     .single();
 
-  const displayName = creator?.creator_profiles?.display_name || creator?.email;
+  const displayName = profile?.creator_profiles?.display_name || profile?.email;
 
-  // Fetch counts
   const { count: designCount } = await supabase
     .from('designs')
     .select('*', { count: 'exact', head: true })
-    .eq('creator_id', creator!.id);
+    .eq('creator_id', creator.id);
 
   const { count: productCount } = await supabase
     .from('sellable_product_instances')
     .select('*', { count: 'exact', head: true })
-    .eq('creator_id', creator!.id);
+    .eq('creator_id', creator.id);
 
-  // Orders and revenue
-  const { data: orders } = await supabase
-    .from('creator_orders')
-    .select(`
-      id, total_price,
-      creator_store_connections (platform, store_name),
-      creator_order_items (earnings_amount)
-    `)
-    .eq('creator_id', creator!.id);
-
-  const totalOrders = orders?.length ?? 0;
-
-  // Calculate revenue by source
-  let storeRevenue = 0;
-  let storeEarnings = 0;
-  for (const order of orders || []) {
-    const orderTotal = Number(order.total_price) || 0;
-    const orderEarnings = (order.creator_order_items || []).reduce(
-      (s: number, i: { earnings_amount: number | null }) => s + (i.earnings_amount || 0), 0
-    );
-    storeRevenue += orderTotal;
-    storeEarnings += orderEarnings;
-  }
+  const orders = await getOrders(creator.id);
+  const { totalOrders, totalRevenue, totalEarnings: storeEarnings } = aggregateOrderTotals(
+    orders.map(o => ({ total_price: o.total_price, creator_order_items: o.creator_order_items }))
+  const storeRevenue = totalRevenue;
 
   // Recommended products from ERP (fetch a few for display)
   let recommendedProducts: { id: string; name: string; image: string | null; price: number }[] = [];

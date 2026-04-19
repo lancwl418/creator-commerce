@@ -1,29 +1,19 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { requireCreator } from '@/lib/server/auth';
+import { getOrders } from '@/lib/queries/orders';
 import { ORDER_STATUS_COLORS, FULFILLMENT_STATUS_COLORS } from '@/lib/constants';
 import SyncOrdersButton from './SyncOrdersButton';
 
 export default async function OrdersPage() {
-  const supabase = await createClient();
+  let creator;
+  try {
+    ({ creator } = await requireCreator());
+  } catch {
+    redirect('/login');
+  }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: creator } = await supabase
-    .from('creators')
-    .select('id')
-    .eq('auth_user_id', user!.id)
-    .single();
-
-  // Fetch orders with store info and line items
-  const { data: orders } = await supabase
-    .from('creator_orders')
-    .select(`
-      *,
-      creator_store_connections (id, platform, store_name, store_url),
-      creator_order_items (id, title, variant_title, quantity, unit_price, total_price, earnings_amount)
-    `)
-    .eq('creator_id', creator!.id)
-    .order('order_placed_at', { ascending: false })
-    .limit(100);
+  const orders = await getOrders(creator.id);
 
   // Get unique stores for tabs
   const storeMap = new Map<string, { id: string; name: string; platform: string }>();

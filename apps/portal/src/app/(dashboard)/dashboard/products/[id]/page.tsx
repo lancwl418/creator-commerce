@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getProductById, getProductArtwork } from '@/lib/queries/products';
 import ProductEditor from './ProductEditor';
 import { BackButton } from './BackButton';
 
@@ -13,29 +13,15 @@ export default async function ProductDetailPage({
 }) {
   const { id } = await params;
   const { from } = await searchParams;
-  const supabase = await createClient();
 
-  const { data: product } = await supabase
-    .from('sellable_product_instances')
-    .select(`
-      *,
-      designs (id, title, status),
-      product_configurations (id, layers, finalized_at),
-      channel_listings (id, channel_type, creator_store_connection_id, external_listing_url, price, currency, status, published_at, error_message, creator_store_connections (platform, store_name))
-    `)
-    .eq('id', id)
-    .single();
-
+  const product = await getProductById(id);
   if (!product) notFound();
 
-  const { data: artwork } = await supabase
-    .from('design_assets')
-    .select('file_url')
-    .eq('design_version_id', product.design_version_id)
-    .eq('asset_type', 'artwork')
-    .single();
+  const artworkUrl = product.design_version_id
+    ? await getProductArtwork(product.design_version_id)
+    : null;
 
-  const previewUrl = (product.preview_urls as string[])?.[0] || artwork?.file_url;
+  const previewUrl = (product.preview_urls as string[])?.[0] || artworkUrl;
 
   return (
     <div>
