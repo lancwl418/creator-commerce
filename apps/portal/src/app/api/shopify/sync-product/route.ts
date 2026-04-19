@@ -179,168 +179,181 @@ async function createProductViaGraphQL(
     cursor = pageVariants.edges[pageVariants.edges.length - 1]?.cursor;
   }
 
-  // Upload media and associate variant images
+  // Upload images via staged uploads (push to Shopify instead of Shopify pulling from URL)
   if (media.length > 0) {
-    const mediaMutation = `
-      mutation productCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
-        productCreateMedia(productId: $productId, media: $media) {
-          media { id originalSource { url } }
-          mediaUserErrors { field message }
+    console.log(`[Shopify Sync] Uploading ${media.length} images via staged uploads`);
+
+    // Step 1: Create staged upload targets
+    const stagedMutation = `
+      mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+        stagedUploadsCreate(input: $input) {
+          stagedTargets {
+            url
+            resourceUrl
+            parameters { name value }
+          }
+          userErrors { field message }
         }
       }
     `;
-    console.log(`[Shopify Sync] Uploading ${media.length} media items to product ${gqlProduct.id}`);
-    const mediaRes = await fetch(graphqlUrl, {
+
+    const stagedInput = media.map((m: { originalSource: string }) => ({
+      resource: 'IMAGE',
+      filename: m.originalSource.split('/').pop()?.split('?')[0] || 'image.jpg',
+      mimeType: m.originalSource.includes('.png') ? 'image/png' : 'image/jpeg',
+      httpMethod: 'PUT',
+    }));
+
+    const stagedRes = await fetch(graphqlUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-      body: JSON.stringify({ query: mediaMutation, variables: { productId: gqlProduct.id, media } }),
+      body: JSON.stringify({ query: stagedMutation, variables: { input: stagedInput } }),
     });
 
-    if (mediaRes.ok) {
-      const mediaResult = await mediaRes.json();
-      const mediaErrors = mediaResult.data?.productCreateMedia?.mediaUserErrors || [];
-      const createdMedia = mediaResult.data?.productCreateMedia?.media || [];
-      if (mediaErrors.length > 0) {
-        console.error('[Shopify Sync] Media upload errors:', JSON.stringify(mediaErrors));
-      }
-      console.log('[Shopify Sync] Media create response:', JSON.stringify({
-        created: createdMedia.length,
-        errors: mediaErrors.length,
-        mediaIds: createdMedia.map((m: { id: string }) => m.id),
-      }));
-
-      // Wait for processing then check status
-      await new Promise(r => setTimeout(r, 3000));
-      const statusQuery = `
-        query getMediaStatus($productId: ID!) {
-          product(id: $productId) {
-            media(first: 20) {
-              edges {
-                node {
-                  ... on MediaImage {
-                    id
-                    status
-                    image { url }
-                    mediaErrors { code details message }
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
-      const statusRes = await fetch(graphqlUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-        body: JSON.stringify({ query: statusQuery, variables: { productId: gqlProduct.id } }),
-      });
-      if (statusRes.ok) {
-        const statusData = await statusRes.json();
-        const mediaEdges = statusData.data?.product?.media?.edges || [];
-        for (const edge of mediaEdges) {
-          const node = edge.node;
-          if (node?.mediaErrors?.length > 0) {
-            console.error('[Shopify Sync] Media processing error:', JSON.stringify(node.mediaErrors), 'for', node.id);
-          }
-        }
-        console.log('[Shopify Sync] Media statuses:', mediaEdges.map((e: { node: { id: string; status: string } }) =>
-          `${e.node?.status || 'unknown'}`
-        ).join(', '));
-      }
+    if (!stagedRes.ok) {
+      console.error('[Shopify Sync] Staged uploads request failed:', stagedRes.status);
     } else {
-      console.error('[Shopify Sync] Media upload HTTP error:', mediaRes.status, await mediaRes.text());
-    }
+      const stagedData = await stagedRes.json();
+      const targets = stagedData.data?.stagedUploadsCreate?.stagedTargets || [];
+      const stagedErrors = stagedData.data?.stagedUploadsCreate?.userErrors || [];
+      if (stagedErrors.length > 0) {
+        console.error('[Shopify Sync] Staged upload errors:', JSON.stringify(stagedErrors));
+      }
 
-    // Associate variant images if we have a color→image mapping
-    if (variantImageMap && variantImageMap.size > 0 && mediaRes.ok) {
-      // Wait briefly for Shopify to process media
-      await new Promise(r => setTimeout(r, 2000));
+      // Step 2: Download each image and upload to Shopify's staged URL
+      const uploadedResourceUrls: string[] = [];
 
-      // Query product media to get IDs
-      const mediaQuery = `
-        query getProductMedia($productId: ID!) {
-          product(id: $productId) {
-            media(first: 100) {
-              edges {
-                node {
-                  ... on MediaImage {
-                    id
-                    image { url }
-                  }
-                }
-              }
+      for (let i = 0; i < Math.min(media.length, targets.length); i++) {
+        const imageUrl = (media[i] as { originalSource: string }).originalSource;
+        const target = targets[i];
+
+        try {
+          // Download image from our URL (R2/proxy)
+          const imgRes = await fetch(imageUrl);
+          if (!imgRes.ok) {
+            console.error(`[Shopify Sync] Failed to download image: ${imageUrl.substring(0, 80)}`);
+            continue;
+          }
+          const imgBuffer = await imgRes.arrayBuffer();
+
+          // Upload to Shopify's staged URL
+          const uploadRes = await fetch(target.url, {
+            method: 'PUT',
+            headers: { 'Content-Type': imageUrl.includes('.png') ? 'image/png' : 'image/jpeg' },
+            body: imgBuffer,
+          });
+
+          if (uploadRes.ok) {
+            uploadedResourceUrls.push(target.resourceUrl);
+          } else {
+            console.error(`[Shopify Sync] Staged upload failed for image ${i}:`, uploadRes.status);
+          }
+        } catch (err) {
+          console.error(`[Shopify Sync] Error uploading image ${i}:`, err);
+        }
+      }
+
+      console.log(`[Shopify Sync] Staged uploads complete: ${uploadedResourceUrls.length}/${media.length}`);
+
+      // Step 3: Attach uploaded images to product
+      if (uploadedResourceUrls.length > 0) {
+        const attachMutation = `
+          mutation productCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
+            productCreateMedia(productId: $productId, media: $media) {
+              media { id }
+              mediaUserErrors { field message }
             }
           }
-        }
-      `;
-      const mediaQueryRes = await fetch(graphqlUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-        body: JSON.stringify({ query: mediaQuery, variables: { productId: gqlProduct.id } }),
-      });
+        `;
+        const attachMedia = uploadedResourceUrls.map(url => ({
+          originalSource: url,
+          mediaContentType: 'IMAGE',
+        }));
 
-      if (mediaQueryRes.ok) {
-        const mediaData = await mediaQueryRes.json();
-        const mediaEdges = mediaData.data?.product?.media?.edges || [];
+        const attachRes = await fetch(graphqlUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+          body: JSON.stringify({ query: attachMutation, variables: { productId: gqlProduct.id, media: attachMedia } }),
+        });
 
-        // Build URL→mediaId lookup (Shopify may change the URL slightly, match by filename)
-        const mediaIdByFilename = new Map<string, string>();
-        for (const edge of mediaEdges) {
-          const node = edge.node;
-          if (node?.id && node?.image?.url) {
-            // Extract filename from Shopify CDN URL for matching
-            const filename = node.image.url.split('/').pop()?.split('?')[0] || '';
-            mediaIdByFilename.set(filename, node.id);
-            // Also store full URL for exact match
-            mediaIdByFilename.set(node.image.url.split('?')[0], node.id);
+        if (attachRes.ok) {
+          const attachData = await attachRes.json();
+          const attached = attachData.data?.productCreateMedia?.media || [];
+          const attachErrors = attachData.data?.productCreateMedia?.mediaUserErrors || [];
+          console.log(`[Shopify Sync] Attached ${attached.length} images to product, errors: ${attachErrors.length}`);
+          if (attachErrors.length > 0) {
+            console.error('[Shopify Sync] Attach errors:', JSON.stringify(attachErrors));
           }
         }
 
-        // Build variant update input: match each variant's color to its image
-        const variantUpdates: { id: string; mediaId: string }[] = [];
-        for (const edge of allVariantEdges) {
-          const node = edge.node;
-          // Get color from option1 (first option, typically Color)
-          const colorOpt = node.selectedOptions?.[0]?.value;
-          if (!colorOpt) continue;
+        // Step 4: Associate variant images
+        if (variantImageMap && variantImageMap.size > 0) {
+          await new Promise(r => setTimeout(r, 3000));
 
-          const imageUrl = variantImageMap.get(colorOpt);
-          if (!imageUrl) continue;
-
-          // Try to find matching media by filename
-          const imageFilename = imageUrl.split('/').pop()?.split('?')[0] || '';
-          const mediaId = mediaIdByFilename.get(imageFilename)
-            || mediaIdByFilename.get(imageUrl.split('?')[0]);
-
-          if (mediaId) {
-            variantUpdates.push({ id: node.id, mediaId });
-          }
-        }
-
-        // Batch update variants with their images
-        if (variantUpdates.length > 0) {
-          const variantMediaMutation = `
-            mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-              productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-                userErrors { field message }
+          const mediaQuery = `
+            query getProductMedia($productId: ID!) {
+              product(id: $productId) {
+                media(first: 100) {
+                  edges { node { ... on MediaImage { id image { url } } } }
+                }
               }
             }
           `;
-          await fetch(graphqlUrl, {
+          const mediaQueryRes = await fetch(graphqlUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-            body: JSON.stringify({
-              query: variantMediaMutation,
-              variables: {
-                productId: gqlProduct.id,
-                variants: variantUpdates.map(v => ({
-                  id: v.id,
-                  mediaId: v.mediaId,
-                })),
-              },
-            }),
+            body: JSON.stringify({ query: mediaQuery, variables: { productId: gqlProduct.id } }),
           });
-          console.log(`[Shopify Sync] Associated ${variantUpdates.length} variant images`);
+
+          if (mediaQueryRes.ok) {
+            const mediaData = await mediaQueryRes.json();
+            const mediaEdges = mediaData.data?.product?.media?.edges || [];
+
+            const mediaIdByFilename = new Map<string, string>();
+            for (const edge of mediaEdges) {
+              const node = edge.node;
+              if (node?.id && node?.image?.url) {
+                const filename = node.image.url.split('/').pop()?.split('?')[0] || '';
+                mediaIdByFilename.set(filename, node.id);
+              }
+            }
+
+            const variantUpdates: { id: string; mediaId: string }[] = [];
+            for (const edge of allVariantEdges) {
+              const node = edge.node;
+              const colorOpt = node.selectedOptions?.[0]?.value;
+              if (!colorOpt) continue;
+              const imageUrl = variantImageMap.get(colorOpt);
+              if (!imageUrl) continue;
+              const imageFilename = imageUrl.split('/').pop()?.split('?')[0] || '';
+              const mediaId = mediaIdByFilename.get(imageFilename);
+              if (mediaId) {
+                variantUpdates.push({ id: node.id, mediaId });
+              }
+            }
+
+            if (variantUpdates.length > 0) {
+              const variantMediaMutation = `
+                mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+                  productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                    userErrors { field message }
+                  }
+                }
+              `;
+              await fetch(graphqlUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+                body: JSON.stringify({
+                  query: variantMediaMutation,
+                  variables: {
+                    productId: gqlProduct.id,
+                    variants: variantUpdates.map(v => ({ id: v.id, mediaId: v.mediaId })),
+                  },
+                }),
+              });
+              console.log(`[Shopify Sync] Associated ${variantUpdates.length} variant images`);
+            }
+          }
         }
       }
     }
