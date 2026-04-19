@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import OrderActions from './OrderActions';
+import { ResyncButton, EditSection } from './OrderActions';
 
 const statusColors: Record<string, string> = {
   paid: 'bg-emerald-50 text-emerald-700',
@@ -86,7 +86,8 @@ export default async function OrderDetailPage({
                     : '—'}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <ResyncButton orderId={order.id} shopifyOrderId={order.shopify_order_id} storeConnectionId={order.creator_store_connection_id} />
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                   statusColors[order.financial_status] || 'bg-gray-100 text-gray-600'
                 }`}>
@@ -217,7 +218,13 @@ export default async function OrderDetailPage({
         <div className="space-y-5">
           {/* Customer */}
           <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Customer</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Customer</h3>
+              <EditSection orderId={order.id} section="customer" fields={[
+                { key: 'customer_name', label: 'Name', value: order.customer_name || '' },
+                { key: 'customer_email', label: 'Email', value: order.customer_email || '' },
+              ]} />
+            </div>
             <div className="space-y-2 text-sm">
               {order.customer_name && (
                 <div className="flex justify-between">
@@ -234,7 +241,19 @@ export default async function OrderDetailPage({
             </div>
             {shipping && (shipping.address1 || shipping.city) && (
               <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Shipping Address</p>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Shipping Address</p>
+                  <EditSection orderId={order.id} section="shipping" fields={[
+                    { key: 'name', label: 'Name', value: shipping.name || '' },
+                    { key: 'address1', label: 'Address 1', value: shipping.address1 || '' },
+                    { key: 'address2', label: 'Address 2', value: shipping.address2 || '' },
+                    { key: 'city', label: 'City', value: shipping.city || '' },
+                    { key: 'province', label: 'Province/State', value: shipping.province || '' },
+                    { key: 'zip', label: 'ZIP', value: shipping.zip || '' },
+                    { key: 'country', label: 'Country', value: shipping.country || '' },
+                    { key: 'phone', label: 'Phone', value: shipping.phone || '' },
+                  ]} />
+                </div>
                 <div className="text-sm text-gray-700 space-y-0.5">
                   {shipping.name && <p className="font-medium text-gray-900">{shipping.name}</p>}
                   {shipping.address1 && <p>{shipping.address1}</p>}
@@ -265,21 +284,6 @@ export default async function OrderDetailPage({
               </div>
             </div>
           </div>
-
-          {/* Actions: Edit + Resync */}
-          <OrderActions
-            orderId={order.id}
-            shopifyOrderId={order.shopify_order_id}
-            storeConnectionId={order.creator_store_connection_id}
-            currentData={{
-              customer_name: order.customer_name,
-              customer_email: order.customer_email,
-              shipping_address: order.shipping_address as Record<string, string> | null,
-              financial_status: order.financial_status,
-              fulfillment_status: order.fulfillment_status,
-              notes: order.notes,
-            }}
-          />
 
           {/* Financial breakdown */}
           <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
