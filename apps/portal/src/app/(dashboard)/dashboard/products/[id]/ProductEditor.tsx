@@ -10,7 +10,12 @@ const DEFAULT_COST = 10.00; // Fallback if ERP price unavailable
 
 function erpImg(path: string): string {
   if (!path) return '';
-  if (path.startsWith('http') || path.startsWith('/api/')) return path;
+  if (path.startsWith('http')) return path;
+  // Convert design-engine proxy URLs (/api/erp-image) to portal format (/api/erp/image)
+  if (path.startsWith('/api/erp-image?')) {
+    return path.replace('/api/erp-image?', '/api/erp/image?');
+  }
+  if (path.startsWith('/api/')) return path;
   return `/api/erp/image?path=${encodeURIComponent(path)}`;
 }
 
@@ -559,7 +564,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                     }`}
                   >
                     <div className="aspect-square bg-gray-50">
-                      <img src={img.url} alt="" className="w-full h-full object-contain p-1" />
+                      <img src={erpImg(img.url)} alt="" className="w-full h-full object-contain p-1" />
                     </div>
                     <div className={`absolute top-1 right-1 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                       selected ? 'bg-primary-600 border-primary-600' : 'bg-white/80 border-gray-300'

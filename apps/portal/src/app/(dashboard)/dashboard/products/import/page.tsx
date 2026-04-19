@@ -140,9 +140,11 @@ export default function ImportFromEditorPage() {
       const created: CreatedProduct[] = [];
 
       for (const product of products) {
+        // Use ERP product name, with design title as prefix for multi-product
+        const erpName = product.name || 'Untitled Product';
         const productTitle = products.length > 1
-          ? `${title_prefix || 'Product'} — ${product.name}`
-          : title_prefix || product.name || 'Untitled Product';
+          ? `${title_prefix || 'Design'} — ${erpName}`
+          : erpName;
 
         // Strip HTML tags from ERP description
         const rawDesc = product.description || '';
