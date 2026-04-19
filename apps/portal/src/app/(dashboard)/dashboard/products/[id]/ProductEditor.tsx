@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import SyncModal from './SyncModal';
 
-const COST = 10.00; // Hardcoded production cost for MVP
+const DEFAULT_COST = 10.00; // Fallback if ERP price unavailable
 
 function erpImg(path: string): string {
   if (!path) return '';
@@ -33,6 +33,7 @@ interface SkuSelection {
   option3: string | null;
   enabled: boolean;
   price?: number | null;
+  erpPrice?: number | null;
   skuImage?: string | null;
 }
 
@@ -235,15 +236,55 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     setSaved(false);
   }, []);
 
+  // Build cost lookup from ERP SKU prices
+  const skuCostMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const sku of erpSkus) {
+      map.set(sku.id, sku.price || DEFAULT_COST);
+    }
+    return map;
+  }, [erpSkus]);
+
+  // Get cost for a specific variant
+  const getSkuCost = useCallback((skuId: string): number => {
+    return skuCostMap.get(skuId) ?? DEFAULT_COST;
+  }, [skuCostMap]);
+
   const priceNum = parseFloat(retailPrice) || 0;
-  const profit = priceNum - COST;
-  const margin = priceNum > 0 ? ((profit / priceNum) * 100) : 0;
   const hasCustomPrices = Object.keys(variantPrices).some(k => variantPrices[k] !== '');
+
+  // Calculate profit range across all enabled variants
+  const profitRange = useMemo(() => {
+    const enabledSkus = erpSkus.filter(s => enabledSkuIds.has(s.id));
+    if (enabledSkus.length === 0) return { min: 0, max: 0, minMargin: 0, maxMargin: 0, costMin: 0, costMax: 0, uniform: true };
+
+    let minProfit = Infinity;
+    let maxProfit = -Infinity;
+    let costMin = Infinity;
+    let costMax = -Infinity;
+
+    for (const sku of enabledSkus) {
+      const cost = sku.price || DEFAULT_COST;
+      const salePrice = variantPrices[sku.id] !== undefined && variantPrices[sku.id] !== ''
+        ? parseFloat(variantPrices[sku.id]) || 0
+        : priceNum;
+      const profit = salePrice - cost;
+      if (profit < minProfit) minProfit = profit;
+      if (profit > maxProfit) maxProfit = profit;
+      if (cost < costMin) costMin = cost;
+      if (cost > costMax) costMax = cost;
+    }
+
+    const minMargin = priceNum > 0 ? (minProfit / priceNum) * 100 : 0;
+    const maxMargin = priceNum > 0 ? (maxProfit / priceNum) * 100 : 0;
+    const uniform = Math.abs(minProfit - maxProfit) < 0.01;
+
+    return { min: minProfit, max: maxProfit, minMargin, maxMargin, costMin, costMax, uniform };
+  }, [erpSkus, enabledSkuIds, variantPrices, priceNum]);
 
   // Core save logic — returns true on success, throws on failure
   const saveProduct = useCallback(async () => {
     if (priceNum <= 0) throw new Error('Please enter a valid price');
-    if (priceNum <= COST) throw new Error(`Price must be higher than cost ($${COST.toFixed(2)})`);
     if (enabledSkuIds.size === 0) throw new Error('Please select at least one variant');
 
     const skuSelections: SkuSelection[] = erpSkus.map(sku => {
@@ -257,6 +298,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         option3: sku.option3,
         enabled: enabledSkuIds.has(sku.id),
         price: hasOverride ? (parseFloat(override) || null) : null,
+        erpPrice: sku.price || null,
         skuImage: sku.skuImage || null,
       };
     });
@@ -269,7 +311,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         selected_skus: skuSelections,
         option_names: optionNames,
         retail_price: priceNum,
-        cost: COST,
+        cost: profitRange.costMin,
         status: product.status === 'draft' ? 'ready' : product.status,
       })
       .eq('id', product.id);
@@ -300,7 +342,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
 
   // Count how many option columns are active (for grid template)
   const optCols = (option1Values.length > 0 ? 1 : 0) + (option2Values.length > 0 ? 1 : 0) + (option3Values.length > 0 ? 1 : 0);
-  const gridCols = `44px ${optCols > 0 ? `repeat(${optCols}, 1fr)` : '1fr'} 90px 60px`;
+  const gridCols = `44px ${optCols > 0 ? `repeat(${optCols}, 1fr)` : '1fr'} 70px 90px 70px 60px`;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -426,20 +468,31 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
             </div>
 
             {/* Profit summary */}
-            <div className={`rounded-xl px-4 py-3 text-sm ${profit > 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+            <div className={`rounded-xl px-4 py-3 text-sm ${profitRange.min > 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
               <div className="flex items-baseline gap-2">
                 <span className="text-gray-500 text-xs">Profit</span>
-                <span className={`text-lg font-bold ${profit > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                  ${profit.toFixed(2)}
+                <span className={`text-lg font-bold ${profitRange.min > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {profitRange.uniform
+                    ? `$${profitRange.min.toFixed(2)}`
+                    : `$${profitRange.min.toFixed(2)} – $${profitRange.max.toFixed(2)}`
+                  }
                 </span>
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-gray-500 text-xs">Margin</span>
-                <span className={`text-xs font-semibold ${profit > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {margin.toFixed(1)}%
+                <span className={`text-xs font-semibold ${profitRange.min > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {profitRange.uniform
+                    ? `${profitRange.minMargin.toFixed(1)}%`
+                    : `${profitRange.minMargin.toFixed(1)}% – ${profitRange.maxMargin.toFixed(1)}%`
+                  }
                 </span>
               </div>
-              <p className="text-[10px] text-gray-400 mt-1">Cost: ${COST.toFixed(2)}</p>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Cost: {profitRange.costMin === profitRange.costMax
+                  ? `$${profitRange.costMin.toFixed(2)}`
+                  : `$${profitRange.costMin.toFixed(2)} – $${profitRange.costMax.toFixed(2)}`
+                }
+              </p>
             </div>
           </div>
 
@@ -509,7 +562,9 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                 {option2Values.length > 0 && <span>{optionNames[1] || 'Size'}</span>}
                 {option3Values.length > 0 && <span>{optionNames[2] || 'Option 3'}</span>}
                 {!hasOptions && <span>SKU</span>}
+                <span>Cost</span>
                 <span>Price</span>
+                <span>Profit</span>
                 <span className="text-right">Stock</span>
               </div>
 
@@ -562,7 +617,11 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                             const innerGridCols = `44px ${
                               (option2Values.length > 0 ? '1fr ' : '') +
                               (option3Values.length > 0 ? '1fr ' : '')
-                            }90px 60px`.trim();
+                            }70px 90px 70px 60px`.trim();
+
+                            const skuCost = getSkuCost(sku.id);
+                            const effectiveSalePrice = isCustom ? (parseFloat(varPrice) || 0) : priceNum;
+                            const skuProfit = effectiveSalePrice - skuCost;
 
                             return (
                               <div
@@ -589,6 +648,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                                 {option3Values.length > 0 && (
                                   <span className="text-sm text-gray-700 truncate">{sku.option3 || '—'}</span>
                                 )}
+                                <span className="text-xs text-gray-500">${skuCost.toFixed(2)}</span>
                                 <div className="relative">
                                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
                                   <input
@@ -603,6 +663,9 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                                     }`}
                                   />
                                 </div>
+                                <span className={`text-xs font-medium ${skuProfit > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                  ${skuProfit.toFixed(2)}
+                                </span>
                                 <span className={`text-xs text-right font-medium ${
                                   sku.inQty > 0 ? 'text-emerald-600' : 'text-red-500'
                                 }`}>
@@ -622,6 +685,9 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                       const enabled = enabledSkuIds.has(sku.id);
                       const varPrice = variantPrices[sku.id];
                       const isCustom = varPrice !== undefined && varPrice !== '';
+                      const skuCost = getSkuCost(sku.id);
+                      const effectiveSalePrice = isCustom ? (parseFloat(varPrice) || 0) : priceNum;
+                      const skuProfit = effectiveSalePrice - skuCost;
 
                       return (
                         <div
@@ -651,6 +717,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                           {!hasOptions && (
                             <span className="text-sm font-mono text-gray-600 truncate">{sku.sku}</span>
                           )}
+                          <span className="text-xs text-gray-500">${skuCost.toFixed(2)}</span>
                           <div className="relative">
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
                             <input
@@ -665,6 +732,9 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                               }`}
                             />
                           </div>
+                          <span className={`text-xs font-medium ${skuProfit > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                            ${skuProfit.toFixed(2)}
+                          </span>
                           <span className={`text-xs text-right font-medium ${
                             sku.inQty > 0 ? 'text-emerald-600' : 'text-red-500'
                           }`}>

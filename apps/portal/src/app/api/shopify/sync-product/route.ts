@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
 const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
-const COST = 10.00; // MVP hardcoded cost
+const DEFAULT_COST = 10.00; // Fallback if ERP price unavailable
 
 
 interface SkuSelection {
@@ -15,6 +15,7 @@ interface SkuSelection {
   option3: string | null;
   enabled: boolean;
   price?: number | null;
+  erpPrice?: number | null;
   skuImage?: string | null;
 }
 
@@ -523,7 +524,7 @@ export async function POST(req: NextRequest) {
     // R2 design preview for this variant (design composited on this color)
     preview_image_url: (sku.option1 ? variantPreviewMap[sku.option1] : null) || null,
     sale_price: sku.price ?? product.retail_price ?? 25,
-    base_cost_snapshot: COST,
+    base_cost_snapshot: sku.erpPrice ?? DEFAULT_COST,
     creator_store_connection_id: store_connection_id,
     is_active: true,
     erp_sync_status: 'pending',
