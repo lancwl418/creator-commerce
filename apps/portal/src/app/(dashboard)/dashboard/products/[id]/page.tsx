@@ -21,7 +21,7 @@ export default async function ProductDetailPage({
       *,
       designs (id, title, status),
       product_configurations (id, layers, finalized_at),
-      channel_listings (id, channel_type, creator_store_connection_id, external_listing_url, price, currency, status, published_at, error_message)
+      channel_listings (id, channel_type, creator_store_connection_id, external_listing_url, price, currency, status, published_at, error_message, creator_store_connections (platform, store_name))
     `)
     .eq('id', id)
     .single();

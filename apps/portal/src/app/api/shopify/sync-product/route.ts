@@ -147,6 +147,50 @@ async function createProductViaGraphQL(
     throw new Error('Shopify GraphQL returned no product');
   }
 
+  // Publish to Online Store and other sales channels if status is active
+  if ((shopifyProduct.status as string) !== 'draft') {
+    try {
+      // Get all publications (sales channels)
+      const pubQuery = `
+        query { publications(first: 20) { edges { node { id name } } } }
+      `;
+      const pubRes = await fetch(graphqlUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+        body: JSON.stringify({ query: pubQuery }),
+      });
+      if (pubRes.ok) {
+        const pubData = await pubRes.json();
+        const publications = (pubData.data?.publications?.edges || [])
+          .map((e: { node: { id: string; name: string } }) => e.node);
+
+        if (publications.length > 0) {
+          const publishMutation = `
+            mutation publishablePublish($id: ID!, $input: [PublicationInput!]!) {
+              publishablePublish(id: $id, input: $input) {
+                userErrors { field message }
+              }
+            }
+          `;
+          await fetch(graphqlUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+            body: JSON.stringify({
+              query: publishMutation,
+              variables: {
+                id: gqlProduct.id,
+                input: publications.map((p: { id: string }) => ({ publicationId: p.id })),
+              },
+            }),
+          });
+          console.log(`[Shopify Sync] Published to ${publications.length} channels: ${publications.map((p: { name: string }) => p.name).join(', ')}`);
+        }
+      }
+    } catch (e) {
+      console.warn('[Shopify Sync] Publication failed (non-blocking):', e);
+    }
+  }
+
   // Fetch remaining variants if >250
   let allVariantEdges = gqlProduct.variants.edges;
   let hasNextPage = gqlProduct.variants.edges.length === 250;

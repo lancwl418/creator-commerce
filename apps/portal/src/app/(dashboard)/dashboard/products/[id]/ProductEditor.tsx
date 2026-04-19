@@ -51,6 +51,7 @@ interface Listing {
   currency: string;
   status: string;
   error_message?: string;
+  creator_store_connections?: { platform: string; store_name: string | null };
 }
 
 interface ProductData {
@@ -447,11 +448,14 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                 <div key={listing.id} className="flex items-center justify-between rounded-xl bg-surface-secondary p-3">
                   <div>
                     <p className="font-medium text-sm text-gray-900">
-                      {listing.channel_type === 'marketplace' ? 'Marketplace' : 'Creator Store'}
+                      {listing.creator_store_connections?.store_name || listing.channel_type}
                     </p>
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold mt-0.5 ${statusStyles[listing.status] || 'bg-gray-100 text-gray-600'}`}>
-                      {listing.status}
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] text-gray-400 capitalize">{listing.creator_store_connections?.platform || 'store'}</span>
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusStyles[listing.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {listing.status}
+                      </span>
+                    </div>
                   </div>
                   <p className="font-bold text-gray-900">${Number(listing.price).toFixed(2)}</p>
                 </div>
