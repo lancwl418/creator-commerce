@@ -183,15 +183,24 @@ export default async function OrderDetailPage({
                   <span className="text-gray-900">{order.customer_email}</span>
                 </div>
               )}
-              {shipping?.country && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Location</span>
-                  <span className="text-gray-900">
-                    {[shipping.city, shipping.province, shipping.country].filter(Boolean).join(', ')}
-                  </span>
-                </div>
-              )}
             </div>
+            {shipping && (shipping.address1 || shipping.city) && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Shipping Address</p>
+                <div className="text-sm text-gray-700 space-y-0.5">
+                  {shipping.name && <p className="font-medium text-gray-900">{shipping.name}</p>}
+                  {shipping.address1 && <p>{shipping.address1}</p>}
+                  {shipping.address2 && <p>{shipping.address2}</p>}
+                  <p>
+                    {[shipping.city, shipping.province, shipping.zip].filter(Boolean).join(', ')}
+                  </p>
+                  {shipping.country && <p>{shipping.country}</p>}
+                  {shipping.phone && (
+                    <p className="text-gray-500 mt-1">{shipping.phone}</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Store */}
