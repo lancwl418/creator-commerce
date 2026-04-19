@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-
-const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
-const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
-const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
+import { SHOPIFY_API_VERSION, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET } from '@/lib/constants';
 
 /**
  * GET /api/shopify/debug-webhooks?store_connection_id=xxx
@@ -61,7 +58,7 @@ export async function GET(req: NextRequest) {
   const shopDomain = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
 
   // List webhooks
-  const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/webhooks.json`, {
+  const res = await fetch(`https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`, {
     headers: { 'X-Shopify-Access-Token': accessToken },
   });
 

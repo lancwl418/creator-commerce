@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const ERP_IMAGE_BASE = 'http://118.195.245.201:8081/ideamax/sys/common/static/';
+import { ERP_IMAGE_BASE_URL } from '@/lib/constants';
 
 export async function GET(request: NextRequest) {
   const path = request.nextUrl.searchParams.get('path');
@@ -8,7 +7,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing path parameter' }, { status: 400 });
   }
 
-  const imageUrl = path.startsWith('http') ? path : `${ERP_IMAGE_BASE}${path}`;
+  const imageUrl = path.startsWith('http') ? path : `${ERP_IMAGE_BASE_URL}${path}`;
 
   try {
     const res = await fetch(imageUrl);

@@ -1,20 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { ORDER_STATUS_COLORS, FULFILLMENT_STATUS_COLORS } from '@/lib/constants';
 import SyncOrdersButton from './SyncOrdersButton';
-
-const statusColors: Record<string, string> = {
-  paid: 'bg-emerald-50 text-emerald-700',
-  partially_paid: 'bg-amber-50 text-amber-700',
-  pending: 'bg-yellow-50 text-yellow-700',
-  refunded: 'bg-red-50 text-red-600',
-  voided: 'bg-gray-100 text-gray-500',
-};
-
-const fulfillmentColors: Record<string, string> = {
-  fulfilled: 'bg-emerald-50 text-emerald-700',
-  partial: 'bg-amber-50 text-amber-700',
-  unfulfilled: 'bg-gray-100 text-gray-600',
-};
 
 export default async function OrdersPage() {
   const supabase = await createClient();
@@ -165,12 +152,12 @@ export default async function OrdersPage() {
                     <td className="px-5 py-3.5">
                       <div className="flex flex-col gap-1">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold w-fit ${
-                          statusColors[order.financial_status] || 'bg-gray-100 text-gray-600'
+                          ORDER_STATUS_COLORS[order.financial_status] || 'bg-gray-100 text-gray-600'
                         }`}>
                           {order.financial_status || 'unknown'}
                         </span>
                         <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold w-fit ${
-                          fulfillmentColors[order.fulfillment_status || 'unfulfilled'] || 'bg-gray-100 text-gray-600'
+                          FULFILLMENT_STATUS_COLORS[order.fulfillment_status || 'unfulfilled'] || 'bg-gray-100 text-gray-600'
                         }`}>
                           {order.fulfillment_status || 'unfulfilled'}
                         </span>

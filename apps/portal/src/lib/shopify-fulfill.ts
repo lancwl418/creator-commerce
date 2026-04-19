@@ -1,8 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service';
-
-const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
-const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
-const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
+import { SHOPIFY_API_VERSION, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET } from '@/lib/constants';
 
 interface FulfillmentInput {
   orderId: string;  // our creator_order.id
@@ -74,7 +71,7 @@ export async function pushFulfillmentToShopify(input: FulfillmentInput): Promise
 
   // Get fulfillment orders from Shopify
   const foRes = await fetch(
-    `https://${shopDomain}/admin/api/${API_VERSION}/orders/${order.shopify_order_id}/fulfillment_orders.json`,
+    `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/orders/${order.shopify_order_id}/fulfillment_orders.json`,
     { headers: { 'X-Shopify-Access-Token': accessToken } },
   );
 
@@ -104,7 +101,7 @@ export async function pushFulfillmentToShopify(input: FulfillmentInput): Promise
 
   // Push fulfillment to Shopify
   const fulfillRes = await fetch(
-    `https://${shopDomain}/admin/api/${API_VERSION}/fulfillments.json`,
+    `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/fulfillments.json`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },

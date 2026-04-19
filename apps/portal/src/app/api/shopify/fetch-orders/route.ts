@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
-
-const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
-const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
-const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
+import { SHOPIFY_API_VERSION, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET } from '@/lib/constants';
 
 /**
  * POST /api/shopify/fetch-orders
@@ -90,7 +87,7 @@ export async function POST(req: NextRequest) {
   // Single order resync or fetch all
   if (single_order_id) {
     const singleRes: Response = await fetch(
-      `https://${shopDomain}/admin/api/${API_VERSION}/orders/${single_order_id}.json`,
+      `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/orders/${single_order_id}.json`,
       { headers: { 'X-Shopify-Access-Token': accessToken } },
     );
     if (singleRes.ok) {
@@ -101,7 +98,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let pageUrl: string | null = single_order_id ? null : `https://${shopDomain}/admin/api/${API_VERSION}/orders.json?status=any&limit=250`;
+  let pageUrl: string | null = single_order_id ? null : `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250`;
 
   for (;;) {
     if (!pageUrl) break;

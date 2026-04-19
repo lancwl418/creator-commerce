@@ -3,14 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-
-interface Listing {
-  id: string;
-  channel_type: string;
-  price: number;
-  currency: string;
-  status: string;
-}
+import type { Listing } from '@/lib/types';
 
 interface ProductActionsProps {
   productId: string;

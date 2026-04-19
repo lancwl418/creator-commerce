@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/service';
-
-const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
+import { SHOPIFY_CLIENT_SECRET } from '@/lib/constants';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 

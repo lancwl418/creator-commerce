@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import crypto from 'crypto';
-
-const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
-const CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
-const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
+import { SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, SHOPIFY_API_VERSION } from '@/lib/constants';
 
 function getBaseUrl(req: NextRequest): string {
   return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
@@ -49,7 +46,7 @@ export async function GET(req: NextRequest) {
     .map(([k, v]) => `${k}=${v}`)
     .join('&');
   const expectedHmac = crypto
-    .createHmac('sha256', CLIENT_SECRET)
+    .createHmac('sha256', SHOPIFY_CLIENT_SECRET)
     .update(sortedParams)
     .digest('hex');
 
@@ -62,8 +59,8 @@ export async function GET(req: NextRequest) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
+      client_id: SHOPIFY_CLIENT_ID,
+      client_secret: SHOPIFY_CLIENT_SECRET,
       code,
       expiring: 1, // Request expiring token (required since 2025)
     }),
@@ -86,7 +83,7 @@ export async function GET(req: NextRequest) {
   // Fetch shop info for display name
   let storeName = shop;
   try {
-    const shopRes = await fetch(`https://${shop}/admin/api/${API_VERSION}/shop.json`, {
+    const shopRes = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/shop.json`, {
       headers: { 'X-Shopify-Access-Token': access_token },
     });
     if (shopRes.ok) {
@@ -132,7 +129,7 @@ export async function GET(req: NextRequest) {
 
     for (const topic of topics) {
       const whRes = await fetch(
-        `https://${shop}/admin/api/${API_VERSION}/webhooks.json`,
+        `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`,
         {
           method: 'POST',
           headers: {

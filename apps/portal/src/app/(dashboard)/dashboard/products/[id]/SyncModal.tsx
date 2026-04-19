@@ -3,22 +3,8 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-
-interface StoreConnection {
-  id: string;
-  platform: string;
-  store_name: string | null;
-  store_url: string | null;
-  status: string;
-}
-
-interface Listing {
-  id: string;
-  channel_type: string;
-  creator_store_connection_id?: string;
-  external_listing_url?: string;
-  status: string;
-}
+import type { StoreConnection } from '@/lib/types';
+import type { Listing } from '@/lib/types';
 
 interface SyncModalProps {
   productId: string;

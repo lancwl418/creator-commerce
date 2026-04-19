@@ -1,21 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { ORDER_STATUS_COLORS, FULFILLMENT_STATUS_COLORS } from '@/lib/constants';
 import { ResyncButton, EditSection, FulfillSection } from './OrderActions';
-
-const statusColors: Record<string, string> = {
-  paid: 'bg-emerald-50 text-emerald-700',
-  partially_paid: 'bg-amber-50 text-amber-700',
-  pending: 'bg-yellow-50 text-yellow-700',
-  refunded: 'bg-red-50 text-red-600',
-  voided: 'bg-gray-100 text-gray-500',
-};
-
-const fulfillmentColors: Record<string, string> = {
-  fulfilled: 'bg-emerald-50 text-emerald-700',
-  partial: 'bg-amber-50 text-amber-700',
-  unfulfilled: 'bg-gray-100 text-gray-600',
-};
 
 export default async function OrderDetailPage({
   params,
@@ -89,12 +76,12 @@ export default async function OrderDetailPage({
               <div className="flex items-center gap-2">
                 <ResyncButton orderId={order.id} shopifyOrderId={order.shopify_order_id} storeConnectionId={order.creator_store_connection_id} />
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                  statusColors[order.financial_status] || 'bg-gray-100 text-gray-600'
+                  ORDER_STATUS_COLORS[order.financial_status] || 'bg-gray-100 text-gray-600'
                 }`}>
                   {order.financial_status || 'unknown'}
                 </span>
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                  fulfillmentColors[order.fulfillment_status || 'unfulfilled'] || 'bg-gray-100 text-gray-600'
+                  FULFILLMENT_STATUS_COLORS[order.fulfillment_status || 'unfulfilled'] || 'bg-gray-100 text-gray-600'
                 }`}>
                   {order.fulfillment_status || 'unfulfilled'}
                 </span>

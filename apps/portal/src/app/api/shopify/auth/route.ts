@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import crypto from 'crypto';
-
-const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
-const SCOPES = process.env.SHOPIFY_SCOPES ?? 'write_products,read_products,read_orders';
+import { SHOPIFY_CLIENT_ID, SHOPIFY_SCOPES } from '@/lib/constants';
 
 function getAppUrl(req: NextRequest): string {
   // APP_URL (runtime) takes priority, then NEXT_PUBLIC_APP_URL (build-time inline)
@@ -21,7 +19,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid shop domain. Use format: mystore.myshopify.com' }, { status: 400 });
   }
 
-  if (!CLIENT_ID) {
+  if (!SHOPIFY_CLIENT_ID) {
     return NextResponse.json({ error: 'Shopify app not configured' }, { status: 500 });
   }
 
@@ -48,13 +46,13 @@ export async function GET(req: NextRequest) {
   const redirectUri = `${appUrl}/api/shopify/callback`;
 
   const authUrl = `https://${shop}/admin/oauth/authorize?` +
-    `client_id=${CLIENT_ID}&` +
-    `scope=${encodeURIComponent(SCOPES)}&` +
+    `client_id=${SHOPIFY_CLIENT_ID}&` +
+    `scope=${encodeURIComponent(SHOPIFY_SCOPES)}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `state=${state}`;
 
   console.log('[Shopify OAuth] Auth URL:', authUrl);
-  console.log('[Shopify OAuth] Scopes:', SCOPES);
+  console.log('[Shopify OAuth] Scopes:', SHOPIFY_SCOPES);
   console.log('[Shopify OAuth] Redirect URI:', redirectUri);
 
   const response = NextResponse.redirect(authUrl);

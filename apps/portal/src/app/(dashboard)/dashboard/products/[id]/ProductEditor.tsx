@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import SyncModal from './SyncModal';
-
-const DEFAULT_COST = 10.00; // Fallback if ERP price unavailable
+import type { ErpSku, SkuSelection, Listing, ProductData } from '@/lib/types';
+import { DEFAULT_COST, PRODUCT_STATUS_COLORS } from '@/lib/constants';
 
 function erpImg(path: string): string {
   if (!path) return '';
@@ -17,58 +17,6 @@ function erpImg(path: string): string {
   }
   if (path.startsWith('/api/')) return path;
   return `/api/erp/image?path=${encodeURIComponent(path)}`;
-}
-
-interface ErpSku {
-  id: string;
-  sku: string;
-  price: number;
-  option1: string | null;
-  option2: string | null;
-  option3: string | null;
-  inQty: number;
-  skuImage: string | null;
-}
-
-interface SkuSelection {
-  sku_id: string;
-  sku: string;
-  option1: string | null;
-  option2: string | null;
-  option3: string | null;
-  enabled: boolean;
-  price?: number | null;
-  erpPrice?: number | null;
-  skuImage?: string | null;
-}
-
-interface Listing {
-  id: string;
-  channel_type: string;
-  creator_store_connection_id?: string;
-  external_listing_url?: string;
-  price: number;
-  currency: string;
-  status: string;
-  error_message?: string;
-  creator_store_connections?: { platform: string; store_name: string | null };
-}
-
-interface ProductData {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  cost: number;
-  retail_price: number | null;
-  selected_skus: SkuSelection[];
-  design_id: string;
-  design_version_id: string;
-  product_template_id: string;
-  base_price_suggestion: number | null;
-  variant_preview_urls: Record<string, string> | null;
-  product_images: { id: string; url: string; rawPath: string; isMain: boolean }[];
-  created_at: string;
 }
 
 interface ProductEditorProps {
@@ -355,12 +303,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     }
   }
 
-  const statusStyles: Record<string, string> = {
-    draft: 'bg-gray-100 text-gray-600',
-    ready: 'bg-blue-50 text-blue-700',
-    listed: 'bg-emerald-50 text-emerald-700',
-    paused: 'bg-amber-50 text-amber-700',
-  };
+  const statusStyles = PRODUCT_STATUS_COLORS;
 
   // Count how many option columns are active (for grid template)
   const optCols = (option1Values.length > 0 ? 1 : 0) + (option2Values.length > 0 ? 1 : 0) + (option3Values.length > 0 ? 1 : 0);

@@ -1,23 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { SkuSelection } from '@/lib/types';
+import { SHOPIFY_API_VERSION, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, DEFAULT_COST } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/server';
-
-const API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
-const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
-const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
-const DEFAULT_COST = 10.00; // Fallback if ERP price unavailable
-
-
-interface SkuSelection {
-  sku_id: string;
-  sku: string;
-  option1: string | null;
-  option2: string | null;
-  option3: string | null;
-  enabled: boolean;
-  price?: number | null;
-  erpPrice?: number | null;
-  skuImage?: string | null;
-}
 
 interface ShopifyCreatedProduct {
   id: number | string;
@@ -47,7 +31,7 @@ async function createProductViaGraphQL(
   skuPriceMap?: Map<string, number>,
   variantImageMap?: Map<string, string>,
 ): Promise<ShopifyCreatedProduct> {
-  const graphqlUrl = `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`;
+  const graphqlUrl = `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`;
 
   // Build productSet input
   // Shopify VariantOptionValueInput uses { optionName: "Color", name: "Red" }
