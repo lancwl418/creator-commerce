@@ -211,26 +211,17 @@ async function processOrderCreate(
     return;
   }
 
-  // Insert matched line items
+  // Replace line items: delete existing then insert fresh (idempotent)
+  await supabase.from('creator_order_items').delete().eq('creator_order_id', creatorOrder.id);
+
   for (const { item, variant } of matchedItems) {
     const quantity = Number(item.quantity) || 1;
     const unitPrice = parseFloat(String(item.price)) || 0;
-    const lineItemId = item.id ? String(item.id) : null;
-
-    if (lineItemId) {
-      const { data: existing } = await supabase
-        .from('creator_order_items')
-        .select('id')
-        .eq('creator_order_id', creatorOrder.id)
-        .eq('shopify_line_item_id', lineItemId)
-        .single();
-      if (existing) continue;
-    }
 
     await supabase.from('creator_order_items').insert({
       creator_order_id: creatorOrder.id,
       channel_listing_variant_id: variant.id,
-      shopify_line_item_id: lineItemId,
+      shopify_line_item_id: item.id ? String(item.id) : null,
       shopify_variant_id: item.variant_id ? String(item.variant_id) : null,
       shopify_product_id: item.product_id ? String(item.product_id) : null,
       title: String(item.title || ''),
