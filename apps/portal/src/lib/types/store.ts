@@ -4,6 +4,6 @@ export interface StoreConnection {
   store_name: string | null;
   store_url: string | null;
   status: string;
-  last_sync_at: string | null;
-  connected_at: string | null;
+  last_sync_at?: string | null;
+  connected_at?: string | null;
 }
