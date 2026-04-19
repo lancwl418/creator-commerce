@@ -53,9 +53,12 @@ export async function POST(req: NextRequest) {
 
     switch (topic) {
       case 'orders/create':
-        await processOrderCreate(supabase, connection, order);
+        // Ignore — we only create orders after payment (orders/paid)
+        console.log(`[Webhook] Skipping orders/create, waiting for payment`);
         break;
       case 'orders/paid':
+        await processOrderCreate(supabase, connection, order);
+        break;
       case 'orders/updated':
         await processOrderUpdate(supabase, connection, order);
         break;
