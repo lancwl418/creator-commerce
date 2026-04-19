@@ -150,3 +150,153 @@ export function EditSection({ orderId, section, fields: initialFields }: EditSec
     </div>
   );
 }
+
+// ── Fulfill Section (per-line-item fulfillment) ──
+
+interface FulfillSectionProps {
+  orderId: string;
+  items: { shopify_line_item_id: string; title: string; variant_title: string | null; sku: string | null }[];
+  fulfillmentStatus: string | null;
+}
+
+export function FulfillSection({ orderId, items, fulfillmentStatus }: FulfillSectionProps) {
+  const [showForm, setShowForm] = useState(false);
+  const [fulfilling, setFulfilling] = useState(false);
+  const [error, setError] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [carrier, setCarrier] = useState('');
+  const [trackingUrl, setTrackingUrl] = useState('');
+  const [note, setNote] = useState('');
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(() => new Set(items.map(i => i.shopify_line_item_id)));
+
+  function toggleItem(id: string) {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleFulfill() {
+    if (!trackingNumber.trim() || !carrier.trim()) {
+      setError('Tracking number and carrier are required');
+      return;
+    }
+    if (selectedItems.size === 0) {
+      setError('Select at least one item');
+      return;
+    }
+
+    setFulfilling(true);
+    setError('');
+
+    try {
+      const res = await fetch(`/api/orders/${orderId}/fulfill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tracking_number: trackingNumber.trim(),
+          carrier: carrier.trim(),
+          tracking_url: trackingUrl.trim() || undefined,
+          line_item_ids: Array.from(selectedItems),
+          note: note.trim() || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setError(err.error || 'Fulfillment failed');
+      }
+    } catch {
+      setError('Fulfillment failed');
+    } finally {
+      setFulfilling(false);
+    }
+  }
+
+  if (fulfillmentStatus === 'fulfilled') return null;
+
+  return (
+    <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Fulfill Order</h3>
+        {!showForm && (
+          <button onClick={() => setShowForm(true)}
+            className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 transition-all">
+            Add Fulfillment
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <div className="space-y-3">
+          {/* Select items */}
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1.5">Items to Fulfill</label>
+            <div className="space-y-1.5">
+              {items.map(item => (
+                <label key={item.shopify_line_item_id} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={selectedItems.has(item.shopify_line_item_id)}
+                    onChange={() => toggleItem(item.shopify_line_item_id)}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                  <span className="text-xs text-gray-700">
+                    {item.title}{item.variant_title ? ` — ${item.variant_title}` : ''}
+                    {item.sku ? <span className="text-gray-400 ml-1">({item.sku})</span> : ''}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Tracking info */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-0.5">Tracking Number *</label>
+              <input value={trackingNumber} onChange={e => setTrackingNumber(e.target.value)}
+                className="w-full rounded-md border border-border px-2 py-1.5 text-xs" placeholder="1Z999AA10..." />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-0.5">Carrier *</label>
+              <select value={carrier} onChange={e => setCarrier(e.target.value)}
+                className="w-full rounded-md border border-border px-2 py-1.5 text-xs">
+                <option value="">Select...</option>
+                <option value="UPS">UPS</option>
+                <option value="FedEx">FedEx</option>
+                <option value="USPS">USPS</option>
+                <option value="DHL">DHL</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-0.5">Tracking URL</label>
+            <input value={trackingUrl} onChange={e => setTrackingUrl(e.target.value)}
+              className="w-full rounded-md border border-border px-2 py-1.5 text-xs" placeholder="https://..." />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-0.5">Note</label>
+            <input value={note} onChange={e => setNote(e.target.value)}
+              className="w-full rounded-md border border-border px-2 py-1.5 text-xs" placeholder="Optional note..." />
+          </div>
+
+          {error && <p className="text-[10px] text-red-500">{error}</p>}
+
+          <div className="flex gap-2">
+            <button onClick={handleFulfill} disabled={fulfilling}
+              className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 transition-all">
+              {fulfilling ? 'Fulfilling...' : `Fulfill ${selectedItems.size} Item${selectedItems.size !== 1 ? 's' : ''}`}
+            </button>
+            <button onClick={() => { setShowForm(false); setError(''); }}
+              className="rounded-lg border border-border px-3 py-2 text-xs text-gray-500 hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

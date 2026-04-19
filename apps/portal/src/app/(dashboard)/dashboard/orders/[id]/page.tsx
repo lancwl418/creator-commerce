@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { ResyncButton, EditSection } from './OrderActions';
+import { ResyncButton, EditSection, FulfillSection } from './OrderActions';
 
 const statusColors: Record<string, string> = {
   paid: 'bg-emerald-50 text-emerald-700',
@@ -349,6 +349,20 @@ export default async function OrderDetailPage({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Fulfillment */}
+      <div className="mt-6">
+        <FulfillSection
+          orderId={order.id}
+          items={items.map((i: { shopify_line_item_id: string; title: string; variant_title: string | null; sku: string | null }) => ({
+            shopify_line_item_id: i.shopify_line_item_id,
+            title: i.title,
+            variant_title: i.variant_title,
+            sku: i.sku,
+          }))}
+          fulfillmentStatus={order.fulfillment_status}
+        />
       </div>
 
       {/* Activity Log */}
