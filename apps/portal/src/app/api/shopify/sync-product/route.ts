@@ -560,7 +560,11 @@ export async function POST(req: NextRequest) {
 
   const previewUrls = (product.preview_urls as string[]) || [];
   const artworkUrls = (product.design_artwork_urls as string[]) || [];
-  const imageUrls = [...previewUrls, ...artworkUrls].filter(
+  // Selected ERP product images (user chose which to sync)
+  const productImages = ((product.product_images as { rawPath?: string; url?: string }[]) || [])
+    .map(img => img.rawPath ? toPublicUrl(img.rawPath) : (img.url || ''))
+    .filter(Boolean);
+  const imageUrls = [...previewUrls, ...artworkUrls, ...productImages].filter(
     url => url && url.startsWith('http')
   );
 

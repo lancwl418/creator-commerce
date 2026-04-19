@@ -35,21 +35,37 @@ export function convertErpProduct(product: ErpProduct): ProductTemplate | null {
   // If ERP operators have already configured a print template via the embed
   // tool, use it verbatim — this is the source of truth for mockups and
   // printable areas. Falls through to the default-image flow only when not set.
+  // Prefer English name, fallback to Chinese
+  const productName = product.itemEnName || product.itemCnName || product.title;
+  const productDescription = product.description || '';
+
+  // Collect product-level images (not SKU images)
+  const productImages = (product.prodImageList || []).map(img => ({
+    id: img.id,
+    url: resolveErpImageUrl(img.picSrc),
+    rawPath: img.picSrc,
+    isMain: img.isMain === 1,
+    position: img.position,
+  }));
+
   if (product.printTemplate?.views?.length) {
     const pt = product.printTemplate;
     return {
       id: `erp-${product.id}`,
       type: product.productType || 'erp',
-      name: product.itemCnName || product.title,
-      description: product.description || '',
+      name: productName,
+      description: productDescription,
       views: pt.views,
       defaultViewId: pt.views[0].id,
       metadata: {
         source: 'erp',
         erpProductId: product.id,
         itemNo: product.itemNo,
+        itemEnName: product.itemEnName || null,
+        itemCnName: product.itemCnName || null,
         price: product.prodSkuList?.[0]?.price ?? null,
         vendor: product.vendor,
+        productImages,
         productRects: pt.productRects,
         colorVariants,
       },
@@ -100,16 +116,19 @@ export function convertErpProduct(product: ErpProduct): ProductTemplate | null {
   return {
     id: `erp-${product.id}`,
     type: product.productType || 'erp',
-    name: product.itemCnName || product.title,
-    description: product.description || '',
+    name: productName,
+    description: productDescription,
     views,
     defaultViewId: views[0].id,
     metadata: {
       source: 'erp',
       erpProductId: product.id,
       itemNo: product.itemNo,
+      itemEnName: product.itemEnName || null,
+      itemCnName: product.itemCnName || null,
       price: product.prodSkuList?.[0]?.price ?? null,
       vendor: product.vendor,
+      productImages,
       colorVariants,
     },
   };

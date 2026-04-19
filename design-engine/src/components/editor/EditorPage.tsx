@@ -305,6 +305,7 @@ function EditorPageInner() {
               thumbnail,
               layers: allLayers,
               artwork_urls: artworkUrls,
+              product_images: entry.template.metadata?.productImages || [],
               print_area_snapshot: defaultView ? {
                 x: defaultView.printableArea.x,
                 y: defaultView.printableArea.y,
@@ -341,6 +342,7 @@ function EditorPageInner() {
           thumbnail: currentMockup || artworkUrl,
           layers: allLayers,
           artwork_urls: artworkUrls,
+          product_images: selectedTemplate?.metadata?.productImages || [],
           print_area_snapshot: defaultView ? {
             x: defaultView.printableArea.x,
             y: defaultView.printableArea.y,
@@ -384,6 +386,7 @@ function EditorPageInner() {
           thumbnail: p.thumbnail || portalMatch?.thumbnail,
           layers: p.layers,
           artwork_urls: p.artwork_urls,
+          product_images: p.product_images,
           print_area_snapshot: p.print_area_snapshot,
           design_metadata: p.design_metadata,
         };

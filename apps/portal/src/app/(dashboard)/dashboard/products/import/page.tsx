@@ -209,6 +209,7 @@ export default function ImportFromEditorPage() {
             preview_urls: previewUrls,
             design_artwork_urls: storedArtworkUrls,
             variant_preview_urls: product.variant_previews || null,
+            product_images: product.product_images || [],
           })
           .select('*')
           .single();

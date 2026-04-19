@@ -61,6 +61,7 @@ interface ProductData {
   product_template_id: string;
   base_price_suggestion: number | null;
   variant_preview_urls: Record<string, string> | null;
+  product_images: { id: string; url: string; rawPath: string; isMain: boolean }[];
   created_at: string;
 }
 
@@ -93,6 +94,20 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const [description, setDescription] = useState(product.description || '');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
+
+  // Selected ERP product images to sync to store
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(() => {
+    return new Set(product.product_images.map(img => img.id));
+  });
+
+  const toggleProductImage = useCallback((imgId: string) => {
+    setSelectedImageIds(prev => {
+      const next = new Set(prev);
+      if (next.has(imgId)) next.delete(imgId); else next.add(imgId);
+      return next;
+    });
+    setSaved(false);
+  }, []);
 
   // Product-level retail price (default for all variants)
   const [retailPrice, setRetailPrice] = useState(
@@ -312,6 +327,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         option_names: optionNames,
         retail_price: priceNum,
         cost: profitRange.costMin,
+        product_images: product.product_images.filter(img => selectedImageIds.has(img.id)),
         status: product.status === 'draft' ? 'ready' : product.status,
       })
       .eq('id', product.id);
@@ -520,6 +536,46 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
                   <span className="text-[10px] text-gray-500 mt-1 block truncate w-20">{v.color}</span>
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Product Images (from ERP) — select which to sync */}
+        {product.product_images.length > 0 && (
+          <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Product Images</h3>
+              <span className="text-xs text-gray-400">{selectedImageIds.size}/{product.product_images.length} selected for sync</span>
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+              {product.product_images.map((img) => {
+                const selected = selectedImageIds.has(img.id);
+                return (
+                  <button
+                    key={img.id}
+                    onClick={() => toggleProductImage(img.id)}
+                    className={`relative rounded-lg border-2 overflow-hidden transition-all ${
+                      selected ? 'border-primary-500 shadow-sm' : 'border-transparent opacity-50'
+                    }`}
+                  >
+                    <div className="aspect-square bg-gray-50">
+                      <img src={img.url} alt="" className="w-full h-full object-contain p-1" />
+                    </div>
+                    <div className={`absolute top-1 right-1 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                      selected ? 'bg-primary-600 border-primary-600' : 'bg-white/80 border-gray-300'
+                    }`}>
+                      {selected && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      )}
+                    </div>
+                    {img.isMain && (
+                      <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] font-bold px-1 rounded">MAIN</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
