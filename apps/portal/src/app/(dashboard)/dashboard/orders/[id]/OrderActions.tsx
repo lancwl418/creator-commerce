@@ -236,17 +236,28 @@ export function FulfillSection({ orderId, items, fulfillmentStatus }: FulfillSec
           <div>
             <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1.5">Items to Fulfill</label>
             <div className="space-y-1.5">
-              {items.map(item => (
-                <label key={item.shopify_line_item_id} className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={selectedItems.has(item.shopify_line_item_id)}
-                    onChange={() => toggleItem(item.shopify_line_item_id)}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                  <span className="text-xs text-gray-700">
-                    {item.title}{item.variant_title ? ` — ${item.variant_title}` : ''}
-                    {item.sku ? <span className="text-gray-400 ml-1">({item.sku})</span> : ''}
-                  </span>
-                </label>
-              ))}
+              {items.map(item => {
+                const checked = selectedItems.has(item.shopify_line_item_id);
+                return (
+                  <button key={item.shopify_line_item_id} type="button"
+                    onClick={() => toggleItem(item.shopify_line_item_id)}
+                    className="flex items-center gap-2 w-full text-left">
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                      checked ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
+                    }`}>
+                      {checked && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-700">
+                      {item.title}{item.variant_title ? ` — ${item.variant_title}` : ''}
+                      {item.sku ? <span className="text-gray-400 ml-1">({item.sku})</span> : ''}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
