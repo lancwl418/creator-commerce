@@ -170,16 +170,11 @@ export default async function OrderDetailPage({
                         <p className="text-xs font-mono text-gray-600">{item.sku || '—'}</p>
                         {customSku && (
                           <div className="text-[10px] text-gray-400 space-y-0.5">
-                            <p>ERP Product: {customSku.erp_product_id}</p>
-                            <p>ERP SKU: {customSku.erp_sku_id}</p>
+                            <p>Ideamax Product: {customSku.erp_product_id}</p>
+                            <p>Ideamax SKU: {customSku.erp_sku_id}</p>
                             {customSku.erp_synced_sku_id && (
                               <p>Custom SKU: {customSku.erp_synced_sku_id}</p>
                             )}
-                            <p className={`inline-block rounded px-1 py-0.5 text-[9px] font-semibold ${
-                              customSku.erp_sync_status === 'synced' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-                            }`}>
-                              ERP: {customSku.erp_sync_status}
-                            </p>
                           </div>
                         )}
                       </div>
