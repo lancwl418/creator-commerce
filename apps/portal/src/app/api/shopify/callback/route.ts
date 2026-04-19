@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
   // Register order webhooks (best-effort, don't fail OAuth on error)
   try {
     const webhookAddress = `${getBaseUrl(req)}/api/webhooks/shopify/orders`;
-    const topics = ['orders/create', 'orders/paid'];
+    const topics = ['orders/create', 'orders/paid', 'orders/updated', 'orders/cancelled'];
 
     for (const topic of topics) {
       const whRes = await fetch(

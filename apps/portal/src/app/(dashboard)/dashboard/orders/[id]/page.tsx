@@ -29,6 +29,8 @@ export default async function OrderDetailPage({
     .select(`
       *,
       creator_store_connections (id, platform, store_name, store_url),
+      creator_order_logs (id, action, source, changes, note, created_by, created_at),
+      creator_order_fulfillments (id, tracking_number, tracking_url, carrier, status, fulfilled_at),
       creator_order_items (
         id, title, variant_title, sku, quantity,
         unit_price, total_price, sale_price_snapshot,
@@ -285,8 +287,99 @@ export default async function OrderDetailPage({
               </div>
             </div>
           </div>
+          {/* Fulfillment */}
+          {(order.creator_order_fulfillments || []).length > 0 && (
+            <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Fulfillment</h3>
+              {(order.creator_order_fulfillments || []).map((f: {
+                id: string; tracking_number: string; carrier: string; tracking_url: string | null;
+                status: string; fulfilled_at: string | null;
+              }) => (
+                <div key={f.id} className="text-sm space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Carrier</span>
+                    <span className="text-gray-900">{f.carrier}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Tracking</span>
+                    {f.tracking_url ? (
+                      <a href={f.tracking_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-700 font-medium">
+                        {f.tracking_number}
+                      </a>
+                    ) : (
+                      <span className="text-gray-900">{f.tracking_number}</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Status</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      f.status === 'delivered' ? 'bg-emerald-50 text-emerald-700'
+                      : f.status === 'shipped' ? 'bg-blue-50 text-blue-700'
+                      : 'bg-gray-100 text-gray-600'
+                    }`}>{f.status}</span>
+                  </div>
+                  {f.fulfilled_at && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Date</span>
+                      <span className="text-gray-600 text-xs">{new Date(f.fulfilled_at).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Activity Log */}
+      {(order.creator_order_logs || []).length > 0 && (
+        <div className="mt-6 rounded-2xl border border-border bg-white p-6 shadow-sm">
+          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Activity Log</h3>
+          <div className="space-y-3">
+            {(order.creator_order_logs || [])
+              .sort((a: { created_at: string }, b: { created_at: string }) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .map((log: {
+                id: string; action: string; source: string; note: string | null;
+                changes: Record<string, unknown>; created_at: string;
+              }) => (
+              <div key={log.id} className="flex gap-3 text-sm">
+                <div className="shrink-0 mt-0.5">
+                  <div className={`w-2 h-2 rounded-full mt-1.5 ${
+                    log.action === 'created' ? 'bg-emerald-500'
+                    : log.action === 'cancelled' ? 'bg-red-500'
+                    : log.action === 'fulfilled' ? 'bg-blue-500'
+                    : log.action === 'manual_edit' ? 'bg-amber-500'
+                    : 'bg-gray-400'
+                  }`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900 capitalize">{log.action.replace(/_/g, ' ')}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                      log.source === 'shopify_webhook' ? 'bg-green-50 text-green-600'
+                      : log.source === 'manual' ? 'bg-amber-50 text-amber-600'
+                      : 'bg-gray-100 text-gray-500'
+                    }`}>{log.source.replace(/_/g, ' ')}</span>
+                    <span className="text-xs text-gray-400 ml-auto">
+                      {new Date(log.created_at).toLocaleString('en-US', {
+                        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                  {log.note && (
+                    <p className="text-gray-500 mt-0.5">{log.note}</p>
+                  )}
+                  {log.changes && Object.keys(log.changes).length > 0 && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Changed: {Object.keys(log.changes).join(', ')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
