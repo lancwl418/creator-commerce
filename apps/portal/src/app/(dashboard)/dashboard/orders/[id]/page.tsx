@@ -33,7 +33,15 @@ export default async function OrderDetailPage({
         id, title, variant_title, sku, quantity,
         unit_price, total_price, sale_price_snapshot,
         base_cost_snapshot, earnings_amount,
-        shopify_product_id, shopify_variant_id
+        shopify_product_id, shopify_variant_id,
+        channel_listing_variant_id,
+        channel_listing_variants (
+          id, external_variant_id,
+          custom_product_skus (
+            id, erp_product_id, erp_sku_id, sku_code,
+            erp_synced_sku_id, erp_sync_status, preview_image_url
+          )
+        )
       )
     `)
     .eq('id', id)
@@ -117,7 +125,7 @@ export default async function OrderDetailPage({
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-6 py-2.5 text-[11px] font-semibold text-gray-400 uppercase">Product</th>
-                  <th className="text-left px-6 py-2.5 text-[11px] font-semibold text-gray-400 uppercase">SKU</th>
+                  <th className="text-left px-6 py-2.5 text-[11px] font-semibold text-gray-400 uppercase">SKU / IDs</th>
                   <th className="text-center px-6 py-2.5 text-[11px] font-semibold text-gray-400 uppercase">Qty</th>
                   <th className="text-right px-6 py-2.5 text-[11px] font-semibold text-gray-400 uppercase">Price</th>
                   <th className="text-right px-6 py-2.5 text-[11px] font-semibold text-gray-400 uppercase">Cost</th>
@@ -129,16 +137,52 @@ export default async function OrderDetailPage({
                   id: string; title: string; variant_title: string | null; sku: string | null;
                   quantity: number; unit_price: number; total_price: number;
                   base_cost_snapshot: number | null; earnings_amount: number | null;
-                }) => (
+                  channel_listing_variants: {
+                    id: string; external_variant_id: string;
+                    custom_product_skus: {
+                      id: string; erp_product_id: string; erp_sku_id: string; sku_code: string;
+                      erp_synced_sku_id: string | null; erp_sync_status: string;
+                      preview_image_url: string | null;
+                    };
+                  } | null;
+                }) => {
+                  const customSku = item.channel_listing_variants?.custom_product_skus;
+                  const previewImg = customSku?.preview_image_url;
+                  return (
                   <tr key={item.id}>
                     <td className="px-6 py-3.5">
-                      <p className="text-sm font-medium text-gray-900">{item.title}</p>
-                      {item.variant_title && (
-                        <p className="text-xs text-gray-400 mt-0.5">{item.variant_title}</p>
-                      )}
+                      <div className="flex items-center gap-3">
+                        {previewImg && (
+                          <div className="w-10 h-10 rounded-md border border-border bg-gray-50 overflow-hidden shrink-0">
+                            <img src={previewImg} alt="" className="w-full h-full object-contain" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                          {item.variant_title && (
+                            <p className="text-xs text-gray-400 mt-0.5">{item.variant_title}</p>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-3.5">
-                      <span className="text-xs font-mono text-gray-500">{item.sku || '—'}</span>
+                      <div className="space-y-1">
+                        <p className="text-xs font-mono text-gray-600">{item.sku || '—'}</p>
+                        {customSku && (
+                          <div className="text-[10px] text-gray-400 space-y-0.5">
+                            <p>ERP Product: {customSku.erp_product_id}</p>
+                            <p>ERP SKU: {customSku.erp_sku_id}</p>
+                            {customSku.erp_synced_sku_id && (
+                              <p>Custom SKU: {customSku.erp_synced_sku_id}</p>
+                            )}
+                            <p className={`inline-block rounded px-1 py-0.5 text-[9px] font-semibold ${
+                              customSku.erp_sync_status === 'synced' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                            }`}>
+                              ERP: {customSku.erp_sync_status}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-3.5 text-center">
                       <span className="text-sm text-gray-700">{item.quantity}</span>
@@ -159,7 +203,8 @@ export default async function OrderDetailPage({
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
