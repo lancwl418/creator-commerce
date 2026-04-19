@@ -53,9 +53,9 @@ export async function POST(req: NextRequest) {
 
     switch (topic) {
       case 'orders/create':
-      case 'orders/paid':
         await processOrderCreate(supabase, connection, order);
         break;
+      case 'orders/paid':
       case 'orders/updated':
         await processOrderUpdate(supabase, connection, order);
         break;
