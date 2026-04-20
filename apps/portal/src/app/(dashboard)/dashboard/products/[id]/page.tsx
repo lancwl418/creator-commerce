@@ -21,7 +21,8 @@ export default async function ProductDetailPage({
     ? await getProductArtwork(product.design_version_id)
     : null;
 
-  const previewUrl = (product.preview_urls as string[])?.[0] || artworkUrl;
+  const previewUrls = Array.isArray(product.preview_urls) ? product.preview_urls : [];
+  const previewUrl = previewUrls[0] || artworkUrl;
 
   return (
     <div>

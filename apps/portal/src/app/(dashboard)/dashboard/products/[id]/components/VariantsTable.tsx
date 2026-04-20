@@ -6,9 +6,14 @@ import { getSkuCost, calculateVariantProfit } from '@/lib/utils';
 
 // ── Shared checkbox SVG ──
 
-function CheckIcon({ size = 3 }: { size?: number }) {
+const checkSizeClasses: Record<string, string> = {
+  small: 'w-2.5 h-2.5',
+  normal: 'w-3 h-3',
+};
+
+function CheckIcon({ small }: { small?: boolean }) {
   return (
-    <svg className={`w-${size} h-${size} text-white`} fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+    <svg className={`${small ? checkSizeClasses.small : checkSizeClasses.normal} text-white`} fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
     </svg>
   );
@@ -224,17 +229,16 @@ function SkuRow({ sku, gridCols, enabled, variantPrices, productPrice, option2Va
   const cost = getSkuCost(sku);
   const salePrice = isCustom ? (parseFloat(varPrice) || 0) : productPrice;
   const profit = calculateVariantProfit(salePrice, cost);
-  const checkSize = small ? 4 : 5;
 
   return (
     <div className={`grid gap-2 items-center px-2 ${small ? 'py-2' : 'py-2.5'} transition-all rounded-lg ${
       enabled ? 'bg-white' : 'bg-gray-50 opacity-50'
     }`} style={{ gridTemplateColumns: gridCols }}>
       <button onClick={() => onToggle(sku.id)} className="flex justify-center">
-        <div className={`w-${checkSize} h-${checkSize} rounded${small ? '' : '-md'} border-2 flex items-center justify-center transition-all ${
+        <div className={`${small ? 'w-4 h-4 rounded' : 'w-5 h-5 rounded-md'} border-2 flex items-center justify-center transition-all ${
           enabled ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
         }`}>
-          {enabled && <CheckIcon size={small ? 2.5 : 3} />}
+          {enabled && <CheckIcon small={small} />}
         </div>
       </button>
       {option2Values.length > 0 && <span className="text-sm text-gray-700 truncate">{sku.option2 || '—'}</span>}

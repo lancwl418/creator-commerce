@@ -16,9 +16,9 @@ export async function getOrders(creatorId: string) {
   return data || [];
 }
 
-export async function getOrderById(orderId: string) {
+export async function getOrderById(orderId: string, creatorId?: string) {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from('creator_orders')
     .select(`
       *,
@@ -41,8 +41,11 @@ export async function getOrderById(orderId: string) {
         )
       )
     `)
-    .eq('id', orderId)
-    .single();
+    .eq('id', orderId);
+
+  if (creatorId) query = query.eq('creator_id', creatorId);
+
+  const { data } = await query.single();
 
   return data;
 }

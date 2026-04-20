@@ -15,9 +15,9 @@ export async function getProducts(creatorId: string) {
   return data || [];
 }
 
-export async function getProductById(productId: string) {
+export async function getProductById(productId: string, creatorId?: string) {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from('sellable_product_instances')
     .select(`
       *,
@@ -25,9 +25,11 @@ export async function getProductById(productId: string) {
       product_configurations (id, layers, finalized_at),
       channel_listings (id, channel_type, creator_store_connection_id, external_listing_url, price, currency, status, published_at, error_message, creator_store_connections (platform, store_name))
     `)
-    .eq('id', productId)
-    .single();
+    .eq('id', productId);
 
+  if (creatorId) query = query.eq('creator_id', creatorId);
+
+  const { data } = await query.single();
   return data;
 }
 

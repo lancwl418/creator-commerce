@@ -35,6 +35,7 @@ export default async function DashboardPage() {
   const orders = await getOrders(creator.id);
   const { totalOrders, totalRevenue, totalEarnings: storeEarnings } = aggregateOrderTotals(
     orders.map(o => ({ total_price: o.total_price, creator_order_items: o.creator_order_items }))
+  );
   const storeRevenue = totalRevenue;
 
   // Recommended products from ERP (fetch a few for display)

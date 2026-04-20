@@ -9,7 +9,7 @@ import {
   resolveErpImageUrl, extractColorVariants, extractOptionValues,
   groupSkusByColor, isColorFullyEnabled as checkColorEnabled,
   isColorPartiallyEnabled as checkColorPartial,
-  calculateProfitRange, getSkuCost as getSkuCostUtil,
+  calculateProfitRange,
 } from '@/lib/utils';
 
 import SyncModal from './SyncModal';
