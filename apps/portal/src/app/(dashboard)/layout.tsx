@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { requireCreator } from '@/lib/server/auth';
 import { Sidebar } from '@/components/layout/Sidebar';
 
 export default async function DashboardLayout({
@@ -7,20 +7,14 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
+  let creator;
+  try {
+    ({ creator } = await requireCreator());
+  } catch {
     redirect('/login');
   }
 
-  const { data: creator } = await supabase
-    .from('creators')
-    .select('user_type')
-    .eq('auth_user_id', user.id)
-    .single();
-
-  const userType = (creator?.user_type as 'designer' | 'distributor') ?? 'designer';
+  const userType = (creator.user_type as 'designer' | 'distributor') ?? 'designer';
 
   return (
     <div className="min-h-screen bg-surface-secondary flex">

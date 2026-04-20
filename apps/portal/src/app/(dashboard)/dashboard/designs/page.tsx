@@ -1,34 +1,17 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { requireCreator } from '@/lib/server/auth';
+import { getDesigns } from '@/lib/queries/designs';
 
 export default async function DesignsPage() {
-  const supabase = await createClient();
+  let creator;
+  try {
+    ({ creator } = await requireCreator());
+  } catch {
+    redirect('/login');
+  }
 
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: creator } = await supabase
-    .from('creators')
-    .select('id')
-    .eq('auth_user_id', user!.id)
-    .single();
-
-  const { data: designs } = await supabase
-    .from('designs')
-    .select(`
-      *,
-      design_versions!design_versions_design_id_fkey (
-        id,
-        version_number,
-        design_assets (
-          id,
-          asset_type,
-          file_url,
-          file_name
-        )
-      )
-    `)
-    .eq('creator_id', creator!.id)
-    .order('created_at', { ascending: false });
+  const designs = await getDesigns(creator.id);
 
   return (
     <div>

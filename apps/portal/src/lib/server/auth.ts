@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export interface AuthContext {
   user: { id: string; email?: string };
-  creator: { id: string };
+  creator: { id: string; user_type?: string };
   supabase: Awaited<ReturnType<typeof createClient>>;
 }
 
@@ -19,7 +19,7 @@ export async function requireCreator(): Promise<AuthContext> {
 
   const { data: creator } = await supabase
     .from('creators')
-    .select('id')
+    .select('id, user_type')
     .eq('auth_user_id', user.id)
     .single();
 

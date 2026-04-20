@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getDesignById } from '@/lib/queries/designs';
 import { PromoteButton } from '../PromoteButton';
 
 export default async function DesignDetailPage({
@@ -9,36 +9,8 @@ export default async function DesignDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  const { data: design } = await supabase
-    .from('designs')
-    .select(`
-      *,
-      design_versions!design_versions_design_id_fkey (
-        id,
-        version_number,
-        changelog,
-        created_at,
-        design_assets (
-          id,
-          asset_type,
-          file_url,
-          file_name,
-          file_size,
-          mime_type,
-          width_px,
-          height_px,
-          dpi
-        )
-      ),
-      design_tags (
-        id,
-        tag
-      )
-    `)
-    .eq('id', id)
-    .single();
+  const design = await getDesignById(id);
 
   if (!design) notFound();
 
