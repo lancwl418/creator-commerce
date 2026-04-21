@@ -58,9 +58,9 @@ export default async function ProductsPage() {
           {/* Rows */}
           <div className="divide-y divide-border-light">
             {products.map((product) => {
-              const previewUrls = Array.isArray(product.preview_urls) ? product.preview_urls : [];
+              const previewUrls: string[] = Array.isArray(product.preview_urls) ? product.preview_urls : [];
               const previewUrl = previewUrls[0];
-              const artworkUrls = Array.isArray(product.design_artwork_urls) ? product.design_artwork_urls : [];
+              const artworkUrls: string[] = Array.isArray(product.design_artwork_urls) ? product.design_artwork_urls : [];
               const listings = (product.channel_listings ?? []) as { id: string; channel_type: string; status: string; price: number; currency: string; creator_store_connections?: { platform: string } }[];
               const activeListings = listings.filter((l) => l.status === 'active');
               const displayPrice = product.retail_price ?? activeListings[0]?.price;
