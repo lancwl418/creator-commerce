@@ -439,15 +439,26 @@ function EditorPageInner() {
           }
         }
 
-        // Redirect to Portal's import page with data in URL hash
-        const payload = encodeURIComponent(JSON.stringify({
+        // Navigate to Portal via hidden form POST to the callback URL.
+        // Using a form submission avoids the browser's popup blocker which
+        // blocks cross-origin window.location.href after async operations
+        // (shows about:blank#blocked).
+        const payload = JSON.stringify({
           design_id: editorConfig.designId,
           products: mergedProducts,
           title_prefix: decodeURIComponent(titlePrefix),
-        }));
+        });
 
-        const portalOrigin = new URL(callbackUrl).origin;
-        window.location.href = `${portalOrigin}/dashboard/products/import#${payload}`;
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = callbackUrl;
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'payload';
+        input.value = payload;
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
         return;
       } else {
         // No callback — just save locally

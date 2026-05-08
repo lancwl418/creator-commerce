@@ -139,7 +139,7 @@ export default function CatalogDetailPage() {
     const { key } = await res.json();
 
     const portalOrigin = window.location.origin;
-    const callbackUrl = `${portalOrigin}/dashboard/products/import`;
+    const callbackUrl = `${portalOrigin}/api/products/import-redirect`;
 
     window.location.href =
       `${DESIGN_ENGINE_URL}/embed` +

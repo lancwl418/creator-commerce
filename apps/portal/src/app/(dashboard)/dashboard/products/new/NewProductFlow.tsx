@@ -149,7 +149,7 @@ export default function NewProductFlow({ creatorId, designs: initialDesigns }: N
       }))
     ));
 
-    const callbackUrl = `${window.location.origin}/dashboard/products/import`;
+    const callbackUrl = `${window.location.origin}/api/products/import-redirect`;
     const titlePrefix = selectedDesign.title;
 
     const editorUrl = `${DESIGN_ENGINE_URL}/embed`
