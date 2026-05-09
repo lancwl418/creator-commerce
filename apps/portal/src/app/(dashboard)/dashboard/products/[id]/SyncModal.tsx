@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import type { StoreConnection } from '@/lib/types';
@@ -21,6 +22,7 @@ const platformIcons: Record<string, { name: string; color: string }> = {
 };
 
 export default function SyncModal({ productId, listings, onClose, onSynced, onBeforeSync }: SyncModalProps) {
+  const router = useRouter();
   const supabase = createClient();
   const [stores, setStores] = useState<StoreConnection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +90,7 @@ export default function SyncModal({ productId, listings, onClose, onSynced, onBe
 
       setSuccess({ url: data.shopify_url, storeName: store.store_name || store.platform });
       onSynced();
+      router.prefetch('/dashboard/products');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sync');
     } finally {
@@ -95,14 +98,24 @@ export default function SyncModal({ productId, listings, onClose, onSynced, onBe
     }
   }
 
+  // After a successful sync, dismissing the modal (footer Done, header X,
+  // or backdrop click) should land the user on the Created Products list.
+  const handleDismiss = () => {
+    if (success) {
+      router.push('/dashboard/products');
+    } else {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={handleDismiss}>
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-900">Sync to Store</h3>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+            <button onClick={handleDismiss} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
               </svg>
@@ -237,7 +250,7 @@ export default function SyncModal({ productId, listings, onClose, onSynced, onBe
         {/* Footer */}
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end">
           <button
-            onClick={onClose}
+            onClick={handleDismiss}
             className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-gray-600 hover:bg-white transition-colors"
           >
             {success ? 'Done' : 'Cancel'}
