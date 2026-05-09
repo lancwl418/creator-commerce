@@ -102,7 +102,11 @@ export default async function DesignDetailPage({
               Promote your design on our marketplace, or create your own product to sell on your store.
             </p>
 
-            <PromoteButton designId={design.id} designStatus={design.status} />
+            <PromoteButton
+              designId={design.id}
+              designStatus={design.status}
+              artworkUrl={artwork?.file_url ?? null}
+            />
 
             <Link
               href={`/dashboard/products/new?design_id=${design.id}`}
