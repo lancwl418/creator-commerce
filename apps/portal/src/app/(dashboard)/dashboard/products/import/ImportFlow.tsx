@@ -109,10 +109,20 @@ export default function ImportFlow({ creatorId }: ImportFlowProps) {
 
   async function saveProducts() {
     try {
-      const hash = window.location.hash.slice(1);
-      if (!hash) { setError('No product data received'); setStatus('error'); return; }
+      let raw: string | null = null;
+      try {
+        raw = sessionStorage.getItem('product_import_payload');
+        if (raw) sessionStorage.removeItem('product_import_payload');
+      } catch {}
 
-      const payload = JSON.parse(decodeURIComponent(hash));
+      if (!raw) {
+        const hash = window.location.hash.slice(1);
+        if (hash) raw = decodeURIComponent(hash);
+      }
+
+      if (!raw) { setError('No product data received'); setStatus('error'); return; }
+
+      const payload = JSON.parse(raw);
       const { design_id, products, title_prefix } = payload;
 
       if (!products || products.length === 0) { setError('No products to save'); setStatus('error'); return; }
