@@ -140,9 +140,32 @@ export default function ImportFlow({ creatorId }: ImportFlowProps) {
         }
       }
 
-      const created: CreatedProduct[] = [];
+      // Upload assets and create rows for all products in parallel.
+      // Within each product, thumbnail + every artwork upload also runs in
+      // parallel — previously each was a serial round-trip to /api/upload-r2.
+      async function uploadDataUrlOrPassThrough(value: string | undefined | null, folder: string): Promise<string | null> {
+        if (!value) return null;
+        if (!value.startsWith('data:')) {
+          return value.startsWith('blob:') ? null : value;
+        }
+        try {
+          const res = await fetch('/api/upload-r2', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data_url: value, folder }),
+          });
+          if (!res.ok) return null;
+          const { url } = await res.json();
+          return url ?? null;
+        } catch (e) {
+          console.error(`Upload failed (${folder}):`, e);
+          return null;
+        }
+      }
 
-      for (const product of products) {
+      const createdResults = await Promise.all((products as unknown[]).map(async (rawProduct) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const product = rawProduct as any;
         const erpName = product.name || 'Untitled Product';
         const productTitle = products.length > 1
           ? `${title_prefix || 'Design'} — ${erpName}`
@@ -151,49 +174,23 @@ export default function ImportFlow({ creatorId }: ImportFlowProps) {
         const rawDesc = product.description || '';
         const cleanDesc = rawDesc.replace(/<[^>]*>/g, '').trim();
 
-        let previewUrls: string[] = [];
-        if (product.thumbnail && product.thumbnail.startsWith('data:')) {
-          try {
-            const res = await fetch('/api/upload-r2', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ data_url: product.thumbnail, folder: 'previews' }),
-            });
-            if (res.ok) {
-              const { url } = await res.json();
-              previewUrls = [url];
-            }
-          } catch (e) { console.error('Preview upload failed:', e); }
-        } else if (product.thumbnail) {
-          previewUrls = [product.thumbnail];
-        }
-        if (previewUrls.length === 0 && artworkFallbackUrl) previewUrls = [artworkFallbackUrl];
-
         let designArtworkUrls: string[] = product.artwork_urls ?? [];
         if (designArtworkUrls.length === 0 && product.layers) {
           designArtworkUrls = product.layers
             .filter((l: { type: string; data?: { src?: string } }) => l.type === 'image' && l.data?.src)
             .map((l: { data: { src: string } }) => l.data.src);
         }
-        const storedArtworkUrls: string[] = [];
-        for (const artUrl of designArtworkUrls) {
-          if (artUrl.startsWith('data:')) {
-            try {
-              const res = await fetch('/api/upload-r2', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data_url: artUrl, folder: 'artworks' }),
-              });
-              if (res.ok) {
-                const { url } = await res.json();
-                storedArtworkUrls.push(url);
-              }
-            } catch { /* skip */ }
-          } else if (artUrl && !artUrl.startsWith('blob:')) {
-            storedArtworkUrls.push(artUrl);
-          }
-        }
-        if (previewUrls.length === 0 && storedArtworkUrls.length > 0) previewUrls = [storedArtworkUrls[0]];
+
+        const [thumbnailUrl, ...artworkResults] = await Promise.all([
+          uploadDataUrlOrPassThrough(product.thumbnail, 'previews'),
+          ...designArtworkUrls.map((u) => uploadDataUrlOrPassThrough(u, 'artworks')),
+        ]);
+        const storedArtworkUrls = artworkResults.filter((u): u is string => !!u);
+
+        let previewUrls: string[] = [];
+        if (thumbnailUrl) previewUrls = [thumbnailUrl];
+        else if (artworkFallbackUrl) previewUrls = [artworkFallbackUrl];
+        else if (storedArtworkUrls.length > 0) previewUrls = [storedArtworkUrls[0]];
 
         const basePriceSuggestion = product.base_cost ? product.base_cost * 2.5 : null;
 
@@ -216,7 +213,7 @@ export default function ImportFlow({ creatorId }: ImportFlowProps) {
           .select('*')
           .single();
 
-        if (instanceError) { console.error('Failed to create product:', instanceError); continue; }
+        if (instanceError) { console.error('Failed to create product:', instanceError); return null; }
 
         if (product.layers?.length > 0) {
           await supabase.from('product_configurations').upsert({
@@ -229,8 +226,10 @@ export default function ImportFlow({ creatorId }: ImportFlowProps) {
           }, { onConflict: 'sellable_product_instance_id' });
         }
 
-        created.push(instance);
-      }
+        return instance as CreatedProduct;
+      }));
+
+      const created: CreatedProduct[] = createdResults.filter((x): x is CreatedProduct => x !== null);
 
       if (created.length === 0) { setError('Failed to create any products'); setStatus('error'); return; }
 

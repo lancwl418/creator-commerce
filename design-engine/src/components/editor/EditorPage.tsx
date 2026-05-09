@@ -393,51 +393,54 @@ function EditorPageInner() {
       });
 
       if (callbackUrl) {
-        // Generate server-side variant previews for each product (upload to R2)
-        for (const product of mergedProducts) {
-          const colorVariants = productsToSave.find(p => p.template_id === product.template_id);
+        // Generate server-side variant previews in parallel across products.
+        // Each product hits /api/generate-variant-previews independently;
+        // server-side the route already batches variants concurrently.
+        await Promise.all(mergedProducts.map(async (product) => {
           const template = multiStore.isMultiProduct
             ? updatedProducts.find(e => e.template.id === product.template_id)?.template
             : selectedTemplate;
           const variants = (template?.metadata?.colorVariants ?? []) as { color: string; imageUrl: string; rawImagePath?: string }[];
-          const printArea = product.print_area_snapshot;
           const meta = product.design_metadata;
 
-          if (variants.length > 0 && meta?.mockupWidth && product.layers?.length > 0) {
-            try {
-              console.log('[Save] Calling generate-variant-previews API...', {
-                variantsCount: variants.length,
-                layersCount: product.layers.length,
-                mockupSize: `${meta.mockupWidth}x${meta.mockupHeight}`,
-              });
-              const res = await fetch('/api/generate-variant-previews', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  product_id: product.template_id,
-                  layers: product.layers,
-                  mockup_width: meta.mockupWidth,
-                  mockup_height: meta.mockupHeight,
-                  variants: variants.map((v) => ({
-                    id: v.color,
-                    mockup_url: v.rawImagePath || v.imageUrl,
-                    label: v.color,
-                  })),
-                }),
-              });
-              const resText = await res.text();
-              console.log('[Save] Variant preview API response:', res.status, resText.substring(0, 200));
-              if (res.ok) {
-                const data = JSON.parse(resText);
-                (product as Record<string, unknown>).variant_previews = data.previews || {};
-                console.log('[Save] Variant previews generated:', Object.keys(data.previews || {}).length);
-              }
-            } catch (err) {
-              console.error('[Save] Variant preview generation failed:', err);
-              // Non-blocking — continue without variant previews
-            }
+          if (!(variants.length > 0 && meta?.mockupWidth && product.layers?.length > 0)) {
+            return;
           }
-        }
+
+          try {
+            console.log('[Save] Calling generate-variant-previews API...', {
+              productId: product.template_id,
+              variantsCount: variants.length,
+              layersCount: product.layers.length,
+              mockupSize: `${meta.mockupWidth}x${meta.mockupHeight}`,
+            });
+            const res = await fetch('/api/generate-variant-previews', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                product_id: product.template_id,
+                layers: product.layers,
+                mockup_width: meta.mockupWidth,
+                mockup_height: meta.mockupHeight,
+                variants: variants.map((v) => ({
+                  id: v.color,
+                  mockup_url: v.rawImagePath || v.imageUrl,
+                  label: v.color,
+                })),
+              }),
+            });
+            const resText = await res.text();
+            console.log('[Save] Variant preview API response:', product.template_id, res.status, resText.substring(0, 200));
+            if (res.ok) {
+              const data = JSON.parse(resText);
+              (product as Record<string, unknown>).variant_previews = data.previews || {};
+              console.log('[Save] Variant previews generated:', product.template_id, Object.keys(data.previews || {}).length);
+            }
+          } catch (err) {
+            console.error('[Save] Variant preview generation failed:', product.template_id, err);
+            // Non-blocking — continue without variant previews
+          }
+        }));
 
         // Navigate to Portal via hidden form POST to the callback URL.
         // Using a form submission avoids the browser's popup blocker which
