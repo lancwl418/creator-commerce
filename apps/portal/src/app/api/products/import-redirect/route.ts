@@ -29,8 +29,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing payload' }, { status: 400 });
   }
 
-  const origin = request.nextUrl.origin;
-  const target = `${origin}/dashboard/products/import`;
+  // Same-origin path only — using request.nextUrl.origin would bake in the
+  // server's bind host (e.g. 0.0.0.0), which the browser refuses to navigate to.
+  const target = '/dashboard/products/import';
   const escaped = JSON.stringify(payload);
 
   const html = `<!DOCTYPE html>
