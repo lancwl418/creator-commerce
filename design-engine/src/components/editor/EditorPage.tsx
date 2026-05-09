@@ -10,6 +10,7 @@ import LayerPanel from './LayerPanel';
 import PropertiesPanel from './PropertiesPanel';
 import VariantPreviewStrip from './VariantPreviewStrip';
 import ValidationDialog from './ValidationDialog';
+import GhostLoader from '../GhostLoader';
 import { EditorConfigContext, useEditorConfig } from './EditorConfigContext';
 import { useDesignStore } from '@/stores/designStore';
 import { useEditorStore } from '@/stores/editorStore';
@@ -498,6 +499,13 @@ function EditorPageInner() {
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden">
+      {saving && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl px-10 py-8 shadow-2xl">
+            <GhostLoader size="lg" message="Saving your design…" />
+          </div>
+        </div>
+      )}
       {validationResult && (
         <ValidationDialog
           result={validationResult}

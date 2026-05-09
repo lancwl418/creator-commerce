@@ -153,12 +153,24 @@ export default function SyncModal({ productId, listings, onClose, onSynced, onBe
           )}
 
           {/* Loading */}
-          {loading && !success && (
-            <GhostLoader size="sm" message="Loading stores..." />
+          {loading && !success && !syncingId && (
+            <GhostLoader size="sm" message="Loading stores…" />
+          )}
+
+          {/* Syncing in progress */}
+          {syncingId && !success && (
+            <GhostLoader
+              size="md"
+              message={`Syncing to ${
+                stores.find((s) => s.id === syncingId)?.store_name ||
+                stores.find((s) => s.id === syncingId)?.platform ||
+                'your store'
+              }…`}
+            />
           )}
 
           {/* No stores */}
-          {!loading && !success && stores.length === 0 && (
+          {!loading && !success && !syncingId && stores.length === 0 && (
             <div className="text-center py-6">
               <p className="text-sm text-gray-500 mb-3">No stores connected yet.</p>
               <Link
@@ -171,7 +183,7 @@ export default function SyncModal({ productId, listings, onClose, onSynced, onBe
           )}
 
           {/* Store list */}
-          {!loading && !success && stores.length > 0 && (
+          {!loading && !success && !syncingId && stores.length > 0 && (
             <div className="space-y-3">
               <p className="text-sm text-gray-500">Choose a store to sync this product to:</p>
               {stores.map(store => {
