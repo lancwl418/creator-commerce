@@ -39,6 +39,9 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 COPY --from=builder --chown=nextjs:nodejs /app/apps/portal/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/portal/.next/static ./apps/portal/.next/static
+# Next.js standalone output does NOT bundle public/; copy it explicitly so
+# static assets like /product/*.png are served by the runtime server.
+COPY --from=builder --chown=nextjs:nodejs /app/apps/portal/public ./apps/portal/public
 
 USER nextjs
 EXPOSE 10000
