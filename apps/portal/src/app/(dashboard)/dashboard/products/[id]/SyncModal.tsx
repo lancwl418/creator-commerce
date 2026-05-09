@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import GhostLoader from '@/components/GhostLoader';
 import type { StoreConnection } from '@/lib/types';
 import type { Listing } from '@/lib/types';
 
@@ -153,10 +154,7 @@ export default function SyncModal({ productId, listings, onClose, onSynced, onBe
 
           {/* Loading */}
           {loading && !success && (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-gray-500 ml-3">Loading stores...</span>
-            </div>
+            <GhostLoader size="sm" message="Loading stores..." />
           )}
 
           {/* No stores */}

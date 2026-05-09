@@ -3,6 +3,7 @@
 import type { ErpSku } from '@/lib/types';
 import type { SkuGroup } from '@/lib/utils';
 import { getSkuCost, calculateVariantProfit } from '@/lib/utils';
+import GhostLoader from '@/components/GhostLoader';
 
 // ── Shared checkbox SVG ──
 
@@ -76,10 +77,7 @@ export default function VariantsTable({
       </div>
 
       {loadingSkus ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-gray-500 ml-3">Loading variants...</span>
-        </div>
+        <GhostLoader size="sm" message="Loading variants..." />
       ) : skuError ? (
         <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
           <p className="text-sm text-amber-700">{skuError}</p>
