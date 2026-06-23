@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
 import { getOrders } from '@/lib/queries/orders';
 import { aggregateOrderTotals } from '@/lib/utils';
+import OnboardingSteps from './OnboardingSteps';
 
 export default async function DashboardPage() {
   let supabase, creator;
@@ -31,6 +32,12 @@ export default async function DashboardPage() {
     .from('sellable_product_instances')
     .select('*', { count: 'exact', head: true })
     .eq('creator_id', creator.id);
+
+  const { count: publishedCount } = await supabase
+    .from('sellable_product_instances')
+    .select('*', { count: 'exact', head: true })
+    .eq('creator_id', creator.id)
+    .in('status', ['listed', 'published']);
 
   const orders = await getOrders(creator.id);
   const { totalOrders, totalRevenue, totalEarnings: storeEarnings } = aggregateOrderTotals(
@@ -73,6 +80,9 @@ export default async function DashboardPage() {
         <h2 className="text-2xl font-bold text-gray-900">Welcome back, {displayName}</h2>
         <p className="text-gray-500 mt-1">Here&apos;s an overview of your creator dashboard</p>
       </div>
+
+      {/* Onboarding steps */}
+      <OnboardingSteps publishedCount={publishedCount ?? 0} />
 
       {/* Stats Row 1: Counts */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
