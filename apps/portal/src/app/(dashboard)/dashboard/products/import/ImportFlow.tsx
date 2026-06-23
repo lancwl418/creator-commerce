@@ -301,7 +301,19 @@ export default function ImportFlow({ creatorId }: ImportFlowProps) {
           if (!edit) return null;
 
           return (
-            <div key={product.id} className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
+            <div key={product.id} className="relative rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
+              {/* Status badge — top right */}
+              <div className="absolute top-3 right-4 flex items-center gap-2 z-10">
+                {isSaved && (
+                  <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                    Saved
+                  </span>
+                )}
+                <span className="inline-block rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600">Draft</span>
+              </div>
               <div className="flex gap-5 p-5">
                 {/* Preview */}
                 <div className="w-32 h-32 rounded-xl bg-surface-secondary flex items-center justify-center overflow-hidden shrink-0">
@@ -374,18 +386,7 @@ export default function ImportFlow({ creatorId }: ImportFlowProps) {
               </div>
 
               {/* Card footer */}
-              <div className="flex items-center justify-between px-5 py-3 bg-surface-secondary border-t border-border-light">
-                <div className="flex items-center gap-2">
-                  <span className="inline-block rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600">Draft</span>
-                  {isSaved && (
-                    <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                      </svg>
-                      Saved
-                    </span>
-                  )}
-                </div>
+              <div className="flex items-center justify-end px-5 py-3 bg-surface-secondary border-t border-border-light">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleQuickSave(product.id)}
@@ -396,8 +397,11 @@ export default function ImportFlow({ creatorId }: ImportFlowProps) {
                   </button>
                   <Link
                     href={`/dashboard/products/${product.id}?from=import`}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary-500 bg-primary-50 px-4 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100 transition-colors"
                   >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                    </svg>
                     Full Edit
                   </Link>
                 </div>
