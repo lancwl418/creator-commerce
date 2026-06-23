@@ -13,6 +13,7 @@ import {
 } from '@/lib/utils';
 
 import SyncModal from './SyncModal';
+import UnlistModal from './UnlistModal';
 import PricingPanel from './components/PricingPanel';
 import ColorPreviews from './components/ColorPreviews';
 import ProductImagesSelector from './components/ProductImagesSelector';
@@ -45,6 +46,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const [description, setDescription] = useState(product.description || '');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
+  const [showUnlistModal, setShowUnlistModal] = useState(false);
   const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(() =>
     new Set(product.product_images.map(img => img.id))
   );
@@ -233,7 +235,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           onImageClick={setLightboxUrl}
         />
 
-        <ChannelListings listings={listings} />
+        <ChannelListings listings={listings} onUnlist={() => setShowUnlistModal(true)} />
       </div>
 
       {/* Right Column */}
@@ -307,6 +309,16 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           onClose={() => setShowSyncModal(false)}
           onSynced={() => router.refresh()}
           onBeforeSync={saveProduct}
+        />
+      )}
+
+      {/* Unlist Modal */}
+      {showUnlistModal && (
+        <UnlistModal
+          productId={product.id}
+          listings={listings}
+          onClose={() => setShowUnlistModal(false)}
+          onUnlisted={() => router.refresh()}
         />
       )}
     </div>

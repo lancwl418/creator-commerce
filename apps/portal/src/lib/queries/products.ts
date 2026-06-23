@@ -7,7 +7,7 @@ export async function getProducts(creatorId: string) {
     .select(`
       *,
       designs (id, title),
-      channel_listings (id, channel_type, creator_store_connection_id, status, price, currency, creator_store_connections (platform))
+      channel_listings (id, channel_type, creator_store_connection_id, status, price, currency, creator_store_connections (platform, store_name))
     `)
     .eq('creator_id', creatorId)
     .order('created_at', { ascending: false });

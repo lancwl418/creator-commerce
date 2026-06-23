@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
 import { getProducts } from '@/lib/queries/products';
+import type { Listing } from '@/lib/types';
+import ProductRowActions from './ProductRowActions';
 
 export default async function ProductsPage() {
   let creator;
@@ -46,13 +48,14 @@ export default async function ProductsPage() {
       ) : (
         <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
           {/* Table header */}
-          <div className="hidden sm:grid sm:grid-cols-[auto_1fr_160px_120px_100px_100px] gap-4 items-center px-5 py-3 bg-surface-secondary border-b border-border-light text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+          <div className="hidden sm:grid sm:grid-cols-[auto_1fr_160px_120px_100px_100px_80px] gap-4 items-center px-5 py-3 bg-surface-secondary border-b border-border-light text-[11px] font-semibold uppercase tracking-wider text-gray-400">
             <div className="w-10" />
             <div>Product</div>
             <div>Design</div>
             <div>Channel</div>
             <div>Price</div>
             <div>Status</div>
+            <div className="text-right">Actions</div>
           </div>
 
           {/* Rows */}
@@ -66,11 +69,14 @@ export default async function ProductsPage() {
               const displayPrice = product.retail_price ?? activeListings[0]?.price;
 
               return (
-                <Link
+                <div
                   key={product.id}
-                  href={`/dashboard/products/${product.id}`}
-                  className="group flex flex-col sm:grid sm:grid-cols-[auto_1fr_160px_120px_100px_100px] gap-3 sm:gap-4 items-start sm:items-center px-5 py-4 hover:bg-surface-hover transition-colors"
+                  className="group flex flex-col sm:grid sm:grid-cols-[auto_1fr_160px_120px_100px_100px_80px] gap-3 sm:gap-4 items-start sm:items-center px-5 py-4 hover:bg-surface-hover transition-colors"
                 >
+                  <Link
+                    href={`/dashboard/products/${product.id}`}
+                    className="contents"
+                  >
                   {/* Thumbnail */}
                   <div className="w-10 h-10 rounded-lg bg-surface-secondary flex items-center justify-center overflow-hidden shrink-0">
                     {previewUrl ? (
@@ -134,11 +140,17 @@ export default async function ProductsPage() {
                     )}
                   </div>
 
-                  {/* Status */}
-                  <div>
-                    <StatusBadge status={product.status} />
+                    {/* Status */}
+                    <div>
+                      <StatusBadge status={product.status} />
+                    </div>
+                  </Link>
+
+                  {/* Actions */}
+                  <div className="sm:justify-self-end">
+                    <ProductRowActions productId={product.id} listings={listings as unknown as Listing[]} />
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
