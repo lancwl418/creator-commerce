@@ -4,6 +4,7 @@ export {
   calculateVariantProfit,
   calculateEarnings,
   calculateProfitRange,
+  markupPrice,
   formatPrice,
   formatPriceRange,
   formatPercentRange,

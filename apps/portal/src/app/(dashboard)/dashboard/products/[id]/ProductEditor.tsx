@@ -1,19 +1,20 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { ErpSku, SkuSelection, Listing, ProductData } from '@/lib/types';
-import { DEFAULT_COST } from '@/lib/constants';
 import {
   resolveErpImageUrl, extractColorVariants, extractOptionValues,
   groupSkusByColor, isColorFullyEnabled as checkColorEnabled,
   isColorPartiallyEnabled as checkColorPartial,
-  calculateProfitRange,
+  calculateProfitRange, getSkuCost, markupPrice,
 } from '@/lib/utils';
 
 import SyncModal from './SyncModal';
 import UnlistModal from './UnlistModal';
+import WizardSteps, { type WizardStep } from './components/WizardSteps';
 import PricingPanel from './components/PricingPanel';
 import ColorPreviews from './components/ColorPreviews';
 import ProductImagesSelector from './components/ProductImagesSelector';
@@ -47,6 +48,8 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showUnlistModal, setShowUnlistModal] = useState(false);
+  const [step, setStep] = useState<WizardStep>('detail');
+  const [markup, setMarkup] = useState('100');
   const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(() =>
     new Set(product.product_images.map(img => img.id))
   );
@@ -154,6 +157,22 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
 
   const applyPriceToAll = useCallback(() => { setVariantPrices({}); setSaved(false); }, []);
 
+  // Bulk-set every enabled variant's price to cost × (1 + markup%)
+  const applyMarkup = useCallback(() => {
+    const pct = parseFloat(markup);
+    if (isNaN(pct)) return;
+    setVariantPrices(() => {
+      const next: Record<string, string> = {};
+      for (const sku of erpSkus) {
+        if (!enabledSkuIds.has(sku.id)) continue;
+        const cost = getSkuCost(sku);
+        next[sku.id] = markupPrice(cost, pct).toFixed(2);
+      }
+      return next;
+    });
+    setSaved(false);
+  }, [markup, erpSkus, enabledSkuIds]);
+
   const isColorFull = useCallback((c: string) => checkColorEnabled(erpSkus, c, enabledSkuIds), [erpSkus, enabledSkuIds]);
   const isColorPartial = useCallback((c: string) => checkColorPartial(erpSkus, c, enabledSkuIds), [erpSkus, enabledSkuIds]);
 
@@ -208,95 +227,170 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
 
   // ── Render ──
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      {/* Left Column */}
-      <div className="lg:col-span-2 space-y-4">
-        {/* Preview Image */}
-        <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
-          <div className="aspect-square bg-surface-secondary flex items-center justify-center">
-            {previewUrl ? (
-              <img src={previewUrl} alt={product.title} className="w-full h-full object-contain p-8" />
-            ) : (
-              <span className="text-gray-400 text-sm">No preview</span>
-            )}
-          </div>
-        </div>
-
-        <ProductInfoCard
-          title={title}
-          description={description}
-          status={product.status}
-          designId={product.design_id}
-          designTitle={designTitle}
-          designArtworkUrls={designArtworkUrls}
-          createdAt={product.created_at}
-          onTitleChange={(v) => { setTitle(v); setSaved(false); }}
-          onDescriptionChange={(v) => { setDescription(v); setSaved(false); }}
-          onImageClick={setLightboxUrl}
-        />
-
-        <ChannelListings listings={listings} onUnlist={() => setShowUnlistModal(true)} />
-      </div>
-
-      {/* Right Column */}
-      <div className="lg:col-span-3 space-y-5">
-        <PricingPanel
-          retailPrice={retailPrice}
-          onRetailPriceChange={(v) => { setRetailPrice(v); setSaved(false); }}
-          profitRange={profitRange}
-          hasCustomPrices={hasCustomPrices}
-          onResetPrices={applyPriceToAll}
-        />
-
-        <ColorPreviews colorVariants={colorVariants} onImageClick={setLightboxUrl} />
-
-        <ProductImagesSelector
-          images={product.product_images}
-          selectedIds={selectedImageIds}
-          onToggle={toggleProductImage}
-        />
-
-        <VariantsTable
-          erpSkus={erpSkus}
-          enabledSkuIds={enabledSkuIds}
-          variantPrices={variantPrices}
-          productPrice={priceNum}
-          optionNames={optionNames}
-          option1Values={option1Values}
-          option2Values={option2Values}
-          option3Values={option3Values}
-          hasOptions={hasOptions}
-          skusByColor={skusByColor}
-          loadingSkus={loadingSkus}
-          skuError={skuError}
-          onToggleSku={toggleSku}
-          onToggleColor={toggleColor}
-          onSelectAll={selectAll}
-          onClearAll={clearAll}
-          onSetVariantPrice={setVariantPrice}
-          isColorFullyEnabled={isColorFull}
-          isColorPartiallyEnabled={isColorPartial}
-        />
-
-        {/* Error */}
-        {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-5 py-3">
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
+    <div className="space-y-6">
+      {/* Wizard top bar */}
+      <div className="sticky top-0 z-20 flex items-center justify-between gap-4 rounded-2xl border border-border bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
+        {step === 'detail' ? (
+          <Link
+            href="/dashboard/products"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+            </svg>
+            Back
+          </Link>
+        ) : (
+          <button
+            onClick={() => setStep('detail')}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+            </svg>
+            Back to detail
+          </button>
         )}
 
-        {/* Actions */}
-        <div className="flex items-center gap-3">
-          <button onClick={handleSave} disabled={saving}
-            className="flex-1 rounded-xl border-2 border-primary-600 px-6 py-3 text-sm font-semibold text-primary-600 hover:bg-primary-50 disabled:opacity-50 transition-all">
-            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save All'}
+        <div className="hidden sm:block">
+          <WizardSteps current={step} onStepClick={(s) => setStep(s === 'price' ? 'price' : 'detail')} />
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save as Draft'}
           </button>
-          <button onClick={() => setShowSyncModal(true)}
-            className="flex-1 rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-500 transition-all shadow-md shadow-primary-600/25">
-            Sync to Your Stores
-          </button>
+          {step === 'detail' ? (
+            <button
+              onClick={() => setStep('price')}
+              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
+            >
+              Continue to Price
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowSyncModal(true)}
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-500 transition-colors shadow-md shadow-primary-600/25"
+            >
+              Publish
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="rounded-xl bg-red-50 border border-red-200 px-5 py-3">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Step content */}
+      {step === 'detail' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Preview Image */}
+            <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
+              <div className="aspect-square bg-surface-secondary flex items-center justify-center">
+                {previewUrl ? (
+                  <img src={previewUrl} alt={product.title} className="w-full h-full object-contain p-8" />
+                ) : (
+                  <span className="text-gray-400 text-sm">No preview</span>
+                )}
+              </div>
+            </div>
+
+            <ProductInfoCard
+              title={title}
+              description={description}
+              status={product.status}
+              designId={product.design_id}
+              designTitle={designTitle}
+              designArtworkUrls={designArtworkUrls}
+              createdAt={product.created_at}
+              onTitleChange={(v) => { setTitle(v); setSaved(false); }}
+              onDescriptionChange={(v) => { setDescription(v); setSaved(false); }}
+              onImageClick={setLightboxUrl}
+            />
+
+            <ChannelListings listings={listings} onUnlist={() => setShowUnlistModal(true)} />
+          </div>
+
+          {/* Right Column */}
+          <div className="lg:col-span-3 space-y-5">
+            <ColorPreviews colorVariants={colorVariants} onImageClick={setLightboxUrl} />
+
+            <ProductImagesSelector
+              images={product.product_images}
+              selectedIds={selectedImageIds}
+              onToggle={toggleProductImage}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-5 max-w-4xl">
+          <PricingPanel
+            retailPrice={retailPrice}
+            onRetailPriceChange={(v) => { setRetailPrice(v); setSaved(false); }}
+            profitRange={profitRange}
+            hasCustomPrices={hasCustomPrices}
+            onResetPrices={applyPriceToAll}
+          />
+
+          {/* Bulk markup */}
+          <div className="rounded-2xl border border-border bg-white p-5 shadow-sm flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Set markup</label>
+              <div className="relative w-28">
+                <input
+                  type="number"
+                  min="0"
+                  value={markup}
+                  onChange={(e) => setMarkup(e.target.value)}
+                  className="w-full rounded-lg border border-border pl-3 pr-7 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+              </div>
+            </div>
+            <button
+              onClick={applyMarkup}
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-500 transition-colors"
+            >
+              Apply to all variants
+            </button>
+            <p className="text-[11px] text-gray-400 flex-1 min-w-[200px]">
+              Sets every enabled variant&apos;s price to cost × (1 + markup%).
+            </p>
+          </div>
+
+          <VariantsTable
+            erpSkus={erpSkus}
+            enabledSkuIds={enabledSkuIds}
+            variantPrices={variantPrices}
+            productPrice={priceNum}
+            optionNames={optionNames}
+            option1Values={option1Values}
+            option2Values={option2Values}
+            option3Values={option3Values}
+            hasOptions={hasOptions}
+            skusByColor={skusByColor}
+            loadingSkus={loadingSkus}
+            skuError={skuError}
+            onToggleSku={toggleSku}
+            onToggleColor={toggleColor}
+            onSelectAll={selectAll}
+            onClearAll={clearAll}
+            onSetVariantPrice={setVariantPrice}
+            isColorFullyEnabled={isColorFull}
+            isColorPartiallyEnabled={isColorPartial}
+          />
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightboxUrl && <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}

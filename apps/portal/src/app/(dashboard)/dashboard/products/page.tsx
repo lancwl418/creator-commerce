@@ -5,7 +5,20 @@ import { getProducts } from '@/lib/queries/products';
 import type { Listing } from '@/lib/types';
 import ProductRowActions from './ProductRowActions';
 
-export default async function ProductsPage() {
+// Status groups → the three product tabs
+const TABS = [
+  { key: 'mockup', label: 'Mockup', statuses: ['draft'] },
+  { key: 'unpublished', label: 'Unpublished', statuses: ['ready', 'paused', 'pending_review'] },
+  { key: 'published', label: 'Published', statuses: ['listed', 'published'] },
+] as const;
+
+type TabKey = (typeof TABS)[number]['key'];
+
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   let creator;
   try {
     ({ creator } = await requireCreator());
@@ -13,7 +26,17 @@ export default async function ProductsPage() {
     redirect('/login');
   }
 
+  const { tab } = await searchParams;
+  const activeTab: TabKey = TABS.some((t) => t.key === tab) ? (tab as TabKey) : 'mockup';
+
   const products = await getProducts(creator.id);
+
+  const counts = Object.fromEntries(
+    TABS.map((t) => [t.key, products.filter((p) => (t.statuses as readonly string[]).includes(p.status)).length]),
+  ) as Record<TabKey, number>;
+
+  const activeStatuses = TABS.find((t) => t.key === activeTab)!.statuses as readonly string[];
+  const visibleProducts = products.filter((p) => activeStatuses.includes(p.status));
 
   return (
     <div>
@@ -46,7 +69,37 @@ export default async function ProductsPage() {
           </Link>
         </div>
       ) : (
-        <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
+        <>
+          {/* Tabs */}
+          <div className="flex items-center gap-1 mb-4 border-b border-border-light">
+            {TABS.map((t) => {
+              const isActive = t.key === activeTab;
+              return (
+                <Link
+                  key={t.key}
+                  href={`/dashboard/products?tab=${t.key}`}
+                  className={`relative px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    isActive ? 'text-primary-700' : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  {t.label}
+                  <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+                    isActive ? 'bg-primary-50 text-primary-700' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {counts[t.key]}
+                  </span>
+                  {isActive && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-primary-600" />}
+                </Link>
+              );
+            })}
+          </div>
+
+          {visibleProducts.length === 0 ? (
+            <div className="rounded-2xl border-2 border-dashed border-gray-300 p-12 text-center bg-white">
+              <p className="text-gray-500">No {TABS.find((t) => t.key === activeTab)!.label.toLowerCase()} products.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
           {/* Table header */}
           <div className="hidden sm:grid sm:grid-cols-[auto_1fr_160px_120px_100px_100px_80px] gap-4 items-center px-5 py-3 bg-surface-secondary border-b border-border-light text-[11px] font-semibold uppercase tracking-wider text-gray-400">
             <div className="w-10" />
@@ -60,7 +113,7 @@ export default async function ProductsPage() {
 
           {/* Rows */}
           <div className="divide-y divide-border-light">
-            {products.map((product) => {
+            {visibleProducts.map((product) => {
               const previewUrls: string[] = Array.isArray(product.preview_urls) ? product.preview_urls : [];
               const previewUrl = previewUrls[0];
               const artworkUrls: string[] = Array.isArray(product.design_artwork_urls) ? product.design_artwork_urls : [];
@@ -154,8 +207,10 @@ export default async function ProductsPage() {
               );
             })}
           </div>
-        </div>
-      )}
+            </div>
+          )}
+          </>
+        )}
     </div>
   );
 }

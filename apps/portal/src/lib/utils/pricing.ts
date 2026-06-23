@@ -32,6 +32,11 @@ export function calculateVariantProfit(salePrice: number, cost: number): number 
   return salePrice - cost;
 }
 
+/** Apply a markup percentage to a cost: cost × (1 + markupPct/100). */
+export function markupPrice(cost: number, markupPct: number): number {
+  return cost * (1 + markupPct / 100);
+}
+
 /** Calculate earnings for a line item */
 export function calculateEarnings(salePrice: number, baseCost: number, quantity: number): number {
   return (salePrice - baseCost) * quantity;
