@@ -393,7 +393,9 @@ function EditorPageInner() {
         };
       });
 
-      if (callbackUrl) {
+      const inIframe = typeof window !== 'undefined' && window.self !== window.top;
+
+      if (callbackUrl || inIframe) {
         // Generate server-side variant previews in parallel across products.
         // Each product hits /api/generate-variant-previews independently;
         // server-side the route already batches variants concurrently.
@@ -443,19 +445,33 @@ function EditorPageInner() {
           }
         }));
 
-        // Navigate to Portal via hidden form POST to the callback URL.
-        // Using a form submission avoids the browser's popup blocker which
-        // blocks cross-origin window.location.href after async operations
-        // (shows about:blank#blocked).
-        const payload = JSON.stringify({
+        const payloadObj = {
           design_id: editorConfig.designId,
           products: mergedProducts,
           title_prefix: decodeURIComponent(titlePrefix),
-        });
+        };
+
+        // Iframe mode: hand the payload to the parent window (Portal wizard)
+        // via postMessage instead of navigating. The parent creates the
+        // draft product and moves to the next wizard step.
+        if (inIframe) {
+          const parentOriginParam = params.get('parent_origin');
+          window.parent.postMessage(
+            { type: 'DESIGN_EDITOR_SAVED', payload: payloadObj },
+            parentOriginParam ? decodeURIComponent(parentOriginParam) : '*',
+          );
+          return;
+        }
+
+        // Full-page mode: navigate to Portal via hidden form POST to the
+        // callback URL. Using a form submission avoids the browser's popup
+        // blocker which blocks cross-origin window.location.href after async
+        // operations (shows about:blank#blocked).
+        const payload = JSON.stringify(payloadObj);
 
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = callbackUrl;
+        form.action = callbackUrl!;
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = 'payload';

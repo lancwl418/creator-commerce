@@ -138,6 +138,17 @@ export default function CatalogPage() {
     window.location.href = editorUrl;
   }
 
+  // Single-product entry: launch the create wizard for one product (Tapstitch-style).
+  async function handleDesignSingle(product: ErpProduct) {
+    const res = await fetch('/api/erp/products-cache', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: [product] }),
+    });
+    const { key } = await res.json();
+    router.push(`/dashboard/products/create?templates=${encodeURIComponent(`erp-${product.id}`)}&cache_key=${key}`);
+  }
+
   function getImageUrl(product: ErpProduct): string | null {
     if (product.mainPic) {
       return `/api/erp/image?path=${encodeURIComponent(product.mainPic)}`;
@@ -306,6 +317,18 @@ export default function CatalogPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                     </svg>
                   )}
+                </button>
+
+                {/* Design button — overlay on hover, single-product wizard */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDesignSingle(product);
+                  }}
+                  className="absolute bottom-[88px] left-1/2 -translate-x-1/2 z-10 rounded-lg bg-gray-900 px-4 py-2 text-xs font-semibold text-white shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-800"
+                >
+                  Design
                 </button>
 
                 {/* Card body — click navigates to detail */}

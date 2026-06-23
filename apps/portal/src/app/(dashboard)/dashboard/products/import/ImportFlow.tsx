@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { createProductsFromDesignPayload } from '@/lib/products/createFromDesignPayload';
 import GhostLoader from '@/components/GhostLoader';
 
 interface CreatedProduct {
@@ -124,113 +125,10 @@ export default function ImportFlow({ creatorId }: ImportFlowProps) {
       if (!raw) { setError('No product data received'); setStatus('error'); return; }
 
       const payload = JSON.parse(raw);
-      const { design_id, products, title_prefix } = payload;
 
-      if (!products || products.length === 0) { setError('No products to save'); setStatus('error'); return; }
+      if (!payload.products || payload.products.length === 0) { setError('No products to save'); setStatus('error'); return; }
 
-      let designVersionId: string | null = null;
-      let artworkFallbackUrl: string | null = null;
-
-      if (design_id) {
-        const { data: design } = await supabase.from('designs').select('id, current_version_id').eq('id', design_id).single();
-        if (design?.current_version_id) {
-          designVersionId = design.current_version_id;
-          const { data: artworkAsset } = await supabase.from('design_assets').select('file_url')
-            .eq('design_version_id', designVersionId).eq('asset_type', 'artwork').single();
-          artworkFallbackUrl = artworkAsset?.file_url ?? null;
-        }
-      }
-
-      // Upload assets and create rows for all products in parallel.
-      // Within each product, thumbnail + every artwork upload also runs in
-      // parallel — previously each was a serial round-trip to /api/upload-r2.
-      async function uploadDataUrlOrPassThrough(value: string | undefined | null, folder: string): Promise<string | null> {
-        if (!value) return null;
-        if (!value.startsWith('data:')) {
-          return value.startsWith('blob:') ? null : value;
-        }
-        try {
-          const res = await fetch('/api/upload-r2', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data_url: value, folder }),
-          });
-          if (!res.ok) return null;
-          const { url } = await res.json();
-          return url ?? null;
-        } catch (e) {
-          console.error(`Upload failed (${folder}):`, e);
-          return null;
-        }
-      }
-
-      const createdResults = await Promise.all((products as unknown[]).map(async (rawProduct) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const product = rawProduct as any;
-        const erpName = product.name || 'Untitled Product';
-        const productTitle = products.length > 1
-          ? `${title_prefix || 'Design'} — ${erpName}`
-          : erpName;
-
-        const rawDesc = product.description || '';
-        const cleanDesc = rawDesc.replace(/<[^>]*>/g, '').trim();
-
-        let designArtworkUrls: string[] = product.artwork_urls ?? [];
-        if (designArtworkUrls.length === 0 && product.layers) {
-          designArtworkUrls = product.layers
-            .filter((l: { type: string; data?: { src?: string } }) => l.type === 'image' && l.data?.src)
-            .map((l: { data: { src: string } }) => l.data.src);
-        }
-
-        const [thumbnailUrl, ...artworkResults] = await Promise.all([
-          uploadDataUrlOrPassThrough(product.thumbnail, 'previews'),
-          ...designArtworkUrls.map((u) => uploadDataUrlOrPassThrough(u, 'artworks')),
-        ]);
-        const storedArtworkUrls = artworkResults.filter((u): u is string => !!u);
-
-        let previewUrls: string[] = [];
-        if (thumbnailUrl) previewUrls = [thumbnailUrl];
-        else if (artworkFallbackUrl) previewUrls = [artworkFallbackUrl];
-        else if (storedArtworkUrls.length > 0) previewUrls = [storedArtworkUrls[0]];
-
-        const basePriceSuggestion = product.base_cost ? product.base_cost * 2.5 : null;
-
-        const { data: instance, error: instanceError } = await supabase
-          .from('sellable_product_instances')
-          .insert({
-            creator_id: creatorId,
-            design_id: design_id || null,
-            design_version_id: designVersionId,
-            product_template_id: product.template_id,
-            title: productTitle,
-            description: cleanDesc,
-            status: 'draft',
-            base_price_suggestion: basePriceSuggestion,
-            preview_urls: previewUrls,
-            design_artwork_urls: storedArtworkUrls,
-            variant_preview_urls: product.variant_previews || null,
-            product_images: product.product_images || [],
-          })
-          .select('*')
-          .single();
-
-        if (instanceError) { console.error('Failed to create product:', instanceError); return null; }
-
-        if (product.layers?.length > 0) {
-          await supabase.from('product_configurations').upsert({
-            sellable_product_instance_id: instance.id,
-            design_version_id: designVersionId || '00000000-0000-0000-0000-000000000000',
-            product_template_id: product.template_id,
-            layers: product.layers,
-            print_area_snapshot: product.print_area_snapshot || null,
-            design_metadata: product.design_metadata || null,
-          }, { onConflict: 'sellable_product_instance_id' });
-        }
-
-        return instance as CreatedProduct;
-      }));
-
-      const created: CreatedProduct[] = createdResults.filter((x): x is CreatedProduct => x !== null);
+      const created = await createProductsFromDesignPayload(supabase, creatorId, payload);
 
       if (created.length === 0) { setError('Failed to create any products'); setStatus('error'); return; }
 
