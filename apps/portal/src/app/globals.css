@@ -1,27 +1,49 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap');
 @import 'tailwindcss';
 
 @theme {
-  --color-primary-50: #f0f4ff;
-  --color-primary-100: #dbe4ff;
-  --color-primary-200: #bac8ff;
-  --color-primary-300: #91a7ff;
-  --color-primary-400: #748ffc;
-  --color-primary-500: #5c7cfa;
-  --color-primary-600: #4c6ef5;
-  --color-primary-700: #4263eb;
-  --color-primary-800: #3b5bdb;
-  --color-primary-900: #364fc7;
+  /* Ghostyle "Primary blacks" — primary is a neutral ink ramp. 600+ are
+     near-black, so existing white-on-primary buttons read as solid black CTAs. */
+  --color-primary-50: #f4f5f5;
+  --color-primary-100: #e9e9e9;
+  --color-primary-200: #c7c7c7;
+  --color-primary-300: #9e9e9e;
+  --color-primary-400: #757575;
+  --color-primary-500: #585858;
+  --color-primary-600: #1a1a1a;
+  --color-primary-700: #0a0a0a;
+  --color-primary-800: #000000;
+  --color-primary-900: #000000;
+
+  /* Ghostyle brand yellow (Secondary). Pair with BLACK text. */
+  --color-brand-50: #fef9eb;
+  --color-brand-100: #fff3d8;
+  --color-brand-200: #ffe6ac;
+  --color-brand-300: #ffdd8e;
+  --color-brand-400: #ffd166;
+  --color-brand-500: #ffd166;
+  --color-brand-600: #f5be3f;
+  --color-brand: #ffd166;
+  --color-ink: #0a0a0a;
 
   --color-surface: #ffffff;
-  --color-surface-hover: #f8f9fc;
-  --color-surface-secondary: #f1f3f9;
-  --color-border: #e2e6ef;
-  --color-border-light: #eef0f6;
+  --color-surface-hover: #f4f5f5;
+  --color-surface-secondary: #f4f5f5;
+  --color-border: #e9e9e9;
+  --color-border-light: #f4f5f5;
+
+  --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Clash Display', 'Figtree', sans-serif;
 }
 
 * {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Ghostyle headings use Clash Display */
+h1, h2, h3, .font-display {
+  font-family: 'Clash Display', 'Figtree', sans-serif;
 }
 
 body {
