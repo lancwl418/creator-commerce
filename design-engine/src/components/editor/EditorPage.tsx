@@ -23,6 +23,7 @@ import { useHistory } from '@/hooks/useHistory';
 import type { ValidationResult } from '@/core/design/DesignValidator';
 import type { DesignLayer } from '@/types/design';
 import type { EditorConfig } from '@/types/editor-config';
+import { DESIGN_EDITOR_MESSAGE } from '@creator-commerce/shared';
 import {
   Layers, Package, Upload, X, Undo2, Redo2, ZoomIn, ZoomOut, Save,
   AlignCenterVertical, AlignCenterHorizontal,
@@ -457,7 +458,7 @@ function EditorPageInner() {
         if (inIframe) {
           const parentOriginParam = params.get('parent_origin');
           window.parent.postMessage(
-            { type: 'DESIGN_EDITOR_SAVED', payload: payloadObj },
+            { type: DESIGN_EDITOR_MESSAGE.SAVED, payload: payloadObj },
             parentOriginParam ? decodeURIComponent(parentOriginParam) : '*',
           );
           return;

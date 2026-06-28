@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { DESIGN_EDITOR_MESSAGE, isDesignEditorMessage } from '@creator-commerce/shared';
 import { createProductsFromDesignPayload } from '@/lib/products/createFromDesignPayload';
 import WizardSteps from '../[id]/components/WizardSteps';
 import GhostLoader from '@/components/GhostLoader';
@@ -38,8 +39,7 @@ export default function CreateWizard({ creatorId, templates, cacheKey }: CreateW
 
     async function onMessage(e: MessageEvent) {
       if (e.origin !== engineOrigin) return;
-      const data = e.data as { type?: string; payload?: unknown };
-      if (!data || data.type !== 'DESIGN_EDITOR_SAVED' || !data.payload) return;
+      if (!isDesignEditorMessage(e.data) || e.data.type !== DESIGN_EDITOR_MESSAGE.SAVED) return;
       if (handledRef.current) return;
       handledRef.current = true;
       setCreating(true);
@@ -47,7 +47,7 @@ export default function CreateWizard({ creatorId, templates, cacheKey }: CreateW
         const created = await createProductsFromDesignPayload(
           supabase,
           creatorId,
-          data.payload as Parameters<typeof createProductsFromDesignPayload>[2],
+          e.data.payload,
         );
         if (created.length === 0) throw new Error('Failed to create product');
         router.push(`/dashboard/products/${created[0].id}?from=create`);

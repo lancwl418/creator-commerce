@@ -1,28 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { DesignEditorPayload, DesignEditorProduct } from '@creator-commerce/shared';
 
 /**
- * Shape of a single product as emitted by the Design Engine
- * (both the form-POST callback and the iframe postMessage use this).
+ * Product/payload shapes emitted by the Design Engine. These come from the
+ * shared host ⇄ editor contract (`@creator-commerce/shared`); aliased here for
+ * local readability and backwards compatibility.
  */
-export interface DesignPayloadProduct {
-  template_id: string;
-  name?: string;
-  description?: string;
-  base_cost?: number;
-  thumbnail?: string | null;
-  layers?: { type: string; data?: { src?: string } }[];
-  artwork_urls?: string[];
-  product_images?: unknown[];
-  print_area_snapshot?: unknown;
-  design_metadata?: unknown;
-  variant_previews?: Record<string, string> | null;
-}
-
-export interface DesignPayload {
-  design_id?: string | null;
-  products: DesignPayloadProduct[];
-  title_prefix?: string;
-}
+export type DesignPayloadProduct = DesignEditorProduct;
+export type DesignPayload = DesignEditorPayload;
 
 export interface CreatedProductRow {
   id: string;

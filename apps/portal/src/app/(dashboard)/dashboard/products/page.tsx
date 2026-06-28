@@ -4,15 +4,7 @@ import { requireCreator } from '@/lib/server/auth';
 import { getProducts } from '@/lib/queries/products';
 import type { Listing } from '@/lib/types';
 import ProductRowActions from './ProductRowActions';
-
-// Status groups → the three product tabs
-const TABS = [
-  { key: 'mockup', label: 'Mockup', statuses: ['draft'] },
-  { key: 'unpublished', label: 'Unpublished', statuses: ['ready', 'paused', 'pending_review'] },
-  { key: 'published', label: 'Published', statuses: ['listed', 'published'] },
-] as const;
-
-type TabKey = (typeof TABS)[number]['key'];
+import { PRODUCT_TABS, resolveProductTab, productMatchesTab, countProductsByTab } from '@/lib/products/productTabs';
 
 export default async function ProductsPage({
   searchParams,
@@ -27,16 +19,12 @@ export default async function ProductsPage({
   }
 
   const { tab } = await searchParams;
-  const activeTab: TabKey = TABS.some((t) => t.key === tab) ? (tab as TabKey) : 'mockup';
+  const activeTab = resolveProductTab(tab);
 
   const products = await getProducts(creator.id);
 
-  const counts = Object.fromEntries(
-    TABS.map((t) => [t.key, products.filter((p) => (t.statuses as readonly string[]).includes(p.status)).length]),
-  ) as Record<TabKey, number>;
-
-  const activeStatuses = TABS.find((t) => t.key === activeTab)!.statuses as readonly string[];
-  const visibleProducts = products.filter((p) => activeStatuses.includes(p.status));
+  const counts = countProductsByTab(products);
+  const visibleProducts = products.filter((p) => productMatchesTab(p.status, activeTab));
 
   return (
     <div>
@@ -72,7 +60,7 @@ export default async function ProductsPage({
         <>
           {/* Tabs */}
           <div className="flex items-center gap-1 mb-4 border-b border-border-light">
-            {TABS.map((t) => {
+            {PRODUCT_TABS.map((t) => {
               const isActive = t.key === activeTab;
               return (
                 <Link
@@ -96,7 +84,7 @@ export default async function ProductsPage({
 
           {visibleProducts.length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-gray-300 p-12 text-center bg-white">
-              <p className="text-gray-500">No {TABS.find((t) => t.key === activeTab)!.label.toLowerCase()} products.</p>
+              <p className="text-gray-500">No {PRODUCT_TABS.find((t) => t.key === activeTab)!.label.toLowerCase()} products.</p>
             </div>
           ) : (
             <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
