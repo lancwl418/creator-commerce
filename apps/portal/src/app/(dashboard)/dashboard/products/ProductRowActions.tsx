@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Listing } from '@/lib/types';
@@ -18,19 +19,18 @@ export default function ProductRowActions({ productId, listings }: ProductRowAct
   const [showUnlist, setShowUnlist] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const hasActiveListing = listings.some((l) => l.creator_store_connection_id && l.status !== 'removed');
 
-  // Close the menu on outside click.
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [open]);
+  // Open the menu anchored to the button via fixed positioning + a portal, so
+  // it isn't clipped by the list card's overflow-hidden.
+  function openMenu() {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    setOpen(true);
+  }
 
   async function handleDuplicate() {
     setBusy(true);
@@ -60,12 +60,12 @@ export default function ProductRowActions({ productId, listings }: ProductRowAct
 
   return (
     <div
-      ref={menuRef}
       className="relative"
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
     >
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={() => (open ? setOpen(false) : openMenu())}
         title="Actions"
         aria-label="Product actions"
         className="rounded-lg border border-border px-2 py-1.5 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
@@ -77,8 +77,13 @@ export default function ProductRowActions({ productId, listings }: ProductRowAct
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute right-0 z-30 mt-1 w-44 rounded-xl border border-border bg-white py-1 shadow-lg">
+      {open && menuPos && createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-50 w-44 rounded-xl border border-border bg-white py-1 shadow-lg"
+            style={{ top: menuPos.top, right: menuPos.right }}
+          >
           <button
             onClick={() => { setOpen(false); router.push(`/dashboard/products/${productId}/edit`); }}
             className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -119,7 +124,9 @@ export default function ProductRowActions({ productId, listings }: ProductRowAct
             </svg>
             Delete
           </button>
-        </div>
+          </div>
+        </>,
+        document.body,
       )}
 
       {confirmDelete && (
