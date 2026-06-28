@@ -130,8 +130,15 @@ async function handlePortalMode(
   }
 
   if (matched.length === 0) {
-    // Legacy flow: fetch all products and match by ID
-    await fetchExternalProducts(appendTemplates);
+    // No cache hit: load the product(s) directly and match by id. When every
+    // requested id is an ERP product (the ghostyle storefront embed case),
+    // fetch ERP only — no Shopify call, so no Shopify token is required.
+    const erpOnly = portalIds.length > 0 && portalIds.every((id) => id.startsWith('erp-'));
+    if (erpOnly) {
+      await fetchErpProducts(appendTemplates);
+    } else {
+      await fetchExternalProducts(appendTemplates);
+    }
 
     const allTemplates = useProductStore.getState().templates;
 
@@ -251,6 +258,27 @@ function addArtworkLayer(artworkUrl: string) {
     console.warn('[TemplateLoader] Failed to load artwork image:', artworkUrl);
   };
   img.src = proxiedUrl;
+}
+
+/**
+ * Fetches ERP products only (no Shopify), converts them to ProductTemplates,
+ * and appends them. Used for the ERP-id embed path (e.g. the ghostyle
+ * storefront), so no Shopify Admin token is needed in that flow.
+ */
+async function fetchErpProducts(
+  appendTemplates: (templates: ProductTemplate[]) => void
+) {
+  try {
+    const res = await fetch('/api/erp-products?pageNo=1&pageSize=200');
+    if (!res.ok) throw new Error(`ERP API ${res.status}`);
+    const data = (await res.json()) as ErpProductListResponse;
+    if (data.success) {
+      const templates = convertErpProducts(data.result.records);
+      if (templates.length > 0) appendTemplates(templates);
+    }
+  } catch (err) {
+    console.warn('[TemplateLoader] Failed to load ERP products:', err);
+  }
 }
 
 /**
