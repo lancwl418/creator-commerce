@@ -211,6 +211,21 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     if (updateError) throw updateError;
   }, [erpSkus, enabledSkuIds, variantPrices, priceNum, title, description, optionNames, product, supabase, selectedImageIds, profitRange.costMin]);
 
+  // Remember which wizard step the user was on for this product, so reopening
+  // it (e.g. after Save as Draft sends them to the list) returns to that step.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`pe_step_${product.id}`);
+      if (saved === 'price' || saved === 'detail') setStep(saved);
+    } catch {}
+  }, [product.id]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`pe_step_${product.id}`, step);
+    } catch {}
+  }, [step, product.id]);
+
   async function handleSave() {
     setSaving(true);
     setError('');
