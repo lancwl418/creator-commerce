@@ -12,6 +12,8 @@ export const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';
 export const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID ?? '';
 export const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET ?? '';
 export const SHOPIFY_SCOPES = process.env.SHOPIFY_SCOPES ?? 'write_products,read_products,read_orders';
+// API secret of the ghostyle custom app — verifies its customers/* webhooks.
+export const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET ?? '';
 
 // ── UI Status Colors ──
 export const ORDER_STATUS_COLORS: Record<string, string> = {
