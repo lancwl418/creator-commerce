@@ -30,7 +30,17 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Gate protected routes: send unauthenticated users to login with a return
+  // path, so after auth they come back to where they were headed (e.g. the
+  // "Sync to your store" landing page, with the design payload still stashed).
+  const path = request.nextUrl.pathname;
+  if (!user && path.startsWith('/dashboard')) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('next', path + request.nextUrl.search);
+    return NextResponse.redirect(loginUrl);
+  }
 
   return supabaseResponse;
 }

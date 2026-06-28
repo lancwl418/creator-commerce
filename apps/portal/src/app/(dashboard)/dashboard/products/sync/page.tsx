@@ -7,9 +7,11 @@ export default async function SyncFromDesignPage() {
   try {
     ({ creator } = await requireCreator());
   } catch {
-    // Not logged in: the design payload is already stashed in sessionStorage.
-    // Step 1 just bounces to login; the resume-after-login flow is Step 2.
-    redirect('/login');
+    // Not logged in: bounce to login with a return path. The design payload is
+    // already stashed in sessionStorage and survives the login/register hop, so
+    // we land back here and create the product once authenticated. (Middleware
+    // normally adds the same ?next before this renders — this is a fallback.)
+    redirect('/login?next=/dashboard/products/sync');
   }
 
   return <SyncFromDesign creatorId={creator.id} />;

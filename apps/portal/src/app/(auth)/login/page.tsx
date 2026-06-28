@@ -5,6 +5,21 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+/** Read a same-site return path from ?next= (defaults to the dashboard). */
+function getSafeNext(): string {
+  if (typeof window === 'undefined') return '/dashboard';
+  const next = new URLSearchParams(window.location.search).get('next');
+  // Only allow relative same-site paths — reject external / protocol-relative URLs.
+  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+}
+
+/** The ?next= query to forward to the other auth page (empty if none). */
+function nextQuery(): string {
+  if (typeof window === 'undefined') return '';
+  const next = new URLSearchParams(window.location.search).get('next');
+  return next && next.startsWith('/') && !next.startsWith('//') ? `?next=${encodeURIComponent(next)}` : '';
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,7 +44,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/dashboard');
+    router.push(getSafeNext());
   }
 
   return (
@@ -92,7 +107,7 @@ export default function LoginPage() {
 
       <p className="mt-6 text-center text-sm text-white/40">
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="font-medium text-primary-400 hover:text-primary-300 transition-colors">
+        <Link href="/register" onClick={(e) => { e.preventDefault(); router.push(`/register${nextQuery()}`); }} className="font-medium text-primary-400 hover:text-primary-300 transition-colors">
           Sign up
         </Link>
       </p>
