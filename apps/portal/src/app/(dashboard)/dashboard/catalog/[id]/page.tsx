@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-const DESIGN_ENGINE_URL = process.env.NEXT_PUBLIC_DESIGN_ENGINE_URL || 'http://localhost:3001';
-
 interface ErpProductSku {
   id: string;
   sku: string;
@@ -129,8 +127,6 @@ export default function CatalogDetailPage() {
   async function handleStartDesigning() {
     if (!product) return;
 
-    const templateIds = `erp-${product.id}`;
-
     const res = await fetch('/api/erp/products-cache', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -138,15 +134,12 @@ export default function CatalogDetailPage() {
     });
     const { key } = await res.json();
 
-    const portalOrigin = window.location.origin;
-    const callbackUrl = `${portalOrigin}/api/products/import-redirect`;
-
-    window.location.href =
-      `${DESIGN_ENGINE_URL}/embed` +
-      `?templates=${encodeURIComponent(templateIds)}` +
-      `&products_cache_key=${key}` +
-      `&products_cache_url=${encodeURIComponent(`${portalOrigin}/api/erp/products-cache`)}` +
-      `&callback_url=${encodeURIComponent(callbackUrl)}`;
+    // Single-product entry → Tapstitch create wizard. The wizard embeds the
+    // editor and, on save, redirects straight to the product's full-edit page —
+    // no intermediate "Product Created" review screen.
+    router.push(
+      `/dashboard/products/create?templates=${encodeURIComponent(`erp-${product.id}`)}&cache_key=${key}`,
+    );
   }
 
   // Get all product images sorted
