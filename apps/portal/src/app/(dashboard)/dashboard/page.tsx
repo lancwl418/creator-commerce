@@ -28,11 +28,6 @@ export default async function DashboardPage() {
     .select('*', { count: 'exact', head: true })
     .eq('creator_id', creator.id);
 
-  const { count: productCount } = await supabase
-    .from('sellable_product_instances')
-    .select('*', { count: 'exact', head: true })
-    .eq('creator_id', creator.id);
-
   const { count: publishedCount } = await supabase
     .from('sellable_product_instances')
     .select('*', { count: 'exact', head: true })
@@ -44,6 +39,11 @@ export default async function DashboardPage() {
     orders.map(o => ({ total_price: o.total_price, creator_order_items: o.creator_order_items }))
   );
   const storeRevenue = totalRevenue;
+
+  // Orders that still need fulfillment (Shopify marks fulfilled orders only).
+  const ordersRequiringAction = orders.filter(
+    (o) => (o.fulfillment_status ?? null) !== 'fulfilled'
+  ).length;
 
   // Recommended products from ERP (fetch a few for display)
   let recommendedProducts: { id: string; name: string; image: string | null; price: number }[] = [];
@@ -98,33 +98,33 @@ export default async function DashboardPage() {
           <p className="text-3xl font-bold">{designCount ?? 0}</p>
         </Link>
 
-        <Link href="/dashboard/products" className="rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
+        <Link href="/dashboard/products?tab=published" className="rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-white/80">Created Products</p>
+            <p className="text-sm font-medium text-white/80">Products published</p>
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold">{productCount ?? 0}</p>
+          <p className="text-3xl font-bold">{publishedCount ?? 0}</p>
         </Link>
 
         <Link href="/dashboard/orders" className="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-white/80">Total Orders</p>
+            <p className="text-sm font-medium text-white/80">Orders requiring action</p>
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold">{totalOrders}</p>
+          <p className="text-3xl font-bold">{ordersRequiringAction}</p>
         </Link>
 
         <Link href="/dashboard/orders" className="rounded-2xl bg-gradient-to-br from-emerald-500 to-green-700 p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-white/80">Total Earnings</p>
+            <p className="text-sm font-medium text-white/80">Profit</p>
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
