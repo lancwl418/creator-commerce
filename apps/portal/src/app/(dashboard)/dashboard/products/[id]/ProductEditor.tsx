@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import type { ErpSku, SkuSelection, Listing, ProductData, SizeGuide } from '@/lib/types';
+import type { ErpSku, SkuSelection, Listing, ProductData } from '@/lib/types';
 import {
   resolveErpImageUrl, extractColorVariants, extractOptionValues,
   groupSkusByColor, isColorFullyEnabled as checkColorEnabled,
@@ -21,7 +21,6 @@ import ProductImagesSelector from './components/ProductImagesSelector';
 import VariantsTable from './components/VariantsTable';
 import ChannelListings from './components/ChannelListings';
 import ProductInfoCard from './components/ProductInfoCard';
-import SizeGuideEditor from './components/SizeGuideEditor';
 import TagsEditor from './components/TagsEditor';
 import Lightbox from './components/Lightbox';
 
@@ -47,7 +46,6 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   );
   const [title, setTitle] = useState(product.title || '');
   const [description, setDescription] = useState(product.description || '');
-  const [sizeGuide, setSizeGuide] = useState<SizeGuide | null>(product.size_guide ?? null);
   const [tags, setTags] = useState<string[]>(product.tags ?? []);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -212,7 +210,6 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         retail_price: priceNum,
         cost: profitRange.costMin,
         product_images: product.product_images.filter(img => selectedImageIds.has(img.id)),
-        size_guide: sizeGuide,
         shipping_cost: shippingNum,
         tags,
         status: product.status === 'draft' ? 'ready' : product.status,
@@ -220,7 +217,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
       .eq('id', product.id);
 
     if (updateError) throw updateError;
-  }, [erpSkus, enabledSkuIds, variantPrices, priceNum, title, description, optionNames, product, supabase, selectedImageIds, profitRange.costMin, sizeGuide, shippingNum, tags]);
+  }, [erpSkus, enabledSkuIds, variantPrices, priceNum, title, description, optionNames, product, supabase, selectedImageIds, profitRange.costMin, shippingNum, tags]);
 
   // Remember which wizard step the user was on for this product, so reopening
   // it (e.g. after Save as Draft sends them to the list) returns to that step.
@@ -365,11 +362,6 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
               images={product.product_images}
               selectedIds={selectedImageIds}
               onToggle={toggleProductImage}
-            />
-
-            <SizeGuideEditor
-              value={sizeGuide}
-              onChange={(v) => { setSizeGuide(v); setSaved(false); }}
             />
 
             <TagsEditor
