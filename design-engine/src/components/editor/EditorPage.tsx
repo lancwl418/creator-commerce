@@ -177,7 +177,6 @@ function EditorPageInner() {
         console.warn('[Restore] no activeViewId after delay — cannot restore', layers.length, 'layers');
         return;
       }
-      console.log('[Restore] applying', layers.length, 'layers to view', activeViewId);
       for (const raw of layers) {
         const layer: DesignLayer = { ...raw };
         // Proxy external image sources to avoid CORS canvas tainting
@@ -202,7 +201,6 @@ function EditorPageInner() {
       const data = e.data as { type?: string; design?: { layers?: unknown } } | null;
       if (!data || data.type !== DESIGN_EDITOR_MESSAGE.LOAD_DESIGN) return;
       const layers = data.design?.layers;
-      console.log('[Restore] LOAD_DESIGN received', { count: Array.isArray(layers) ? layers.length : 'not-array', status: statusRef.current, alreadyApplied: appliedRestoreRef.current });
       if (!Array.isArray(layers) || appliedRestoreRef.current) return;
       if (statusRef.current === 'loaded') {
         appliedRestoreRef.current = true;
@@ -223,7 +221,6 @@ function EditorPageInner() {
     if (!readySentRef.current) {
       readySentRef.current = true;
       const parentOrigin = new URLSearchParams(window.location.search).get('parent_origin');
-      console.log('[Restore] editor loaded — sending READY to', parentOrigin || '*');
       window.parent.postMessage(
         { type: DESIGN_EDITOR_MESSAGE.READY },
         parentOrigin ? decodeURIComponent(parentOrigin) : '*',
