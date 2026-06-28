@@ -526,9 +526,30 @@ function EditorPageInner() {
           title_prefix: decodeURIComponent(titlePrefix),
         };
 
-        // Iframe mode: hand the payload to the parent window (Portal wizard)
-        // via postMessage instead of navigating. The parent creates the
-        // draft product and moves to the next wizard step.
+        // "Sync to your store" / external host: a callback_url means navigate
+        // (form POST) to the host system. When embedded in an iframe (e.g. the
+        // ghostyle storefront) target _top so we escape the iframe and land the
+        // whole browser on the host. A form POST avoids the popup blocker that
+        // blocks cross-origin window.location after async work.
+        if (callbackUrl) {
+          const payload = JSON.stringify(payloadObj);
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = callbackUrl;
+          if (inIframe) form.target = '_top';
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'payload';
+          input.value = payload;
+          form.appendChild(input);
+          document.body.appendChild(form);
+          form.submit();
+          return;
+        }
+
+        // In-iframe with no callback (Portal wizard): hand the payload to the
+        // parent window via postMessage; the parent creates the draft product
+        // and advances the wizard.
         if (inIframe) {
           const parentOriginParam = params.get('parent_origin');
           window.parent.postMessage(
@@ -537,24 +558,6 @@ function EditorPageInner() {
           );
           return;
         }
-
-        // Full-page mode: navigate to Portal via hidden form POST to the
-        // callback URL. Using a form submission avoids the browser's popup
-        // blocker which blocks cross-origin window.location.href after async
-        // operations (shows about:blank#blocked).
-        const payload = JSON.stringify(payloadObj);
-
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = callbackUrl!;
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'payload';
-        input.value = payload;
-        form.appendChild(input);
-        document.body.appendChild(form);
-        form.submit();
-        return;
       } else {
         // No callback — just save locally
         ExportService.saveToLocal(currentDesign);
