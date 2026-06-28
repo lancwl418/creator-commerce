@@ -29,39 +29,30 @@ launch the button triggers (see below). "Order directly" is out of scope here.
 
 Open the Design Engine `/embed` page in an iframe on the product page. The
 editor needs the **blank POD product** to design on (mockup image + printable
-area). Supply it via the one-time product cache (same mechanism the Creator
-Commerce portal uses):
+area) — but **the theme does not supply it and needs no Shopify token**. Just
+pass the ERP product id; the editor loads the product (mockup + print areas)
+from ERP itself, server-side.
 
-**a. Cache the product** — POST the ERP product object(s) to a cache endpoint,
-get back a `key`:
-
-```
-POST <cache-base>/products-cache
-Content-Type: application/json
-{ "products": [ <ERP product object with prodSkuList / print areas> ] }
-
-→ 200 { "key": "<uuid>" }
-```
-
-The cache must expose a matching `GET <cache-base>/products-cache?key=<key>` that
-returns `{ "products": [...] }` with permissive CORS
-(`Access-Control-Allow-Origin: *`). The Creator Commerce portal already
-implements this at `/api/erp/products-cache`; ghostyle can call that, or stand
-up its own with the same shape.
-
-**b. Launch the iframe:**
+**Launch the iframe:**
 
 ```
 https://editor.ghostyle.com/embed
   ?templates=erp-<ERP_PRODUCT_ID>
-  &products_cache_key=<key>
-  &products_cache_url=<urlencoded cache GET url>
   &callback_url=<urlencoded https://studio.ghostyle.com/api/products/sync-redirect>
+  &parent_origin=<urlencoded https://your-product-page-origin>
 ```
 
-- `templates` — comma-separated template ids; `erp-<id>` matches the cached product.
-- `products_cache_key` / `products_cache_url` — where the editor fetches the product from.
-- `callback_url` — **this is what makes it "Sync to your store"** (see §2). Omit it for a design-only/preview embed.
+- `templates` — `erp-<id>`, where `<id>` is the product's `pod.erp_product_id`
+  metafield. The editor fetches that ERP product directly (no cache, no token).
+- `callback_url` — **this is what makes it "Sync to your store"** (see §2). Omit
+  it for a design-only/preview embed.
+- `parent_origin` — the origin of the page hosting the iframe (for postMessage /
+  navigation safety).
+
+The theme reads `product.metafields.pod.erp_product_id` (Liquid, no token) and
+builds the URL. **No products-cache, no product object, no Shopify token needed
+on the theme side** — all of that is handled server-side by the editor's ERP
+connection.
 
 > For "Order directly", launch the editor **without** `callback_url` (or use
 > your own checkout integration). Only the sync path needs `callback_url`.
@@ -112,9 +103,9 @@ does not construct it — the editor does.
 
 ## 5. ghostyle decisions / TODO
 
-1. **Product data source** — confirm the ERP product object (with print
-   areas/mockup) for the product being designed, and which cache endpoint to use
-   (Creator Commerce's `/api/erp/products-cache` vs ghostyle-hosted).
+1. **Product data source** — just set each product's `pod.erp_product_id`
+   metafield to its ERP id. The editor loads the product (mockup + print areas)
+   from ERP by id — no cache, no Shopify token, no product object on the theme.
 2. **Button placement** — where "Order directly" vs "Sync to your store" appear
    on the product page, and gating (e.g. only show "Sync to your store" to
    logged-in creators, or always show and let the login redirect handle it).
