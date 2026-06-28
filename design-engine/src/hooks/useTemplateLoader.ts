@@ -135,32 +135,41 @@ async function handlePortalMode(
     // fetch ERP only — no Shopify call, so no Shopify token is required.
     const erpOnly = portalIds.length > 0 && portalIds.every((id) => id.startsWith('erp-'));
     if (erpOnly) {
-      await fetchErpProducts(appendTemplates);
+      // Fetch ERP, match by id, and append ONLY the matched product(s) — so the
+      // editor shows just the embedded product, not the whole ERP catalog.
+      const erpTemplates = await fetchErpTemplates();
+      for (const id of portalIds) {
+        const erpId = id.replace(/^erp-/, '');
+        const found = erpTemplates.find(
+          (t) => t.metadata?.erpProductId?.toString() === erpId || t.metadata?.itemNo === erpId,
+        );
+        if (found) matched.push(found);
+      }
+      if (matched.length > 0) appendTemplates(matched);
     } else {
       await fetchExternalProducts(appendTemplates);
-    }
 
-    const allTemplates = useProductStore.getState().templates;
+      const allTemplates = useProductStore.getState().templates;
+      for (const id of portalIds) {
+        let found = allTemplates.find((t) => t.id === id);
 
-    for (const id of portalIds) {
-      let found = allTemplates.find((t) => t.id === id);
+        if (!found && id.startsWith('shopify-')) {
+          const shopifyId = id.replace('shopify-', '');
+          found = allTemplates.find(
+            (t) => t.metadata?.shopifyProductId?.toString() === shopifyId
+          );
+        }
 
-      if (!found && id.startsWith('shopify-')) {
-        const shopifyId = id.replace('shopify-', '');
-        found = allTemplates.find(
-          (t) => t.metadata?.shopifyProductId?.toString() === shopifyId
-        );
+        if (!found && id.startsWith('erp-')) {
+          const erpId = id.replace('erp-', '');
+          found = allTemplates.find(
+            (t) => t.metadata?.erpProductId?.toString() === erpId ||
+                   t.metadata?.itemNo === erpId
+          );
+        }
+
+        if (found) matched.push(found);
       }
-
-      if (!found && id.startsWith('erp-')) {
-        const erpId = id.replace('erp-', '');
-        found = allTemplates.find(
-          (t) => t.metadata?.erpProductId?.toString() === erpId ||
-                 t.metadata?.itemNo === erpId
-        );
-      }
-
-      if (found) matched.push(found);
     }
   }
 
@@ -261,24 +270,21 @@ function addArtworkLayer(artworkUrl: string) {
 }
 
 /**
- * Fetches ERP products only (no Shopify), converts them to ProductTemplates,
- * and appends them. Used for the ERP-id embed path (e.g. the ghostyle
- * storefront), so no Shopify Admin token is needed in that flow.
+ * Fetches ERP products only (no Shopify) and returns them as ProductTemplates.
+ * Used for the ERP-id embed path (e.g. the ghostyle storefront), so no Shopify
+ * token is needed. The caller appends only the matched product(s), keeping the
+ * editor scoped to the embedded product.
  */
-async function fetchErpProducts(
-  appendTemplates: (templates: ProductTemplate[]) => void
-) {
+async function fetchErpTemplates(): Promise<ProductTemplate[]> {
   try {
     const res = await fetch('/api/erp-products?pageNo=1&pageSize=200');
     if (!res.ok) throw new Error(`ERP API ${res.status}`);
     const data = (await res.json()) as ErpProductListResponse;
-    if (data.success) {
-      const templates = convertErpProducts(data.result.records);
-      if (templates.length > 0) appendTemplates(templates);
-    }
+    if (data.success) return convertErpProducts(data.result.records);
   } catch (err) {
     console.warn('[TemplateLoader] Failed to load ERP products:', err);
   }
+  return [];
 }
 
 /**

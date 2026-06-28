@@ -636,7 +636,7 @@ function EditorPageInner() {
 
         {/* Left sidebar — desktop only */}
         <div className="hidden md:flex w-56 flex-col border-r border-gray-200 bg-white overflow-y-auto">
-          {!isEmbedded && <ProductSelector />}
+          {!isEmbedded && !isPortal && <ProductSelector />}
           <div className="p-3 border-t border-gray-200">
             <DesignUploader onLayerAdded={handleLayerAdded} />
             <button
@@ -721,7 +721,7 @@ function EditorPageInner() {
               {mobilePanel === 'products' && (
                 <div>
                   {isMultiProduct && <MultiProductPanel />}
-                  {!isEmbedded && <ProductSelector />}
+                  {!isEmbedded && !isPortal && <ProductSelector />}
                 </div>
               )}
               {mobilePanel === 'upload' && (
