@@ -51,6 +51,7 @@ export default async function ProductDetailPage({
           design_version_id: product.design_version_id,
           product_template_id: product.product_template_id,
           base_price_suggestion: product.base_price_suggestion,
+          shipping_cost: product.shipping_cost ?? 0,
           variant_preview_urls: product.variant_preview_urls ?? null,
           product_images: product.product_images ?? [],
           size_guide: product.size_guide ?? null,

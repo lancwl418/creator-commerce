@@ -58,6 +58,9 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const [retailPrice, setRetailPrice] = useState(
     product.retail_price?.toString() || product.base_price_suggestion?.toString() || '25.00'
   );
+  const [shippingCost, setShippingCost] = useState(
+    product.shipping_cost != null ? product.shipping_cost.toString() : '0'
+  );
   const [variantPrices, setVariantPrices] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     for (const s of product.selected_skus) {
@@ -110,11 +113,12 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   );
 
   const priceNum = parseFloat(retailPrice) || 0;
+  const shippingNum = parseFloat(shippingCost) || 0;
   const hasCustomPrices = Object.keys(variantPrices).some(k => variantPrices[k] !== '');
 
   const profitRange = useMemo(
-    () => calculateProfitRange(erpSkus, enabledSkuIds, variantPrices, priceNum),
-    [erpSkus, enabledSkuIds, variantPrices, priceNum]
+    () => calculateProfitRange(erpSkus, enabledSkuIds, variantPrices, priceNum, shippingNum),
+    [erpSkus, enabledSkuIds, variantPrices, priceNum, shippingNum]
   );
 
   // ── Callbacks ──
@@ -207,12 +211,13 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         cost: profitRange.costMin,
         product_images: product.product_images.filter(img => selectedImageIds.has(img.id)),
         size_guide: sizeGuide,
+        shipping_cost: shippingNum,
         status: product.status === 'draft' ? 'ready' : product.status,
       })
       .eq('id', product.id);
 
     if (updateError) throw updateError;
-  }, [erpSkus, enabledSkuIds, variantPrices, priceNum, title, description, optionNames, product, supabase, selectedImageIds, profitRange.costMin, sizeGuide]);
+  }, [erpSkus, enabledSkuIds, variantPrices, priceNum, title, description, optionNames, product, supabase, selectedImageIds, profitRange.costMin, sizeGuide, shippingNum]);
 
   // Remember which wizard step the user was on for this product, so reopening
   // it (e.g. after Save as Draft sends them to the list) returns to that step.
@@ -370,6 +375,8 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           <PricingPanel
             retailPrice={retailPrice}
             onRetailPriceChange={(v) => { setRetailPrice(v); setSaved(false); }}
+            shippingCost={shippingCost}
+            onShippingCostChange={(v) => { setShippingCost(v); setSaved(false); }}
             profitRange={profitRange}
             hasCustomPrices={hasCustomPrices}
             onResetPrices={applyPriceToAll}

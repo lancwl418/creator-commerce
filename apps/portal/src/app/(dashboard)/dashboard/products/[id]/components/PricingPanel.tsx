@@ -6,13 +6,16 @@ import { formatPriceRange, formatPercentRange } from '@/lib/utils';
 interface PricingPanelProps {
   retailPrice: string;
   onRetailPriceChange: (value: string) => void;
+  shippingCost: string;
+  onShippingCostChange: (value: string) => void;
   profitRange: ProfitRange;
   hasCustomPrices: boolean;
   onResetPrices: () => void;
 }
 
 export default function PricingPanel({
-  retailPrice, onRetailPriceChange, profitRange, hasCustomPrices, onResetPrices,
+  retailPrice, onRetailPriceChange, shippingCost, onShippingCostChange,
+  profitRange, hasCustomPrices, onResetPrices,
 }: PricingPanelProps) {
   return (
     <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
@@ -38,6 +41,25 @@ export default function PricingPanel({
           <p className="text-[11px] text-gray-400 mt-1">Default price for all variants</p>
         </div>
 
+        <div className="flex-1">
+          <label htmlFor="shipping-cost" className="block text-xs font-medium text-gray-500 mb-1.5">
+            Shipping cost (USD)
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
+            <input
+              id="shipping-cost"
+              type="number"
+              step="0.01"
+              min="0"
+              value={shippingCost}
+              onChange={(e) => onShippingCostChange(e.target.value)}
+              className="w-full rounded-xl border border-border pl-8 pr-4 py-2.5 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
+            />
+          </div>
+          <p className="text-[11px] text-gray-400 mt-1">Deducted from profit</p>
+        </div>
+
         <div className={`rounded-xl px-4 py-3 text-sm ${profitRange.min > 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
           <div className="flex items-baseline gap-2">
             <span className="text-gray-500 text-xs">Profit</span>
@@ -53,6 +75,7 @@ export default function PricingPanel({
           </div>
           <p className="text-[10px] text-gray-400 mt-1">
             Cost: {formatPriceRange(profitRange.costMin, profitRange.costMax)}
+            {parseFloat(shippingCost) > 0 && ` · Shipping: $${(parseFloat(shippingCost) || 0).toFixed(2)}`}
           </p>
         </div>
       </div>

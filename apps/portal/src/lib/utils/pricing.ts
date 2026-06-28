@@ -42,12 +42,14 @@ export function calculateEarnings(salePrice: number, baseCost: number, quantity:
   return (salePrice - baseCost) * quantity;
 }
 
-/** Calculate profit range across all enabled variants */
+/** Calculate profit range across all enabled variants. Shipping cost (if any)
+ * is subtracted from each variant's profit. */
 export function calculateProfitRange(
   skus: ErpSku[],
   enabledSkuIds: Set<string>,
   variantPrices: Record<string, string>,
   productPrice: number,
+  shippingCost = 0,
 ): ProfitRange {
   const enabledSkus = skus.filter(s => enabledSkuIds.has(s.id));
   if (enabledSkus.length === 0) {
@@ -62,7 +64,7 @@ export function calculateProfitRange(
   for (const sku of enabledSkus) {
     const cost = getSkuCost(sku);
     const salePrice = getEffectivePrice(sku.id, variantPrices, productPrice);
-    const profit = salePrice - cost;
+    const profit = salePrice - cost - shippingCost;
     if (profit < minProfit) minProfit = profit;
     if (profit > maxProfit) maxProfit = profit;
     if (cost < costMin) costMin = cost;

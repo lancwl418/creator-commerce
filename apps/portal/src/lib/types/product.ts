@@ -40,6 +40,7 @@ export interface ProductData {
   design_version_id: string;
   product_template_id: string;
   base_price_suggestion: number | null;
+  shipping_cost: number | null;
   variant_preview_urls: Record<string, string> | null;
   product_images: ProductImage[];
   size_guide: SizeGuide | null;
