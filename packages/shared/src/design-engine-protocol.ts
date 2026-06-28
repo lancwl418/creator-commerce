@@ -16,6 +16,8 @@ export const DESIGN_EDITOR_MESSAGE = {
   READY: 'DESIGN_EDITOR_READY',
   /** editor → host: user saved; payload carries the design output */
   SAVED: 'DESIGN_EDITOR_SAVED',
+  /** editor → host: user chose "Add to cart"; host adds the design to its cart */
+  ADD_TO_CART: 'DESIGN_EDITOR_ADD_TO_CART',
   /** editor → host: a fatal error occurred */
   ERROR: 'DESIGN_EDITOR_ERROR',
   /** host → editor: load a previously saved design for editing */
@@ -68,6 +70,12 @@ export interface DesignEditorSavedMessage {
   context?: unknown;
 }
 
+export interface DesignEditorAddToCartMessage {
+  type: typeof DESIGN_EDITOR_MESSAGE.ADD_TO_CART;
+  payload: DesignEditorPayload;
+  context?: unknown;
+}
+
 export interface DesignEditorErrorMessage {
   type: typeof DESIGN_EDITOR_MESSAGE.ERROR;
   error: string;
@@ -77,6 +85,7 @@ export interface DesignEditorErrorMessage {
 export type DesignEditorOutboundMessage =
   | DesignEditorReadyMessage
   | DesignEditorSavedMessage
+  | DesignEditorAddToCartMessage
   | DesignEditorErrorMessage;
 
 // ── host → editor messages ──
@@ -99,6 +108,7 @@ export function isDesignEditorMessage(
   return (
     t === DESIGN_EDITOR_MESSAGE.READY ||
     t === DESIGN_EDITOR_MESSAGE.SAVED ||
+    t === DESIGN_EDITOR_MESSAGE.ADD_TO_CART ||
     t === DESIGN_EDITOR_MESSAGE.ERROR
   );
 }

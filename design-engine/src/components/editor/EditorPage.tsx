@@ -136,6 +136,11 @@ function EditorPageInner() {
 
   const isEmbedded = editorConfig.mode === 'embedded';
   const isPortal = editorConfig.mode === 'portal';
+  // Host opted into the "Add to cart" finish action (e.g. ghostyle storefront
+  // launches with &cart=1). Shows a second finish button alongside sync.
+  const cartEnabled =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('cart') === '1';
   const isMultiProduct = useMultiProductStore((s) => s.isMultiProduct);
   const [saving, setSaving] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'none' | 'products' | 'layers' | 'upload'>('none');
@@ -307,8 +312,10 @@ function EditorPageInner() {
     );
   }, []);
 
-  // Save & Finish: save all products back to Portal and redirect
-  const handleSaveAndFinish = useCallback(async () => {
+  // Save & Finish: save the design and hand it off. action='sync' navigates to
+  // the host (Creator Commerce) to create a product; action='cart' posts the
+  // design back to the host (ghostyle) to add to its cart.
+  const handleSaveAndFinish = useCallback(async (action: 'sync' | 'cart' = 'sync') => {
     if (!isPortal) return;
     setSaving(true);
 
@@ -526,6 +533,17 @@ function EditorPageInner() {
           title_prefix: decodeURIComponent(titlePrefix),
         };
 
+        // "Add to cart": hand the design back to the host (ghostyle) so it adds
+        // it to the Shopify cart. Stays in the iframe — no navigation.
+        if (action === 'cart' && inIframe) {
+          const parentOriginParam = params.get('parent_origin');
+          window.parent.postMessage(
+            { type: DESIGN_EDITOR_MESSAGE.ADD_TO_CART, payload: payloadObj },
+            parentOriginParam ? decodeURIComponent(parentOriginParam) : '*',
+          );
+          return;
+        }
+
         // "Sync to your store" / external host: a callback_url means navigate
         // (form POST) to the host system. When embedded in an iframe (e.g. the
         // ghostyle storefront) target _top so we escape the iframe and land the
@@ -690,14 +708,24 @@ function EditorPageInner() {
           active={mobilePanel === 'layers'}
           onClick={() => setMobilePanel(mobilePanel === 'layers' ? 'none' : 'layers')}
         />
+        {isPortal && cartEnabled && (
+          <button
+            onClick={() => handleSaveAndFinish('cart')}
+            disabled={saving}
+            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-gray-700"
+          >
+            <Save className="w-5 h-5" />
+            <span className="text-[10px] font-semibold">{saving ? '...' : 'Add to cart'}</span>
+          </button>
+        )}
         {isPortal && (
           <button
-            onClick={handleSaveAndFinish}
+            onClick={() => handleSaveAndFinish('sync')}
             disabled={saving}
             className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-blue-600"
           >
             <Save className="w-5 h-5" />
-            <span className="text-[10px] font-semibold">{saving ? 'Saving...' : 'Finish'}</span>
+            <span className="text-[10px] font-semibold">{saving ? 'Saving...' : cartEnabled ? 'Sync' : 'Finish'}</span>
           </button>
         )}
       </div>
@@ -742,15 +770,24 @@ function EditorPageInner() {
         </div>
       )}
 
-      {/* Save & Finish — desktop only (mobile has it in tab bar) */}
+      {/* Finish actions — desktop only (mobile has it in tab bar) */}
       {isPortal && (
-        <div className="hidden md:block fixed bottom-6 right-6 z-50">
+        <div className="hidden md:flex fixed bottom-6 right-6 z-50 gap-3">
+          {cartEnabled && (
+            <button
+              onClick={() => handleSaveAndFinish('cart')}
+              disabled={saving}
+              className="px-6 py-3 bg-white text-gray-900 font-semibold rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 transition-all"
+            >
+              {saving ? 'Saving...' : 'Add to cart'}
+            </button>
+          )}
           <button
-            onClick={handleSaveAndFinish}
+            onClick={() => handleSaveAndFinish('sync')}
             disabled={saving}
             className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl shadow-lg hover:bg-blue-700 disabled:opacity-50 transition-all"
           >
-            {saving ? 'Saving...' : 'Save & Finish'}
+            {saving ? 'Saving...' : cartEnabled ? 'Sync to your store' : 'Save & Finish'}
           </button>
         </div>
       )}
