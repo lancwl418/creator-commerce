@@ -14,12 +14,16 @@ export async function POST(request: NextRequest) {
   const contentType = request.headers.get('content-type') || '';
   let payload = '';
 
-  if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
-    const formData = await request.formData();
-    payload = (formData.get('payload') as string) || '';
-  } else {
-    const body = await request.json();
-    payload = JSON.stringify(body);
+  try {
+    if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      payload = (formData.get('payload') as string) || '';
+    } else {
+      const body = await request.json();
+      payload = JSON.stringify(body);
+    }
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
   if (!payload) {

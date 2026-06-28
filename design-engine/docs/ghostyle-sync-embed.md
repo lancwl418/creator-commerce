@@ -38,7 +38,7 @@ from ERP itself, server-side.
 ```
 https://editor.ghostyle.com/embed
   ?templates=erp-<ERP_PRODUCT_ID>
-  &callback_url=<urlencoded https://studio.ghostyle.com/api/products/sync-redirect>
+  &callback_url=<urlencoded https://creator.ghostyle.com/api/products/sync-redirect>
   &parent_origin=<urlencoded https://your-product-page-origin>
 ```
 
@@ -79,7 +79,7 @@ does not construct it — the editor does.
 
 ## 3. Creator Commerce side (already built — for reference)
 
-`POST https://studio.ghostyle.com/api/products/sync-redirect`
+`POST https://creator.ghostyle.com/api/products/sync-redirect`
 - Receives the form POST, stashes the payload, bounces to
   `/dashboard/products/sync`.
 - That page **requires a logged-in creator**, creates the product from the
@@ -93,7 +93,7 @@ does not construct it — the editor does.
 - **Step 1 (current):** if the customer is already logged into Creator Commerce
   they flow straight through. If not, they currently bounce to the Creator
   Commerce `/login`.
-- **Why subdomains matter:** once `studio.ghostyle.com` sets its session cookie
+- **Why subdomains matter:** once `creator.ghostyle.com` sets its session cookie
   on `domain=.ghostyle.com`, a customer logged in on any `*.ghostyle.com` is
   recognized — so the sync lands them straight in without a re-login.
 - A payload-preserving "register/login then resume" flow is **Step 2** on the
@@ -109,7 +109,7 @@ does not construct it — the editor does.
 2. **Button placement** — where "Order directly" vs "Sync to your store" appear
    on the product page, and gating (e.g. only show "Sync to your store" to
    logged-in creators, or always show and let the login redirect handle it).
-3. **Domains** — `editor.ghostyle.com` (engine) and `studio.ghostyle.com`
+3. **Domains** — `editor.ghostyle.com` (engine) and `creator.ghostyle.com`
    (Creator Commerce) must be live with TLS for the iframe + top-navigation to
    work cross-subdomain.
 
@@ -144,10 +144,11 @@ and the launch URL:
 | `pod.erp_product_id` | single_line_text | `2041399393261305857` |
 | `pod.print_areas` | json | `[{ "area":"front", "widthPx":…, "heightPx":…, … }]` — or fetch from ERP by id at launch time |
 
-Theme flow: read `product.metafields.pod.erp_product_id` → obtain the ERP
-product object → POST it to the products-cache (§1a) → launch the editor with
-`templates=erp-<id>` + the returned key. Metafield **definitions + values** can
-be set in the Shopify admin or written by the custom app.
+Theme flow: read `product.metafields.pod.erp_product_id` → launch the editor
+with `templates=erp-<id>` (§1). The editor loads the ERP product server-side —
+no products-cache and no Shopify token on the theme. `pod.print_areas` is
+optional (the editor gets print areas from ERP). Metafield **definitions +
+values** can be set in the Shopify admin or written by the custom app.
 
 ### Custom app — needed for Step 3 (and later)
 
