@@ -76,6 +76,7 @@ export default function EditDesignWizard({ productId, templateId, layers }: Edit
       if (e.data.type === DESIGN_EDITOR_MESSAGE.READY) {
         if (sentRestoreRef.current) return;
         sentRestoreRef.current = true;
+        console.warn('[Restore] host got READY — sending LOAD_DESIGN with', layers.length, 'saved layers');
         iframeRef.current?.contentWindow?.postMessage(
           { type: DESIGN_EDITOR_MESSAGE.LOAD_DESIGN, design: { layers } },
           engineOrigin,
