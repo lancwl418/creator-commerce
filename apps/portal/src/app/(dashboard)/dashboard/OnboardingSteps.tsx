@@ -53,7 +53,7 @@ export default function OnboardingSteps({ publishedCount, target = 5 }: Onboardi
       </div>
 
       {!minimized && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="max-w-md">
           {/* STEP 1 — real flow */}
           <div className="rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 p-5 text-white shadow-lg flex flex-col">
             <p className="text-xs font-semibold text-white/70 uppercase tracking-wider">Step 1</p>
@@ -70,59 +70,8 @@ export default function OnboardingSteps({ publishedCount, target = 5 }: Onboardi
               Add to store
             </Link>
           </div>
-
-          {/* STEP 2 — placeholder, link added later */}
-          <PlaceholderStep
-            step={2}
-            title="Place a test order"
-            description="Order a sample to check fit, fabric, and print quality."
-            cta="View step"
-          />
-
-          {/* STEP 3 — placeholder, link added later */}
-          <PlaceholderStep
-            step={3}
-            title="Get your product in hand"
-            description="Order a product for yourself, friends & family or for a client."
-            cta="Order now"
-          />
-
-          {/* STEP 4 — placeholder, link added later */}
-          <PlaceholderStep
-            step={4}
-            title="Customize your branding"
-            description="Add labels, inserts, and finishing details."
-            cta="Customize now"
-          />
         </div>
       )}
-    </div>
-  );
-}
-
-function PlaceholderStep({
-  step,
-  title,
-  description,
-  cta,
-}: {
-  step: number;
-  title: string;
-  description: string;
-  cta: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-white p-5 shadow-sm flex flex-col">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Step {step}</p>
-      <p className="text-lg font-bold text-gray-900 mt-1">{title}</p>
-      <p className="text-sm text-gray-500 mt-1 flex-1">{description}</p>
-      {/* TODO: replace with a real Link/href once the feature exists */}
-      <button
-        type="button"
-        className="mt-4 inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors self-start"
-      >
-        {cta}
-      </button>
     </div>
   );
 }
