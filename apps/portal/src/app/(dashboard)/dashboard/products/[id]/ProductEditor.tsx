@@ -22,6 +22,7 @@ import VariantsTable from './components/VariantsTable';
 import ChannelListings from './components/ChannelListings';
 import ProductInfoCard from './components/ProductInfoCard';
 import SizeGuideEditor from './components/SizeGuideEditor';
+import TagsEditor from './components/TagsEditor';
 import Lightbox from './components/Lightbox';
 
 interface ProductEditorProps {
@@ -47,6 +48,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
   const [title, setTitle] = useState(product.title || '');
   const [description, setDescription] = useState(product.description || '');
   const [sizeGuide, setSizeGuide] = useState<SizeGuide | null>(product.size_guide ?? null);
+  const [tags, setTags] = useState<string[]>(product.tags ?? []);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showUnlistModal, setShowUnlistModal] = useState(false);
@@ -212,12 +214,13 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         product_images: product.product_images.filter(img => selectedImageIds.has(img.id)),
         size_guide: sizeGuide,
         shipping_cost: shippingNum,
+        tags,
         status: product.status === 'draft' ? 'ready' : product.status,
       })
       .eq('id', product.id);
 
     if (updateError) throw updateError;
-  }, [erpSkus, enabledSkuIds, variantPrices, priceNum, title, description, optionNames, product, supabase, selectedImageIds, profitRange.costMin, sizeGuide, shippingNum]);
+  }, [erpSkus, enabledSkuIds, variantPrices, priceNum, title, description, optionNames, product, supabase, selectedImageIds, profitRange.costMin, sizeGuide, shippingNum, tags]);
 
   // Remember which wizard step the user was on for this product, so reopening
   // it (e.g. after Save as Draft sends them to the list) returns to that step.
@@ -367,6 +370,11 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
             <SizeGuideEditor
               value={sizeGuide}
               onChange={(v) => { setSizeGuide(v); setSaved(false); }}
+            />
+
+            <TagsEditor
+              tags={tags}
+              onChange={(v) => { setTags(v); setSaved(false); }}
             />
           </div>
         </div>

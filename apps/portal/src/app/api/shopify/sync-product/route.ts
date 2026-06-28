@@ -631,11 +631,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const productTags = Array.isArray(product.tags) ? (product.tags as string[]) : [];
   const shopifyProduct: Record<string, unknown> = {
     title: product.title || 'Untitled',
     body_html: product.description || '',
     vendor: 'ideamax',
-    tags: 'ideamax',
+    tags: ['ideamax', ...productTags].join(', '),
     images: allImageUrls.map(url => ({ src: url })),
     status: shopifyStatus,
   };

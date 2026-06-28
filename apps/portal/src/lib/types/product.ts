@@ -41,6 +41,7 @@ export interface ProductData {
   product_template_id: string;
   base_price_suggestion: number | null;
   shipping_cost: number | null;
+  tags: string[] | null;
   variant_preview_urls: Record<string, string> | null;
   product_images: ProductImage[];
   size_guide: SizeGuide | null;
