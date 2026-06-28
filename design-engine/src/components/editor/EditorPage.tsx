@@ -159,6 +159,75 @@ function EditorPageInner() {
     return () => clearTimeout(timer);
   }, [design]);
 
+  // ── Restore a saved design when the host (edit mode) sends LOAD_DESIGN ──
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const pendingRestoreRef = useRef<DesignLayer[] | null>(null);
+  const appliedRestoreRef = useRef(false);
+  const readySentRef = useRef(false);
+
+  const applyRestoreLayers = useCallback((layers: DesignLayer[]) => {
+    const { addLayer } = useDesignStore.getState();
+    const { activeViewId } = useProductStore.getState();
+    if (!activeViewId) return;
+    // Delay so the canvas is mounted (mirrors the artwork-injection timing)
+    setTimeout(() => {
+      for (const raw of layers) {
+        const layer: DesignLayer = { ...raw };
+        // Proxy external image sources to avoid CORS canvas tainting
+        if (layer.type === 'image' && layer.data && typeof (layer.data as { src?: string }).src === 'string') {
+          const imgData = layer.data as unknown as { src: string } & Record<string, unknown>;
+          const src = imgData.src;
+          if (!src.startsWith('/') && !src.startsWith('data:')) {
+            layer.data = { ...imgData, src: `/api/image-proxy?url=${encodeURIComponent(src)}` } as typeof layer.data;
+          }
+        }
+        addLayer(activeViewId, layer);
+        window.dispatchEvent(new CustomEvent('ideamizer:layer-added', { detail: layer }));
+      }
+    }, 1200);
+  }, []);
+
+  // Listen for the host's LOAD_DESIGN message
+  useEffect(() => {
+    if (!isPortal) return;
+    if (typeof window === 'undefined' || window.self === window.top) return;
+    function onMessage(e: MessageEvent) {
+      const data = e.data as { type?: string; design?: { layers?: unknown } } | null;
+      if (!data || data.type !== DESIGN_EDITOR_MESSAGE.LOAD_DESIGN) return;
+      const layers = data.design?.layers;
+      if (!Array.isArray(layers) || appliedRestoreRef.current) return;
+      if (statusRef.current === 'loaded') {
+        appliedRestoreRef.current = true;
+        applyRestoreLayers(layers as DesignLayer[]);
+      } else {
+        pendingRestoreRef.current = layers as DesignLayer[];
+      }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [isPortal, applyRestoreLayers]);
+
+  // Once ready (in an iframe), announce READY and flush any queued restore
+  useEffect(() => {
+    if (!isPortal) return;
+    if (typeof window === 'undefined' || window.self === window.top) return;
+    if (status !== 'loaded') return;
+    if (!readySentRef.current) {
+      readySentRef.current = true;
+      const parentOrigin = new URLSearchParams(window.location.search).get('parent_origin');
+      window.parent.postMessage(
+        { type: DESIGN_EDITOR_MESSAGE.READY },
+        parentOrigin ? decodeURIComponent(parentOrigin) : '*',
+      );
+    }
+    if (pendingRestoreRef.current && !appliedRestoreRef.current) {
+      appliedRestoreRef.current = true;
+      applyRestoreLayers(pendingRestoreRef.current);
+      pendingRestoreRef.current = null;
+    }
+  }, [isPortal, status, applyRestoreLayers]);
+
   const doExport = useCallback((format: 'json' | 'png') => {
     if (format === 'json') {
       if (editorConfig.onExport) {

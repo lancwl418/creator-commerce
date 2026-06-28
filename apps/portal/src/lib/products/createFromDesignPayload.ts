@@ -187,3 +187,78 @@ export async function createProductsFromDesignPayload(
 
   return createdResults.filter((x): x is CreatedProductRow => x !== null);
 }
+
+/**
+ * Re-edit flow: apply an updated design to an EXISTING product instead of
+ * creating a new one. Re-uploads artwork/thumbnail, refreshes preview/artwork
+ * URLs + variant previews, and upserts the product_configuration. Leaves
+ * title/description/status/pricing untouched (those are edited in Detail/Price).
+ */
+export async function updateProductFromDesignPayload(
+  supabase: SupabaseClient,
+  productInstanceId: string,
+  payload: DesignPayload,
+): Promise<boolean> {
+  const product = payload.products?.[0];
+  if (!product) return false;
+
+  let designVersionId: string | null = null;
+  let artworkFallbackUrl: string | null = null;
+  if (payload.design_id) {
+    const { data: design } = await supabase
+      .from('designs')
+      .select('id, current_version_id')
+      .eq('id', payload.design_id)
+      .single();
+    if (design?.current_version_id) {
+      designVersionId = design.current_version_id;
+      const { data: artworkAsset } = await supabase
+        .from('design_assets')
+        .select('file_url')
+        .eq('design_version_id', designVersionId)
+        .eq('asset_type', 'artwork')
+        .single();
+      artworkFallbackUrl = artworkAsset?.file_url ?? null;
+    }
+  }
+
+  const designArtworkUrls = deriveArtworkUrls(product);
+  const [thumbnailUrl, ...artworkResults] = await Promise.all([
+    uploadDataUrlOrPassThrough(product.thumbnail, 'previews'),
+    ...designArtworkUrls.map((u) => uploadDataUrlOrPassThrough(u, 'artworks')),
+  ]);
+  const storedArtworkUrls = artworkResults.filter((u): u is string => !!u);
+  const previewUrls = pickPreviewUrls(thumbnailUrl, artworkFallbackUrl, storedArtworkUrls);
+
+  const update: Record<string, unknown> = {
+    variant_preview_urls: product.variant_previews || null,
+    updated_at: new Date().toISOString(),
+  };
+  if (previewUrls.length > 0) update.preview_urls = previewUrls;
+  if (storedArtworkUrls.length > 0) update.design_artwork_urls = storedArtworkUrls;
+
+  const { error: updateError } = await supabase
+    .from('sellable_product_instances')
+    .update(update)
+    .eq('id', productInstanceId);
+  if (updateError) {
+    console.error('Failed to update product:', updateError);
+    return false;
+  }
+
+  if (product.layers && product.layers.length > 0) {
+    await supabase.from('product_configurations').upsert(
+      {
+        sellable_product_instance_id: productInstanceId,
+        design_version_id: designVersionId || '00000000-0000-0000-0000-000000000000',
+        product_template_id: product.template_id,
+        layers: product.layers,
+        print_area_snapshot: product.print_area_snapshot || null,
+        design_metadata: product.design_metadata || null,
+      },
+      { onConflict: 'sellable_product_instance_id' },
+    );
+  }
+
+  return true;
+}

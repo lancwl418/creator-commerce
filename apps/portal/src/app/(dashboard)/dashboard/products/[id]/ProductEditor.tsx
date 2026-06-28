@@ -253,7 +253,13 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
         )}
 
         <div className="hidden sm:block">
-          <WizardSteps current={step} onStepClick={(s) => setStep(s === 'price' ? 'price' : 'detail')} />
+          <WizardSteps
+            current={step}
+            onStepClick={(s) => {
+              if (s === 'design') { router.push(`/dashboard/products/${product.id}/edit`); return; }
+              setStep(s === 'price' ? 'price' : 'detail');
+            }}
+          />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
