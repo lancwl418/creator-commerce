@@ -213,6 +213,8 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
 
   // Remember which wizard step the user was on for this product, so reopening
   // it (e.g. after Save as Draft sends them to the list) returns to that step.
+  // Restore once on mount; persist only on explicit navigation via goToStep so
+  // the initial 'detail' render never clobbers a saved 'price'.
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`pe_step_${product.id}`);
@@ -220,11 +222,12 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     } catch {}
   }, [product.id]);
 
-  useEffect(() => {
+  const goToStep = useCallback((s: WizardStep) => {
+    setStep(s);
     try {
-      localStorage.setItem(`pe_step_${product.id}`, step);
+      localStorage.setItem(`pe_step_${product.id}`, s);
     } catch {}
-  }, [step, product.id]);
+  }, [product.id]);
 
   async function handleSave() {
     setSaving(true);
@@ -258,7 +261,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           </Link>
         ) : (
           <button
-            onClick={() => setStep('detail')}
+            onClick={() => goToStep('detail')}
             className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors shrink-0"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -273,7 +276,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
             current={step}
             onStepClick={(s) => {
               if (s === 'design') { router.push(`/dashboard/products/${product.id}/edit`); return; }
-              setStep(s === 'price' ? 'price' : 'detail');
+              goToStep(s === 'price' ? 'price' : 'detail');
             }}
           />
         </div>
@@ -288,7 +291,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           </button>
           {step === 'detail' ? (
             <button
-              onClick={() => setStep('price')}
+              onClick={() => goToStep('price')}
               className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
             >
               Continue to Price
