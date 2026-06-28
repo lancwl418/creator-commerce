@@ -36,9 +36,9 @@ export default function WizardSteps({ current, onStepClick }: WizardStepsProps) 
               <span
                 className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                   done
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-ink text-white'
                     : active
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-brand text-ink'
                     : 'border border-gray-300 bg-white text-gray-400'
                 }`}
               >

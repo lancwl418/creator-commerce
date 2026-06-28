@@ -307,7 +307,7 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
           ) : (
             <button
               onClick={() => setShowSyncModal(true)}
-              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-500 transition-colors shadow-md shadow-primary-600/25"
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-ink hover:bg-brand-600 transition-colors shadow-sm"
             >
               Publish
             </button>
