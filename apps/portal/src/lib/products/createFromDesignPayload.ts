@@ -168,10 +168,10 @@ export async function createProductsFromDesignPayload(
       }
 
       if (product.layers && product.layers.length > 0) {
-        await supabase.from('product_configurations').upsert(
+        const { error: configError } = await supabase.from('product_configurations').upsert(
           {
             sellable_product_instance_id: instance.id,
-            design_version_id: designVersionId || '00000000-0000-0000-0000-000000000000',
+            design_version_id: designVersionId || null,
             product_template_id: product.template_id,
             layers: product.layers,
             print_area_snapshot: product.print_area_snapshot || null,
@@ -179,6 +179,7 @@ export async function createProductsFromDesignPayload(
           },
           { onConflict: 'sellable_product_instance_id' },
         );
+        if (configError) console.error('Failed to save product configuration:', configError);
       }
 
       return instance as CreatedProductRow;
@@ -247,10 +248,10 @@ export async function updateProductFromDesignPayload(
   }
 
   if (product.layers && product.layers.length > 0) {
-    await supabase.from('product_configurations').upsert(
+    const { error: configError } = await supabase.from('product_configurations').upsert(
       {
         sellable_product_instance_id: productInstanceId,
-        design_version_id: designVersionId || '00000000-0000-0000-0000-000000000000',
+        design_version_id: designVersionId || null,
         product_template_id: product.template_id,
         layers: product.layers,
         print_area_snapshot: product.print_area_snapshot || null,
@@ -258,6 +259,7 @@ export async function updateProductFromDesignPayload(
       },
       { onConflict: 'sellable_product_instance_id' },
     );
+    if (configError) console.error('Failed to update product configuration:', configError);
   }
 
   return true;
