@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { PRODUCT_STATUS_COLORS } from '@/lib/constants';
+import RichTextEditor from './RichTextEditor';
 
 interface ProductInfoCardProps {
   title: string;
@@ -33,11 +34,9 @@ export default function ProductInfoCard({
       </div>
       <div>
         <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Description</label>
-        <textarea
+        <RichTextEditor
           value={description}
-          onChange={(e) => onDescriptionChange(e.target.value)}
-          rows={3}
-          className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all resize-none"
+          onChange={onDescriptionChange}
           placeholder="Product description..."
         />
       </div>

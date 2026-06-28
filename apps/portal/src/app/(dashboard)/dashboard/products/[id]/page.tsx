@@ -53,6 +53,7 @@ export default async function ProductDetailPage({
           base_price_suggestion: product.base_price_suggestion,
           variant_preview_urls: product.variant_preview_urls ?? null,
           product_images: product.product_images ?? [],
+          size_guide: product.size_guide ?? null,
           created_at: product.created_at,
         }}
         previewUrl={previewUrl}

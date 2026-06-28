@@ -42,7 +42,14 @@ export interface ProductData {
   base_price_suggestion: number | null;
   variant_preview_urls: Record<string, string> | null;
   product_images: ProductImage[];
+  size_guide: SizeGuide | null;
   created_at: string;
+}
+
+/** Editable size-guide table: first column is the size label, rest are measurements. */
+export interface SizeGuide {
+  headers: string[];
+  rows: string[][];
 }
 
 export interface Listing {
