@@ -38,9 +38,11 @@ export function useTemplateLoader() {
       }
 
       case 'portal': {
-        // Portal mode: load all products, then match Portal-selected ones
+        // Portal mode: the product comes from the host (cache or ERP id), so
+        // start empty — don't seed the built-in demo templates (their mockup
+        // SVGs would 404 and they'd clutter a single-product embed).
         setLoading();
-        setTemplates(templateRegistry.getAll());
+        setTemplates([]);
         handlePortalMode(config, appendTemplates);
         break;
       }
