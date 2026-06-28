@@ -121,3 +121,63 @@ does not construct it — the editor does.
 3. **Domains** — `editor.ghostyle.com` (engine) and `studio.ghostyle.com`
    (Creator Commerce) must be live with TLS for the iframe + top-navigation to
    work cross-subdomain.
+
+---
+
+## 6. Do you need a Shopify App? (and product metafields)
+
+**Short answer:** the design + "Sync to your store" flow (§1–§2) needs **only a
+theme embed — no app**. A **custom app** is needed only for the deeper
+integration (user-account sync webhook, reading product data via Admin API).
+Because ghostyle is your *own* store, that's a **custom app** (single store, no
+App Store listing or review) — not a public app.
+
+### Theme embed (no app) — covers Steps 1–2
+
+- Add a section / block / snippet to the product template that renders the
+  editor iframe and the two CTAs ("Order directly" / "Sync to your store").
+- The editor is iframe-embeddable, and `editor.ghostyle.com` is same-site under
+  `ghostyle.com`, so there are no third-party-cookie issues.
+- A Theme App Extension (app block) is a tidier way to let the merchant place it
+  from the theme editor, but a plain Liquid snippet works just as well.
+
+### Product metafields — how the theme knows what to design
+
+The editor needs the **blank POD product** (mockup image + printable area),
+which comes from **ERP, not Shopify**. Map each Shopify product to its ERP
+product via metafields; the theme reads them to build the product-cache payload
+and the launch URL:
+
+| Metafield (`namespace.key`) | Type | Example |
+|---|---|---|
+| `pod.erp_product_id` | single_line_text | `2041399393261305857` |
+| `pod.print_areas` | json | `[{ "area":"front", "widthPx":…, "heightPx":…, … }]` — or fetch from ERP by id at launch time |
+
+Theme flow: read `product.metafields.pod.erp_product_id` → obtain the ERP
+product object → POST it to the products-cache (§1a) → launch the editor with
+`templates=erp-<id>` + the returned key. Metafield **definitions + values** can
+be set in the Shopify admin or written by the custom app.
+
+### Custom app — needed for Step 3 (and later)
+
+Create a **custom app** for ghostyle (Admin → Settings → Apps and sales
+channels → *Develop apps*, or via the Partner dashboard) to get Admin API
+access + webhooks:
+
+- `customers/create` webhook → Creator Commerce provisions a matching creator
+  account (**Step 3 user sync**).
+- Admin API → read products / write the metafields above programmatically.
+- (Later) order webhooks for fulfillment 回流.
+- Likely scopes: `read_products`, `write_products` (for metafields),
+  `read_customers` / `write_customers`, `read_orders`.
+- Private to ghostyle — **no App Store review**.
+
+> Not on Shopify Plus → no Multipass SSO. Login stays on Creator Commerce's own
+> auth; shared `.ghostyle.com` cookies keep it seamless across subdomains.
+
+### Recommended split
+
+1. **Now:** theme embed (iframe + 2 CTAs) → run Steps 1–2. No app required.
+2. **In parallel:** stand up the custom app + product metafields → unblocks
+   Step 3 (user sync) and clean product-data access.
+
