@@ -217,7 +217,8 @@ export default function ProductEditor({ product, previewUrl, designTitle, design
     try {
       await saveProduct();
       setSaved(true);
-      router.refresh();
+      // Saving a draft moves it into the Unpublished tab — land the user there.
+      router.push('/dashboard/products?tab=unpublished');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
