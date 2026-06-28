@@ -55,7 +55,7 @@ export default function OnboardingSteps({ publishedCount, target = 5 }: Onboardi
       {!minimized && (
         <div className="max-w-md">
           {/* STEP 1 — real flow */}
-          <div className="rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 p-5 text-white shadow-lg flex flex-col">
+          <div className="rounded-2xl bg-ink p-5 text-white shadow-lg flex flex-col">
             <p className="text-xs font-semibold text-white/70 uppercase tracking-wider">Step 1</p>
             <p className="text-lg font-bold mt-1">
               {publishedCount} of {target} published products
@@ -65,7 +65,7 @@ export default function OnboardingSteps({ publishedCount, target = 5 }: Onboardi
             </p>
             <Link
               href="/dashboard/catalog"
-              className="mt-4 inline-flex items-center justify-center rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-black/80 transition-colors self-start"
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-ink hover:bg-brand-600 transition-colors self-start"
             >
               Add to store
             </Link>

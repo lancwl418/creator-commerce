@@ -86,7 +86,7 @@ export default async function DashboardPage() {
 
       {/* Stats Row 1: Counts */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-        <Link href="/dashboard/designs" className="rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
+        <Link href="/dashboard/designs" className="rounded-2xl bg-ink p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-white/80">Total Designs</p>
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
@@ -98,7 +98,7 @@ export default async function DashboardPage() {
           <p className="text-3xl font-bold">{designCount ?? 0}</p>
         </Link>
 
-        <Link href="/dashboard/products?tab=published" className="rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
+        <Link href="/dashboard/products?tab=published" className="rounded-2xl bg-ink p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-white/80">Products published</p>
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
@@ -110,7 +110,7 @@ export default async function DashboardPage() {
           <p className="text-3xl font-bold">{publishedCount ?? 0}</p>
         </Link>
 
-        <Link href="/dashboard/orders" className="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
+        <Link href="/dashboard/orders" className="rounded-2xl bg-ink p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-white/80">Orders requiring action</p>
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
@@ -122,10 +122,10 @@ export default async function DashboardPage() {
           <p className="text-3xl font-bold">{ordersRequiringAction}</p>
         </Link>
 
-        <Link href="/dashboard/orders" className="rounded-2xl bg-gradient-to-br from-emerald-500 to-green-700 p-5 text-white shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
+        <Link href="/dashboard/orders" className="rounded-2xl bg-brand p-5 text-ink shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-white/80">Profit</p>
-            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+            <p className="text-sm font-medium text-ink/60">Profit</p>
+            <div className="w-9 h-9 rounded-xl bg-black/10 flex items-center justify-center">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>

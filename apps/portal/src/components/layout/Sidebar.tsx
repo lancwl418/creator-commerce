@@ -46,8 +46,8 @@ export function Sidebar({ userType }: { userType: 'designer' | 'distributor' }) 
     <>
       <div className="h-16 flex items-center justify-between px-5">
         <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-            <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center">
+            <svg className="w-4.5 h-4.5 text-ink" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
             </svg>
           </div>
@@ -74,8 +74,8 @@ export function Sidebar({ userType }: { userType: 'designer' | 'distributor' }) 
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${
                 isActive
-                  ? 'bg-white/15 text-white shadow-sm'
-                  : 'text-white/60 hover:bg-white/8 hover:text-white/90'
+                  ? 'bg-brand text-ink shadow-sm'
+                  : 'text-white/60 hover:bg-white/10 hover:text-white'
               }`}
             >
               <item.icon className="w-[18px] h-[18px]" />
@@ -115,7 +115,7 @@ export function Sidebar({ userType }: { userType: 'designer' | 'distributor' }) 
 
       {/* Mobile drawer */}
       <aside
-        className={`md:hidden fixed inset-y-0 left-0 z-50 w-[260px] bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col transform transition-transform duration-200 ease-in-out ${
+        className={`md:hidden fixed inset-y-0 left-0 z-50 w-[260px] bg-ink flex flex-col transform transition-transform duration-200 ease-in-out ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -123,7 +123,7 @@ export function Sidebar({ userType }: { userType: 'designer' | 'distributor' }) 
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-[240px] bg-gradient-to-b from-gray-900 to-gray-800 flex-col shrink-0">
+      <aside className="hidden md:flex w-[240px] bg-ink flex-col shrink-0">
         {navContent}
       </aside>
     </>
