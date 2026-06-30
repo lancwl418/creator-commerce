@@ -16,6 +16,7 @@ describe('isDesignEditorMessage', () => {
       type: DESIGN_EDITOR_MESSAGE.ERROR,
       error: 'x',
     })).toBe(true);
+    expect(isDesignEditorMessage({ type: DESIGN_EDITOR_MESSAGE.ADD_TO_CART })).toBe(true);
   });
 
   it('rejects inbound and unknown message types', () => {
@@ -27,7 +28,7 @@ describe('isDesignEditorMessage', () => {
     expect(isDesignEditorMessage({})).toBe(false);
     expect(isDesignEditorMessage(null)).toBe(false);
     expect(isDesignEditorMessage(undefined)).toBe(false);
-    expect(isDesignEditorMessage('a string')).toBe(false);
+    expect(isDesignEditorMessage('x')).toBe(false);
     expect(isDesignEditorMessage(123)).toBe(false);
   });
 });

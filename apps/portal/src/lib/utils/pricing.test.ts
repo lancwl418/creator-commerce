@@ -157,6 +157,63 @@ describe('pricing utilities', () => {
         uniform: true,
       });
     });
+
+    it('subtracts shipping cost from a single enabled variant profit', () => {
+      expect(calculateProfitRange(
+        [sku('s1', 4)],
+        new Set(['s1']),
+        {},
+        20,
+        2,
+      )).toMatchObject({
+        min: 14,
+        max: 14,
+        costMin: 4,
+        costMax: 4,
+      });
+    });
+
+    it('defaults omitted shipping cost to 0', () => {
+      expect(calculateProfitRange(
+        [sku('s1', 4), sku('s2', 10)],
+        new Set(['s1', 's2']),
+        {},
+        20,
+      )).toEqual(calculateProfitRange(
+        [sku('s1', 4), sku('s2', 10)],
+        new Set(['s1', 's2']),
+        {},
+        20,
+        0,
+      ));
+    });
+
+    it('subtracts shipping cost from each variant across a range', () => {
+      const withoutShipping = calculateProfitRange(
+        [sku('s1', 4), sku('s2', 10)],
+        new Set(['s1', 's2']),
+        {},
+        20,
+      );
+      const withShipping = calculateProfitRange(
+        [sku('s1', 4), sku('s2', 10)],
+        new Set(['s1', 's2']),
+        {},
+        20,
+        2,
+      );
+
+      expect(withShipping).toMatchObject({
+        min: 8,
+        max: 14,
+        costMin: 4,
+        costMax: 10,
+        minMargin: 40,
+        maxMargin: 70,
+      });
+      expect(withShipping.min).toBe(withoutShipping.min - 2);
+      expect(withShipping.max).toBe(withoutShipping.max - 2);
+    });
   });
 
   describe('formatPrice', () => {
