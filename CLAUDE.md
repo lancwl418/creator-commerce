@@ -21,9 +21,16 @@ ERP Core 是整个业务的数据底座，向上支撑三个面向不同用户�
 | **设计器** | 需要（嵌入主站） | 需要 | 不需要 |
 | **渠道同步** | 不需要 | Shopify / Etsy / TikTok Shop | 自建独立站 |
 | **收益结算** | 无（直接采购） | 差价 / Royalty | 净收入（扣5%平台费） |
-| **现阶段方案** | 已有 Shopify 店铺 | **完整开发（本项目）** | 独立开发 |
+| **现阶段方案** | 已有 Shopify 店铺 | **完整开发（本项目）** | **作为 monorepo 独立 app 开发（本 repo `apps/cn-portal`），共享领域层** |
 
-**Creator Commerce 是本项目的全部范围。** Shopify 主站已有，中国卖家 Portal 独立开发，不在本 repo。
+**本 repo 承载 Creator Commerce + 中国卖家 Portal 两个前端系统。** Shopify 主站已有，不在本 repo。
+
+**中国卖家 Portal 的归属原则（2026-09 决策）：** 它在**业务定位上是独立系统**（面向中国跨境卖家，业务模型、收益、UI、语言均与 Creator Commerce 不同），但在**工程上归属于本 monorepo**，作为独立 app `apps/cn-portal` 存在。判断依据是两系统**领域层高度重叠、表现层完全分离**：
+
+- **领域层共享**：ERP 对接、产品/SKU 数据、取价、类型等下沉到 `packages/shared`（现已有 `packages/shared/src/erp`），两个前端共用一份，避免跨 repo 复制或版本同步。
+- **表现层分离**：各自独立的 app（独立域名/部署/CI）、UI、i18n、路由，以及各自专属的业务规则（cn-portal 无设计器、无渠道同步，走分级取价 + 5% 平台费）。
+- **原则一句话**：同一 monorepo 下的两个"窗口"，共享领域层、分离表现层。
+- 详见 `apps/cn-portal`（依据《中国卖家上架选品系统·产品模块 需求与技术方案 v1》）。
 
 ### 项目结构：Monorepo
 
@@ -38,6 +45,10 @@ creator-commerce/                  ← 本 repo
 │   │   ├── src/
 │   │   ├── package.json
 │   │   └── Dockerfile
+│   ├── cn-portal/                 → 部署为独立 service（中国卖家平台，中文优先）
+│   │   ├── src/                     业务定位独立，工程上共享领域层
+│   │   ├── package.json
+│   │   └── Dockerfile
 │   └── sync-gateway/              → 部署为内部服务
 │       ├── src/
 │       ├── package.json
@@ -47,8 +58,9 @@ creator-commerce/                  ← 本 repo
 │   ├── package.json
 │   └── Dockerfile
 ├── packages/
-│   └── shared/                    → 共享 TypeScript 类型、工具函数
+│   └── shared/                    → 共享领域层：TypeScript 类型、工具函数、ERP client
 │       ├── src/
+│       │   ├── erp/                 ERP client（签名/产品拉取/分级取价），子路径 @creator-commerce/shared/erp
 │       │   ├── types/               postMessage 协议、product_configuration 结构等
 │       │   └── utils/
 │       └── package.json
@@ -64,7 +76,9 @@ creator-commerce/                  ← 本 repo
 | 决策项 | 结论 |
 |--------|------|
 | **代码结构** | Monorepo (pnpm workspaces + turborepo)，源码在一起方便联调，部署各自独立 |
-| **数据库策略** | 两个独立数据库：ERP 自己的 DB（已有，不动）+ Creator Commerce DB（**Supabase**，PostgreSQL 全兼容，Portal + Admin + Design Engine 共享） |
+| **数据库策略** | 两个独立数据库：ERP 自己的 DB（已有，不动）+ Creator Commerce DB（**Supabase**，PostgreSQL 全兼容，Portal + Admin + Design Engine + cn-portal 共享） |
+| **cn-portal 归属** | 业务定位独立、工程上归属本 monorepo；领域层共享（`packages/shared`），表现层分离（独立 app/域名/UI/i18n）。详见「全局系统定位」 |
+| **共享领域层** | ERP client、产品/取价类型下沉到 `packages/shared/src/erp`，经子路径 `@creator-commerce/shared/erp` 导出（含 node crypto，不进主 barrel 以免污染客户端包）。creator portal 仍有一份早于共享包的 ERP 路由，long-term 可迁入共享包消除重复 |
 | **Supabase 使用范围** | Auth（Creator 注册/登录）、Storage（artwork/preview/print file 存储）、Database（全部业务表）、RLS（按 creator 隔离数据） |
 | **技术栈** | Creator Commerce 全栈 Node.js/TypeScript，ERP 是 Java，不强制统一，通过 REST API 通信 |
 | **ERP Customer 创建时机** | Creator/Distributor 审核通过后在 ERP 创建 customer 记录（customerType=creator/distributor），回写 `erpCustomerId` |
