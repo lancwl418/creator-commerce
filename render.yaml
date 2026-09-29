@@ -18,6 +18,15 @@ services:
       - fromGroup: creator commerce
 
   - type: web
+    name: cn-portal
+    runtime: docker
+    dockerfilePath: ./apps/cn-portal/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - fromGroup: creator commerce
+
+  - type: web
     name: design-engine
     runtime: docker
     dockerfilePath: ./design-engine/Dockerfile
