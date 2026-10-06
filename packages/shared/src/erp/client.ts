@@ -44,8 +44,12 @@ export function erpSign(cfg: ErpConfig, timestamp: string): string {
     .digest('hex');
 }
 
-/** 已知接口 code：产品主数据（含 prodSkuList / prodImageList） */
+/** 已知接口 code：产品分页列表（每条含 prodSkuList / prodImageList / pricingGroups） */
 const PRODUCTS_ENDPOINT_CODE = 'K5iOWd6y';
+/** 已知接口 code：按 id 查单个产品详情，返回结构与列表中的单条记录一致 */
+const PRODUCT_DETAIL_ENDPOINT_CODE = 'rcdCIqkQ';
+// ERP 对「产品不存在」返回 HTTP 200 + success=false，只能靠 message 区分（接口文档错误码表）。
+const PRODUCT_NOT_FOUND_MESSAGE = '未找到对应商品数据';
 
 export interface ErpEnvelope<T> {
   success: boolean;
@@ -60,11 +64,12 @@ export class ErpApiError extends Error {
   }
 }
 
-async function erpGet<T>(
+// 签名头每次请求都不同，Next 的 fetch 缓存按请求头生成 key，永远不会命中；
+// 需要缓存的调用方在自己的数据层缓存结果。
+async function erpRequest<T>(
   cfg: ErpConfig,
   code: string,
-  params: Record<string, string>,
-  init?: { revalidate?: number }
+  params: Record<string, string>
 ): Promise<ErpEnvelope<T>> {
   const timestamp = String(Date.now());
   const url = new URL(`${cfg.baseUrl}/openapi/call/${code}`);
@@ -77,14 +82,20 @@ async function erpGet<T>(
       signature: erpSign(cfg, timestamp),
       timestamp,
     },
-    // Next.js fetch 缓存；非 Next 环境忽略此字段
-    ...(init?.revalidate != null ? { next: { revalidate: init.revalidate } } : {}),
-  } as RequestInit);
+  });
 
   if (!res.ok) {
     throw new ErpApiError(`ERP API returned ${res.status}`, res.status);
   }
-  const data = (await res.json()) as ErpEnvelope<T>;
+  return (await res.json()) as ErpEnvelope<T>;
+}
+
+async function erpGet<T>(
+  cfg: ErpConfig,
+  code: string,
+  params: Record<string, string>
+): Promise<ErpEnvelope<T>> {
+  const data = await erpRequest<T>(cfg, code, params);
   if (!data.success || !data.result) {
     throw new ErpApiError(data.message || 'ERP API returned no data', 502);
   }
@@ -103,15 +114,9 @@ export interface RawProductPage {
 export async function fetchProductsEnvelope(
   cfg: ErpConfig,
   pageNo: string,
-  pageSize: string,
-  init?: { revalidate?: number }
+  pageSize: string
 ): Promise<ErpEnvelope<RawProductPage>> {
-  return erpGet<RawProductPage>(
-    cfg,
-    PRODUCTS_ENDPOINT_CODE,
-    { pageNo, pageSize },
-    init
-  );
+  return erpGet<RawProductPage>(cfg, PRODUCTS_ENDPOINT_CODE, { pageNo, pageSize });
 }
 
 /** 拉取产品分页列表 */
@@ -120,12 +125,7 @@ export async function fetchProducts(
   pageNo = 1,
   pageSize = 40
 ): Promise<ErpProductPage> {
-  const data = await fetchProductsEnvelope(
-    cfg,
-    String(pageNo),
-    String(pageSize),
-    { revalidate: 300 }
-  );
+  const data = await fetchProductsEnvelope(cfg, String(pageNo), String(pageSize));
   const result = data.result ?? {};
   const records = result.records ?? result.list ?? [];
   const total = result.total ?? records.length;
@@ -133,21 +133,16 @@ export async function fetchProducts(
   return { records, total, pages, current: result.current ?? pageNo };
 }
 
-/**
- * 按 id 找单个产品。
- * ERP 当前无按 id 查询的接口，逐页查找，避免第 100 条以后的产品无法打开。
- * 如后续 ERP 提供 detail 接口，替换此实现即可。
- */
+/** 按 id 查单个产品；不存在或已被逻辑删除时返回 null。 */
 export async function findProductById(
   cfg: ErpConfig,
   erpProductId: string
 ): Promise<ErpProduct | null> {
-  let pageNo = 1;
-  while (true) {
-    const page = await fetchProducts(cfg, pageNo, 100);
-    const product = page.records.find((p) => p.id === erpProductId);
-    if (product) return product;
-    if (page.records.length === 0 || pageNo >= page.pages) return null;
-    pageNo += 1;
+  const data = await erpRequest<ErpProduct>(cfg, PRODUCT_DETAIL_ENDPOINT_CODE, { id: erpProductId });
+  if (data.success && data.result) {
+    // 列表接口不返回已删除产品，详情接口按 id 直查，这里保持同样的可见范围。
+    return Number(data.result.delFlag) === 1 ? null : data.result;
   }
+  if (data.message?.includes(PRODUCT_NOT_FOUND_MESSAGE)) return null;
+  throw new ErpApiError(data.message || 'ERP API returned no data', 502);
 }

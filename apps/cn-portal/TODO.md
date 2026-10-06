@@ -11,13 +11,25 @@
 - [ ] **是否对卖家展示供应商名称**（文档待确认 #4）：当前默认不展示。关系平台价值/绕过风险。
 - [ ] **起订量是否启用下单校验**（文档待确认 #6）：当前只录字段、只提示、不拦截。
 
+- [ ] **哪些 ERP 产品状态可以给卖家看**：目录目前不按状态过滤，ERP 里的草稿（status=0）、
+      审批中（1）、通过（2）都会显示。需确认只展示哪些状态 / 是否按 shelfStatus 过滤。
+- [ ] **是否用 ERP 的「中国商家」客户等级和 `chinamerchant` 业务线**：ERP 已有客户等级
+      「中国商家」和业务线 `chinamerchant`（商品字段 prodSupport），但定价分组目前只有
+      零售 / 批发 / VIP。需确认卖家等级沿用 VIP / 批发，还是改用「中国商家」，以及目录是否
+      只展示 prodSupport 含 `chinamerchant` 的产品。
+
 ## 二、待接入（工程）
 
+- [ ] **应用 migration 023**：当前 Supabase 项目里没有 `seller_product_visibility`、
+      `product_stock_snapshot`、`product_moq` 三张表，列表页会显示「产品加载失败」、详情页报错。
+      在根目录 `.env` 配好 `DATABASE_URL` 后执行 `pnpm db:migrate`。
 - [ ] **上线前访问控制**：当前 cookie 可由访问者修改，默认 VIP 也不是认证结果，不能作为
       生产价格权限来源。接入真实身份后，删除 cookie/default 占位，并为 migration 023 的三张表
       增加 RLS/写入权限策略（当前 migration 没有定义），库存/可见性/MOQ 仅由运营修改。
 - [ ] **卖家 auth + ERP 真实 tier 解析**：把 `src/lib/seller.ts` 里的 cookie 占位（`cn_seller_tier`）
       换成「登录 → 调 ERP customer 接口读价格等级 → 映射 SellerTier」。
+      ERP 已提供客户档案分页接口（`UmrAedIA`，含 custStageId / vipStage）和客户等级分页接口（`wfi8Vrp4`）；
+      等级匹配建议同时改为按 `pricingGroups[].customerLevelId`，不再按分组名称。
 - [ ] **详情页 variant 精确价**：当前列表/详情用等级价格区间（min–max 起价）；
       详情页按具体尺码档 + 颜色档精确到每个 variant。需按 SKU 的 option(color/size)
       匹配 pricingTiers/colorTiers/printPriceJson 的色档 ct 与尺码档。
@@ -36,6 +48,8 @@
 - [x] **组件与类型组织**：产品 UI 集中到 `src/components/products`，筛选状态放在
       `src/hooks/products`，目录/详情/路由类型集中在 `src/lib/types/catalog.ts`。
       页面入口仅加载和组装；列表/详情共用价格、MOQ 展示组件。
+- [x] **详情页加载慢**：改用 ERP 单品详情接口（`rcdCIqkQ`），不再逐页扫描全量列表；ERP 产品数据
+      进程内缓存 5 分钟，列表页顺带预热详情；列表和详情加了加载骨架。
 - [x] **错误与分页修复**：ERP 业务失败、平台表查询失败不能当作空数据；平台表分页加载；
       详情可跨 ERP 页查找；URL 参数校验、筛选输入重置已修复。
 - [ ] **剩余 ERP 展示类型归并**：Creator Portal 的设计器向导仍有历史 ERP 展示模型，后续

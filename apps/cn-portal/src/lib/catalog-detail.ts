@@ -18,23 +18,13 @@ export function buildProductDetailView(
     ...(product.prodImageList ?? []).map((i) => i.picSrc),
   ]);
 
-  // 属性表（英文原文，文档 5.3）
+  // 属性表（英文原文，文档 5.3）。维度名在产品主档的 option1~3，维度值在各 SKU 的同名字段。
   const attrs: ProductAttribute[] = [];
-  if (product.option1Name)
-    attrs.push({
-      label: product.option1Name,
-      value: distinct(skus.map((s) => s.option1)).join(', '),
-    });
-  if (product.option2Name)
-    attrs.push({
-      label: product.option2Name,
-      value: distinct(skus.map((s) => s.option2)).join(', '),
-    });
-  if (product.option3Name)
-    attrs.push({
-      label: product.option3Name,
-      value: distinct(skus.map((s) => s.option3)).join(', '),
-    });
+  for (const key of ['option1', 'option2', 'option3'] as const) {
+    const label = product[key] || product[`${key}Name`];
+    const value = distinct(skus.map((s) => s[key])).join(', ');
+    if (label && value) attrs.push({ label, value });
+  }
   if (product.weight != null)
     attrs.push({ label: 'Weight', value: String(product.weight) });
 

@@ -65,9 +65,15 @@ export interface ErpProduct {
   tags: string;
   itemNo: string;
   mainPic: string;
+  /** 变体维度名（如 Color / Size）；对应 SKU 上同名字段存的是维度值 */
+  option1?: string | null;
+  option2?: string | null;
+  option3?: string | null;
   option1Name?: string;
   option2Name?: string;
   option3Name?: string;
+  /** 逻辑删除标记，1 = 已删除 */
+  delFlag?: number | string | null;
   /** 生产周期（文档 5.2 详情页展示）——以 ERP 实际字段为准 */
   productionTime?: string | number | null;
   /** 发货地 ship from（文档 5.2/7.1 只读展示）——以 ERP 实际字段为准 */

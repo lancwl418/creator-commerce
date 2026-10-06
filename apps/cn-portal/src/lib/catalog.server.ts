@@ -1,6 +1,8 @@
 import {
   fetchProducts,
   findProductById,
+  type ErpProduct,
+  type ErpProductPage,
   type SellerTier,
 } from '@creator-commerce/shared/erp';
 import { getErpConfig } from './erp';
@@ -8,6 +10,27 @@ import { createClient } from './supabase/server';
 import { buildCatalog } from './catalog';
 import type { CatalogPage, PlatformData, ProductDetailData } from './types/catalog';
 import { loadAllRows } from './platform-data';
+import { createTtlCache } from './ttl-cache';
+
+// ERP 产品数据与卖家等级无关，可以跨请求共用；等级价格、可见性、库存在其后按请求计算。
+const ERP_CACHE_TTL_MS = 5 * 60 * 1000;
+const ERP_PAGE_CACHE_ENTRIES = 50;
+const ERP_PRODUCT_CACHE_ENTRIES = 1000;
+const erpPageCache = createTtlCache<ErpProductPage>(ERP_CACHE_TTL_MS, ERP_PAGE_CACHE_ENTRIES);
+const erpProductCache = createTtlCache<ErpProduct | null>(ERP_CACHE_TTL_MS, ERP_PRODUCT_CACHE_ENTRIES);
+
+function loadErpPage(pageNo: number, pageSize: number): Promise<ErpProductPage> {
+  return erpPageCache.get(`${pageNo}:${pageSize}`, async () => {
+    const page = await fetchProducts(getErpConfig(), pageNo, pageSize);
+    // 列表记录与详情接口返回的结构一致，顺带写入详情缓存，从列表点进详情不必再请求 ERP。
+    for (const product of page.records) erpProductCache.set(product.id, product);
+    return page;
+  });
+}
+
+function loadErpProduct(erpProductId: string): Promise<ErpProduct | null> {
+  return erpProductCache.get(erpProductId, () => findProductById(getErpConfig(), erpProductId));
+}
 
 /** 从平台 3 张薄表装配 PlatformData（按当前等级） */
 export async function loadPlatformData(tier: SellerTier): Promise<PlatformData> {
@@ -64,7 +87,7 @@ export async function getCatalogPage(
   pageSize = 40
 ): Promise<CatalogPage> {
   const [page, data] = await Promise.all([
-    fetchProducts(getErpConfig(), pageNo, pageSize),
+    loadErpPage(pageNo, pageSize),
     loadPlatformData(tier),
   ]);
   const result = buildCatalog(page.records, tier, data);
@@ -77,7 +100,7 @@ export async function getProductDetail(
   tier: SellerTier
 ): Promise<ProductDetailData> {
   const [product, data] = await Promise.all([
-    findProductById(getErpConfig(), erpProductId),
+    loadErpProduct(erpProductId),
     loadPlatformData(tier),
   ]);
   return { product, data };

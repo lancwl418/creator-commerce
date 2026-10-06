@@ -33,19 +33,25 @@ describe('共享 ERP client', () => {
     await expect(fetchProducts(config)).rejects.toThrow('Permission denied');
   });
 
-  it('详情可以找到第一页之外的产品', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(Response.json({ success: true, result: { records: [{ id: 'p1' }], total: 101, pages: 2 } }))
-      .mockResolvedValueOnce(Response.json({ success: true, result: { records: [{ id: 'p101' }], total: 101, pages: 2 } }));
+  it('详情按 id 直接查单品接口，只请求一次', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ success: true, result: { id: 'p101', delFlag: 0 } }));
     vi.stubGlobal('fetch', fetchMock);
-    expect(await findProductById(config, 'p101')).toEqual({ id: 'p101' });
-    expect(new URL(fetchMock.mock.calls[1][0]).searchParams.get('pageNo')).toBe('2');
+    expect(await findProductById(config, 'p101')).toEqual({ id: 'p101', delFlag: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = new URL(fetchMock.mock.calls[0][0]);
+    expect(url.pathname).toBe('/ideamax/openapi/call/rcdCIqkQ');
+    expect(url.searchParams.get('id')).toBe('p101');
   });
 
-  it('不存在的产品在最后一页返回 null', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ success: true, result: { records: [{ id: 'p1' }], pages: 1 } }));
-    vi.stubGlobal('fetch', fetchMock);
+  it('不存在或已逻辑删除的产品返回 null', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ success: false, code: 500, message: '未找到对应商品数据' })));
     expect(await findProductById(config, 'missing')).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ success: true, result: { id: 'p1', delFlag: 1 } })));
+    expect(await findProductById(config, 'p1')).toBeNull();
+  });
+
+  it('详情接口的其他失败不能当成产品不存在', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ success: false, code: 500, message: 'Permission denied' })));
+    await expect(findProductById(config, 'p1')).rejects.toThrow('Permission denied');
   });
 });

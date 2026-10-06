@@ -7,8 +7,7 @@ export async function GET(request: NextRequest) {
     const data = await fetchProductsEnvelope(
       erpConfigFromEnv(),
       searchParams.get('pageNo') ?? '1',
-      searchParams.get('pageSize') ?? '20',
-      { revalidate: 300 }
+      searchParams.get('pageSize') ?? '20'
     );
     return NextResponse.json(data);
   } catch (err) {
