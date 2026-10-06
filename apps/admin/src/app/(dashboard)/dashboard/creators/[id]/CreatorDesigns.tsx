@@ -25,14 +25,16 @@ interface Design {
 }
 
 export function CreatorDesigns({ creatorId, totalCount }: { creatorId: string; totalCount: number }) {
-  const [designs, setDesigns] = useState<Design[]>([]);
+  const [result, setResult] = useState<{ creatorId: string; page: number; designs: Design[] } | null>(null);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  // Loading until the fetched page is the one being shown.
+  const loading = result?.creatorId !== creatorId || result?.page !== page;
+  const designs = result?.designs ?? [];
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     const supabase = createClient();
     const from = (page - 1) * PAGE_SIZE;
 
@@ -43,6 +45,7 @@ export function CreatorDesigns({ creatorId, totalCount }: { creatorId: string; t
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1)
       .then(({ data }) => {
+        if (cancelled) return;
         const mapped = (data || []).map((d) => {
           const versions = (d as unknown as { design_versions: { design_assets: { file_url: string; asset_type: string }[] }[] }).design_versions || [];
           const allAssets = versions.flatMap(v => v.design_assets || []);
@@ -57,9 +60,10 @@ export function CreatorDesigns({ creatorId, totalCount }: { creatorId: string; t
             design_assets: artworks.length > 0 ? artworks : null,
           };
         });
-        setDesigns(mapped);
-        setLoading(false);
+        setResult({ creatorId, page, designs: mapped });
       });
+
+    return () => { cancelled = true; };
   }, [creatorId, page]);
 
   return (

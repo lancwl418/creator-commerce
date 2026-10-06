@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useProductStore } from '@/stores/productStore';
 import { useDesignStore } from '@/stores/designStore';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -9,6 +9,8 @@ interface ColorVariant {
   color: string;
   imageUrl: string;
 }
+
+const NO_VARIANTS: ColorVariant[] = [];
 
 /** Composite artwork layers onto a mockup at a given resolution */
 async function compositeOnMockup(
@@ -83,23 +85,23 @@ export default function VariantPreviewStrip() {
   const activeViewId = useProductStore((s) => s.activeViewId);
   const design = useDesignStore((s) => s.design);
 
-  const colorVariants = (selectedTemplate?.metadata?.colorVariants ?? []) as ColorVariant[];
+  const colorVariants = (selectedTemplate?.metadata?.colorVariants as ColorVariant[] | undefined) ?? NO_VARIANTS;
   const [previews, setPreviews] = useState<Map<string, string>>(new Map());
   const prevDesignRef = useRef<string>('');
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Lightbox state
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
-  const [hiResPreview, setHiResPreview] = useState<string>('');
-  const [loadingHiRes, setLoadingHiRes] = useState(false);
+  const [hiRes, setHiRes] = useState<{ request: object; url: string } | null>(null);
 
-  // Get artwork layers from the current design view
-  const getArtworkLayers = useCallback(() => {
+  // Artwork layers from the current design view
+  const artworkLayers = useMemo(() => {
     if (!activeViewId || !design.views[activeViewId]) return [];
     return design.views[activeViewId].layers.filter(
       (l) => l.visible && l.data.type === 'image'
     );
   }, [design, activeViewId]);
+  const hasArtwork = artworkLayers.length > 0;
 
   const view = selectedTemplate?.views[0];
   const mockupW = view?.mockupWidth || 800;
@@ -109,49 +111,48 @@ export default function VariantPreviewStrip() {
   useEffect(() => {
     if (colorVariants.length === 0) return;
 
-    const layers = getArtworkLayers();
     const sig = JSON.stringify(
-      layers.map((l) => ({ id: l.id, t: l.transform, o: l.opacity, s: (l.data as { src?: string }).src }))
+      artworkLayers.map((l) => ({ id: l.id, t: l.transform, o: l.opacity, s: (l.data as { src?: string }).src }))
     );
     if (sig === prevDesignRef.current) return;
     prevDesignRef.current = sig;
 
-    if (layers.length === 0) {
-      setPreviews(new Map());
-      return;
-    }
-
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      // Without artwork the strip shows the plain mockups, so this only drops stale composites.
       const newPreviews = new Map<string, string>();
-      for (const variant of colorVariants) {
-        const dataUrl = await compositeOnMockup(variant.imageUrl, mockupW, mockupH, layers, 120);
-        if (dataUrl) newPreviews.set(variant.color, dataUrl);
+      if (artworkLayers.length > 0) {
+        for (const variant of colorVariants) {
+          const dataUrl = await compositeOnMockup(variant.imageUrl, mockupW, mockupH, artworkLayers, 120);
+          if (dataUrl) newPreviews.set(variant.color, dataUrl);
+        }
       }
       setPreviews(newPreviews);
     }, 300);
 
     return () => clearTimeout(debounceRef.current);
-  }, [colorVariants, design, getArtworkLayers, mockupW, mockupH]);
+  }, [colorVariants, artworkLayers, mockupW, mockupH]);
+
+  // The hi-res render the open lightbox needs; null when the plain mockup is enough.
+  const hiResRequest = useMemo(() => {
+    const variant = viewingIndex === null ? undefined : colorVariants[viewingIndex];
+    if (!variant || artworkLayers.length === 0) return null;
+    return { variant, layers: artworkLayers, mockupW, mockupH };
+  }, [viewingIndex, colorVariants, artworkLayers, mockupW, mockupH]);
+  const loadingHiRes = hiResRequest !== null && hiRes?.request !== hiResRequest;
 
   // Generate hi-res preview when lightbox opens or navigates
   useEffect(() => {
-    if (viewingIndex === null || !colorVariants[viewingIndex]) return;
+    if (!hiResRequest) return;
 
-    const variant = colorVariants[viewingIndex];
-    const layers = getArtworkLayers();
-
-    if (layers.length === 0) {
-      setHiResPreview(variant.imageUrl);
-      return;
-    }
-
-    setLoadingHiRes(true);
-    compositeOnMockup(variant.imageUrl, mockupW, mockupH, layers, 600, 0.9).then((url) => {
-      setHiResPreview(url || variant.imageUrl);
-      setLoadingHiRes(false);
+    let cancelled = false;
+    const { variant, layers } = hiResRequest;
+    compositeOnMockup(variant.imageUrl, hiResRequest.mockupW, hiResRequest.mockupH, layers, 600, 0.9).then((url) => {
+      if (!cancelled) setHiRes({ request: hiResRequest, url: url || variant.imageUrl });
     });
-  }, [viewingIndex, colorVariants, getArtworkLayers, mockupW, mockupH]);
+
+    return () => { cancelled = true; };
+  }, [hiResRequest]);
 
   // Keyboard navigation for lightbox
   useEffect(() => {
@@ -176,7 +177,7 @@ export default function VariantPreviewStrip() {
         </p>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {colorVariants.map((variant, index) => {
-            const preview = previews.get(variant.color);
+            const preview = hasArtwork ? previews.get(variant.color) : undefined;
             return (
               <button
                 key={variant.color}
@@ -220,7 +221,7 @@ export default function VariantPreviewStrip() {
                   </div>
                 )}
                 <img
-                  src={hiResPreview || colorVariants[viewingIndex].imageUrl}
+                  src={hiResRequest && hiRes ? hiRes.url : colorVariants[viewingIndex].imageUrl}
                   alt={colorVariants[viewingIndex].color}
                   className="max-w-full max-h-full object-contain p-4"
                 />

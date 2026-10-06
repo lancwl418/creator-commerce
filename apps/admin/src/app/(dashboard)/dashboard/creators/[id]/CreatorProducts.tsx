@@ -27,14 +27,16 @@ interface Product {
 }
 
 export function CreatorProducts({ creatorId, totalCount }: { creatorId: string; totalCount: number }) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [result, setResult] = useState<{ creatorId: string; page: number; products: Product[] } | null>(null);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  // Loading until the fetched page is the one being shown.
+  const loading = result?.creatorId !== creatorId || result?.page !== page;
+  const products = result?.products ?? [];
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     const supabase = createClient();
     const from = (page - 1) * PAGE_SIZE;
 
@@ -45,6 +47,7 @@ export function CreatorProducts({ creatorId, totalCount }: { creatorId: string; 
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1)
       .then(({ data }) => {
+        if (cancelled) return;
         const mapped = (data || []).map((p) => {
           const design = Array.isArray(p.designs) ? p.designs[0] : p.designs;
           const listings = Array.isArray(p.channel_listings) ? p.channel_listings : [];
@@ -61,9 +64,10 @@ export function CreatorProducts({ creatorId, totalCount }: { creatorId: string; 
             listing_count: listings.length,
           };
         });
-        setProducts(mapped);
-        setLoading(false);
+        setResult({ creatorId, page, products: mapped });
       });
+
+    return () => { cancelled = true; };
   }, [creatorId, page]);
 
   function fmtPrice(n: number | null) {

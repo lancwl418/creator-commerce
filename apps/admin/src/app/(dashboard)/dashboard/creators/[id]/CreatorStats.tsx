@@ -84,7 +84,10 @@ export function CreatorStats({ creatorId }: { creatorId: string }) {
   const [range, setRange] = useState('current_month');
   const [view, setView] = useState<ViewTab>('overview');
   const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Loading until the stats request for the current creator + range has settled.
+  const statsKey = `${creatorId}:${range}`;
+  const [settledStatsKey, setSettledStatsKey] = useState<string | null>(null);
+  const loading = settledStatsKey !== statsKey;
 
   // Design & Product data
   const [designs, setDesigns] = useState<DesignRow[]>([]);
@@ -92,14 +95,18 @@ export function CreatorStats({ creatorId }: { creatorId: string }) {
   const [loadingExtra, setLoadingExtra] = useState(false);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
+    const key = `${creatorId}:${range}`;
     fetch(`/api/admin/creators/${creatorId}/stats?range=${range}`)
       .then(res => res.json())
       .then(data => {
+        if (cancelled) return;
         if (!data.error) setStats(data);
-        setLoading(false);
+        setSettledStatsKey(key);
       })
-      .catch(() => setLoading(false));
+      .catch(() => { if (!cancelled) setSettledStatsKey(key); });
+
+    return () => { cancelled = true; };
   }, [creatorId, range]);
 
   const loadDesigns = useCallback(async () => {
@@ -208,11 +215,6 @@ export function CreatorStats({ creatorId }: { creatorId: string }) {
     setLoadingExtra(false);
   }, [creatorId]);
 
-  useEffect(() => {
-    if (view === 'design' && designs.length === 0) loadDesigns();
-    if (view === 'product' && products.length === 0) loadProducts();
-  }, [view, designs.length, products.length, loadDesigns, loadProducts]);
-
   // Platform breakdown from channel_listings (real data)
   const [platformStats, setPlatformStats] = useState<{
     platform: string;
@@ -257,9 +259,14 @@ export function CreatorStats({ creatorId }: { creatorId: string }) {
     setLoadingExtra(false);
   }, [creatorId]);
 
-  useEffect(() => {
-    if (view === 'platform' && platformStats.length === 0) loadPlatformStats();
-  }, [view, platformStats.length, loadPlatformStats]);
+  // Each tab loads its data the first time it is opened (and again while it is still empty).
+  const handleViewChange = (next: ViewTab) => {
+    if (next === view) return;
+    setView(next);
+    if (next === 'design' && designs.length === 0) loadDesigns();
+    if (next === 'product' && products.length === 0) loadProducts();
+    if (next === 'platform' && platformStats.length === 0) loadPlatformStats();
+  };
 
   const PLATFORM_COLORS: Record<string, string> = {
     ideamax: 'from-primary-500 to-primary-600',
@@ -317,7 +324,7 @@ export function CreatorStats({ creatorId }: { creatorId: string }) {
         {/* View Tabs */}
         <div className="flex gap-1 mt-3 border-t border-border-light pt-3">
           {VIEW_TABS.map((t) => (
-            <button key={t.key} onClick={() => setView(t.key)}
+            <button key={t.key} onClick={() => handleViewChange(t.key)}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 view === t.key
                   ? 'bg-gray-900 text-white shadow-sm'

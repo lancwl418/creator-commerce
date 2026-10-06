@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CreatorActions } from './CreatorActions';
 import { CreatorStats } from './CreatorStats';
@@ -56,7 +57,7 @@ export default async function CreatorDetailPage({
   return (
     <div className="space-y-6">
       {/* Back button */}
-      <a
+      <Link
         href="/dashboard/creators"
         className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
       >
@@ -64,7 +65,7 @@ export default async function CreatorDetailPage({
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
         </svg>
         Back to Creators
-      </a>
+      </Link>
 
       {/* Header */}
       <div className="bg-white rounded-2xl border border-border-light shadow-sm p-6">
