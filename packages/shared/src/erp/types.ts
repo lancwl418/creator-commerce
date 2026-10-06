@@ -27,7 +27,8 @@ export interface ErpPricingTier {
   tierCode: string; // 如 'S~2XL'
   memberSizes: string[]; // 该档覆盖的尺码
   blankPrice: number; // 空白衣售价（已按等级）
-  colorPrices: Record<string, number> | null; // 按色档的加价
+  /** 各色档的空白衣售价（已按等级），key 为色档 id；有值时优先于 blankPrice */
+  colorPrices: Record<string, number> | null;
 }
 
 export interface ErpPricingGroup {
@@ -37,10 +38,41 @@ export interface ErpPricingGroup {
   printMode: string;
   printMultiplier: number;
   customerLevelId: string; // 客户等级 FK
+  /** 关联的供应商报价 id，对应 product.suppliers[].id */
+  supplierQuoteId?: string | null;
   supplierId: string;
   supplierName: string;
   rules: ErpPricingRule[];
   pricingTiers: ErpPricingTier[];
+}
+
+/** 变体维度（如颜色、尺码）。options[i] 的值存在 SKU 的 option{i+1} 字段 */
+export interface ErpProductOption {
+  dimensionCode: string;
+  dimensionName?: string | null;
+  isSize?: boolean | null;
+  isColor?: boolean | null;
+}
+
+export interface ErpSupplierColorTier {
+  id: string;
+  code: string;
+  memberColors?: string[] | null;
+}
+
+export interface ErpSupplierSizeTier {
+  code: string;
+  memberSizes?: string[] | null;
+  colorTiers?: ErpSupplierColorTier[] | null;
+}
+
+/**
+ * 供应商报价。原始数据含供应商成本价，只能在服务端使用，不要传给浏览器；
+ * 这里只声明解析档位（哪些尺码、颜色属于哪一档）用到的字段。
+ */
+export interface ErpSupplierQuote {
+  id: string;
+  sizeTiers?: ErpSupplierSizeTier[] | null;
 }
 
 export interface ErpProductImage {
@@ -83,6 +115,8 @@ export interface ErpProduct {
   pricingMode?: string | null;
   /** 分级定价组（按客户等级），POD 产品的价格来源 */
   pricingGroups?: ErpPricingGroup[] | null;
+  options?: ErpProductOption[] | null;
+  suppliers?: ErpSupplierQuote[] | null;
   prodSkuList: ErpSku[];
   prodImageList: ErpProductImage[];
 }

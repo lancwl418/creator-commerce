@@ -8,6 +8,7 @@ import type { ProductDetailPageProps } from '@/lib/types/catalog';
 import { t } from '@/lib/i18n';
 import ProductGallery from '@/components/products/ProductGallery';
 import ProductInformation from '@/components/products/ProductInformation';
+import VariantPriceTables from '@/components/products/VariantPriceTables';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   if (!product) notFound();
   const item = getCatalogItem(product, tier, data);
   if (!item) notFound();
-  const details = buildProductDetailView(product, item, data);
+  const details = buildProductDetailView(product, item, data, tier);
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
@@ -29,6 +30,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         <ProductGallery images={details.images} name={item.name} />
         <ProductInformation details={details} tier={tier} />
       </div>
+      <VariantPriceTables tables={details.priceTables} />
     </div>
   );
 }

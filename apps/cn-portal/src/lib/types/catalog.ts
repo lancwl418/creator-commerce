@@ -68,10 +68,33 @@ export interface ProductAttribute {
   value: string;
 }
 
+/** 价格明细表的一列：某工艺在某个印刷面数下的印花售价 */
+export interface PriceTableColumn {
+  craftName: string;
+  faces: number;
+}
+
+export interface PriceTableRow {
+  sizes: string;
+  /** 该行覆盖的颜色；null 表示不分颜色 */
+  colors: string | null;
+  blankPrice: number | null;
+  /** 与 columns 一一对应；该档没有这个工艺/面数时为 null */
+  printPrices: (number | null)[];
+}
+
+/** 一个定价方案下，按「尺码档 × 色档」展开的价格明细 */
+export interface PriceTableView {
+  showBlankPrice: boolean;
+  columns: PriceTableColumn[];
+  rows: PriceTableRow[];
+}
+
 export interface ProductDetailView {
   item: CatalogItem;
   images: string[];
   attributes: ProductAttribute[];
+  priceTables: PriceTableView[];
   productionTime: string | number | null;
   shipFrom: string | null;
 }

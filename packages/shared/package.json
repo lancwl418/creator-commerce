@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./erp": "./src/erp/index.ts",
     "./erp/types": "./src/erp/types.ts",
-    "./erp/pricing": "./src/erp/pricing.ts"
+    "./erp/pricing": "./src/erp/pricing.ts",
+    "./erp/options": "./src/erp/options.ts"
   },
   "scripts": {}
 }

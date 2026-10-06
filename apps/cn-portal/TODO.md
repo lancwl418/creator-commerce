@@ -18,6 +18,12 @@
       零售 / 批发 / VIP。需确认卖家等级沿用 VIP / 批发，还是改用「中国商家」，以及目录是否
       只展示 prodSupport 含 `chinamerchant` 的产品。
 
+- [ ] **印花价为 0 的含义**：ERP 里有的工艺单面或双面售价是 0（例如单面 0、双面 0.48）。
+      页面目前照原值显示 $0.00，起价也按 0 计入。需确认 0 是「免费」还是「未报价」。
+- [ ] **一个产品有多个供应商报价时卖家看哪个**：同一等级下有的产品有多组定价（不同供应商，
+      最多 4 组），详情页目前全部列出并标为「报价方案 1、2…」，不显示供应商名称。
+      需确认是否固定一家（对应《待确认清单》6.5）。
+
 ## 二、待接入（工程）
 
 - [x] **应用 migration 023 / 024**：2026-10-06 已在生产库执行。024 为三张表开启 RLS、只开放读取，
@@ -30,9 +36,9 @@
       换成「登录 → 调 ERP customer 接口读价格等级 → 映射 SellerTier」。
       ERP 已提供客户档案分页接口（`UmrAedIA`，含 custStageId / vipStage）和客户等级分页接口（`wfi8Vrp4`）；
       等级匹配建议同时改为按 `pricingGroups[].customerLevelId`，不再按分组名称。
-- [ ] **详情页 variant 精确价**：当前列表/详情用等级价格区间（min–max 起价）；
-      详情页按具体尺码档 + 颜色档精确到每个 variant。需按 SKU 的 option(color/size)
-      匹配 pricingTiers/colorTiers/printPriceJson 的色档 ct 与尺码档。
+- [x] **详情页 variant 精确价**：详情页新增「价格明细」表，按「尺码档 × 色档」列出该等级的空白件售价
+      和各工艺单面 / 双面印花售价（`resolveTierPriceTables`）。只列可上架 SKU 覆盖到的尺码和颜色。
+      起价与明细同源：空白件售价改为优先取色档价（`colorPrices`），此前只取尺码档的 `blankPrice`。
 - [ ] **下单 / 购物车模块**：详情页「加入购物车」现为占位（`AddToCart.tsx`）。
 - [ ] **后台缺价清单页**：`buildCatalog` 已产出 `missingPriceProducts`，需一个运营可见的清单页
       （文档 4.1：让运营知道哪些产品因缺价没上架）。
