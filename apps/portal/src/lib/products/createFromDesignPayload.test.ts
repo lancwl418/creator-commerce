@@ -112,8 +112,8 @@ describe('design payload product helpers', () => {
       expect(suggestBasePrice(10)).toBe(25);
     });
 
-    it('returns null when base cost is 0 or missing', () => {
-      expect(suggestBasePrice(0)).toBeNull();
+    it('preserves zero cost and keeps a missing cost unknown', () => {
+      expect(suggestBasePrice(0)).toBe(0);
       expect(suggestBasePrice(undefined)).toBeNull();
     });
   });

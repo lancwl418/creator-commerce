@@ -78,7 +78,7 @@ creator-commerce/                  ← 本 repo
 | **代码结构** | Monorepo (pnpm workspaces + turborepo)，源码在一起方便联调，部署各自独立 |
 | **数据库策略** | 两个独立数据库：ERP 自己的 DB（已有，不动）+ Creator Commerce DB（**Supabase**，PostgreSQL 全兼容，Portal + Admin + Design Engine + cn-portal 共享） |
 | **cn-portal 归属** | 业务定位独立、工程上归属本 monorepo；领域层共享（`packages/shared`），表现层分离（独立 app/域名/UI/i18n）。详见「全局系统定位」 |
-| **共享领域层** | ERP client、产品/取价类型下沉到 `packages/shared/src/erp`，经子路径 `@creator-commerce/shared/erp` 导出（含 node crypto，不进主 barrel 以免污染客户端包）。creator portal 仍有一份早于共享包的 ERP 路由，long-term 可迁入共享包消除重复 |
+| **共享领域层** | ERP 请求、签名、环境配置和图片代理由 `packages/shared/src/erp` 统一提供，CN Portal / Creator Portal / Design Engine 复用；服务端使用 `@creator-commerce/shared/erp`，纯取价与类型使用 `/erp/pricing`、`/erp/types`，避免 node crypto 进入客户端。所有 ERP 地址和凭据由环境变量提供 |
 | **Supabase 使用范围** | Auth（Creator 注册/登录）、Storage（artwork/preview/print file 存储）、Database（全部业务表）、RLS（按 creator 隔离数据） |
 | **技术栈** | Creator Commerce 全栈 Node.js/TypeScript，ERP 是 Java，不强制统一，通过 REST API 通信 |
 | **ERP Customer 创建时机** | Creator/Distributor 审核通过后在 ERP 创建 customer 记录（customerType=creator/distributor），回写 `erpCustomerId` |
@@ -88,6 +88,18 @@ creator-commerce/                  ← 本 repo
 | **Design Engine 复用** | 独立部署独立 URL，Shopify 主站和 Creator Portal 均可通过 iframe + API 接入 |
 
 ---
+
+## 前端代码组织约定
+
+完整规则、适用边界和示例见 [前端代码组织与分层规范](docs/frontend-code-conventions.md)。新增和修改代码时以此为参考；Design Engine 保留已有 `components / stores / hooks / core / types` 分层，不为统一目录或减少行数整体重构。以下目录约定主要对应 Portal 类应用。
+
+- `src/app` 的 `page.tsx` 负责路由参数、服务端认证/查询、页面组装；共享接口和大块 JSX 不定义在页面入口。
+- 展示组件放在 `src/components/<业务域>`；产品组件按 `list`、`editor`、`create`、`edit`、`import`、`sync` 分组。通用空态、缩略图等实际跨业务使用的组件放在 `components/ui`。
+- 请求与交互状态放在 `src/hooks/<业务域>`；产品操作、SKU 选择、编辑表单分别使用独立 hook。仅影响展示的弹窗开关等局部状态可留在所属组件。
+- HTTP 请求放在 `src/lib/api`，数据库读操作在 `lib/queries`（浏览器查询使用 `.client.ts` 后缀），各业务域的写操作放在 `lib/<业务域>/mutations.ts`；校验和 payload 构造保持为可独立验证的纯函数。服务端组件直接调用查询层，不拼接自身域名请求内部 API。
+- 共享业务模型、API 响应、路由参数类型放在 `src/lib/types`；单个组件自己的 props 类型保留在组件文件，避免集中成一个巨大类型文件。
+- 跨多个独立组件需要共同维护的客户端状态可使用 store；服务端读取的列表不另建全局副本。各 app 的界面独立，ERP 协议/取价等领域契约继续复用 `packages/shared`。
+- ERP 产品/SKU 类型直接复用共享契约，未知价格/成本保持为空，不以固定金额代替；发布前验证售价与成本。编辑器地址、缓存 URL 和参数编码由 `lib/design-engine.ts` 统一处理，创建/重新编辑共用 iframe 会话 hook。
 
 ## A. 系统总体架构
 

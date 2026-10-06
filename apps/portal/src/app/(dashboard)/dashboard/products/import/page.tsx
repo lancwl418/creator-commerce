@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
-import ImportFlow from './ImportFlow';
+import ImportFlow from '@/components/products/import/ImportFlow';
 
 export default async function ImportFromEditorPage() {
   let creator;

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
 import { getDesigns } from '@/lib/queries/designs';
-import NewProductFlow from './NewProductFlow';
+import NewProductFlow from '@/components/products/new/NewProductFlow';
 
 export default async function NewProductPage() {
   let creator;
@@ -13,5 +13,5 @@ export default async function NewProductPage() {
 
   const designs = await getDesigns(creator.id, ['draft', 'approved', 'published']);
 
-  return <NewProductFlow creatorId={creator.id} designs={designs} />;
+  return <NewProductFlow designs={designs} />;
 }

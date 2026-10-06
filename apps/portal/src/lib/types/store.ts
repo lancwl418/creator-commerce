@@ -1,3 +1,5 @@
+export type PublishStatus = 'active' | 'draft';
+
 export interface StoreConnection {
   id: string;
   platform: string;

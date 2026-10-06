@@ -9,17 +9,9 @@ import type { DesignEditorPayload, DesignEditorProduct } from '@creator-commerce
 export type DesignPayloadProduct = DesignEditorProduct;
 export type DesignPayload = DesignEditorPayload;
 
-export interface CreatedProductRow {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  base_price_suggestion: number | null;
-  preview_urls: string[];
-  design_artwork_urls: string[];
-  product_template_id: string;
-  created_at: string;
-}
+export type { CreatedProductRow } from '@/lib/types/product-import';
+import type { CreatedProductRow } from '@/lib/types/product-import';
+import { PRICE_MULTIPLIER } from '@/lib/constants';
 
 // ── Pure transforms (exported for unit testing) ──
 
@@ -61,9 +53,9 @@ export function pickPreviewUrls(
   return [];
 }
 
-/** Suggested retail price = supply cost × 2.5 (null when cost is missing/zero). */
+/** Suggested retail price uses the configured multiplier; missing costs stay unset. */
 export function suggestBasePrice(baseCost: number | undefined): number | null {
-  return baseCost ? baseCost * 2.5 : null;
+  return baseCost != null && Number.isFinite(baseCost) && baseCost >= 0 ? baseCost * PRICE_MULTIPLIER : null;
 }
 
 /**

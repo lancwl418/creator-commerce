@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import type { ProductListItem } from '@/lib/types/product';
 
 export async function getProducts(creatorId: string) {
   const supabase = await createClient();
@@ -10,7 +11,8 @@ export async function getProducts(creatorId: string) {
       channel_listings (id, channel_type, creator_store_connection_id, status, price, currency, creator_store_connections (platform, store_name))
     `)
     .eq('creator_id', creatorId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .returns<ProductListItem[]>();
 
   return data || [];
 }

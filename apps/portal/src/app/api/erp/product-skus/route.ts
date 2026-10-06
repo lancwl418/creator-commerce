@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { ERP_API_BASE_URL, SHOPIFY_API_VERSION } from '@/lib/constants';
-
-// ERP config
-const ERP_API_URL = `${ERP_API_BASE_URL}/openapi/call/K5iOWd6y`;
-const APP_KEY = process.env.ERP_APP_KEY ?? 'ak-OwVVN4U4gJINJ4nK';
-const SECRET_KEY = process.env.ERP_SECRET_KEY ?? 'QSd7yhGrQ1YyPIFJ9LJXHAbOU67C1A7K';
+import { ErpApiError, erpConfigFromEnv, findProductById } from '@creator-commerce/shared/erp';
+import { SHOPIFY_API_VERSION } from '@/lib/constants';
 
 // Shopify config
 const SHOPIFY_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? '';
@@ -47,7 +42,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to fetch SKU data' },
-      { status: 500 }
+      { status: err instanceof ErpApiError ? err.status : 500 }
     );
   }
 }
@@ -109,73 +104,28 @@ async function fetchShopifySkus(shopifyProductId: string): Promise<NextResponse>
 }
 
 async function fetchErpSkus(erpProductId: string): Promise<NextResponse> {
-  const timestamp = String(Date.now());
-  const signature = crypto
-    .createHash('md5')
-    .update(APP_KEY + SECRET_KEY + timestamp)
-    .digest('hex');
-
-  const url = new URL(ERP_API_URL);
-  url.searchParams.set('pageNo', '1');
-  url.searchParams.set('pageSize', '100');
-
-  const res = await fetch(url.toString(), {
-    headers: {
-      'Content-Type': 'application/json',
-      appkey: APP_KEY,
-      signature,
-      timestamp,
-    },
-  });
-
-  if (!res.ok) {
-    return NextResponse.json(
-      { error: `ERP API returned ${res.status}` },
-      { status: res.status }
-    );
-  }
-
-  const data = await res.json();
-  if (!data.success || !data.result?.records) {
-    return NextResponse.json({ error: 'ERP API returned no data' }, { status: 502 });
-  }
-
-  const product = data.result.records.find(
-    (p: { id: string }) => p.id === erpProductId
-  );
+  const product = await findProductById(erpConfigFromEnv(), erpProductId);
 
   if (!product) {
     return NextResponse.json({ error: 'Product not found in ERP' }, { status: 404 });
   }
 
-  const skus: SkuResult[] = (product.prodSkuList || []).map((sku: {
-    id: string;
-    sku: string;
-    price: number;
-    option1: string;
-    option2: string;
-    option3: string;
-    inQty: number;
-    skuImage: string;
-  }) => ({
-    id: sku.id,
-    sku: sku.sku,
-    price: sku.price,
+  const skus = (product.prodSkuList ?? []).map((sku) => ({
+    ...sku,
     option1: sku.option1 || null,
     option2: sku.option2 || null,
     option3: sku.option3 || null,
-    inQty: sku.inQty,
     skuImage: sku.skuImage || null,
   }));
 
   // Extract option names from ERP product (e.g. "Color", "Size", "material")
   const erpOptionNames: string[] = [];
   if (product.option1Name) erpOptionNames.push(product.option1Name);
-  else if (skus.some((s: SkuResult) => s.option1)) erpOptionNames.push('Color');
+  else if (skus.some((s) => s.option1)) erpOptionNames.push('Color');
   if (product.option2Name) erpOptionNames.push(product.option2Name);
-  else if (skus.some((s: SkuResult) => s.option2)) erpOptionNames.push('Size');
+  else if (skus.some((s) => s.option2)) erpOptionNames.push('Size');
   if (product.option3Name) erpOptionNames.push(product.option3Name);
-  else if (skus.some((s: SkuResult) => s.option3)) erpOptionNames.push('Option 3');
+  else if (skus.some((s) => s.option3)) erpOptionNames.push('Option 3');
 
   return NextResponse.json({
     product_id: product.id,

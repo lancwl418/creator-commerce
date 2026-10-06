@@ -5,7 +5,7 @@ import {
   type ErpSku,
   type ErpPricingGroup,
 } from '@creator-commerce/shared/erp';
-import { buildCatalog, applyFilters, type PlatformData } from './catalog';
+import { buildCatalog, getCatalogItem, applyFilters, type PlatformData } from './catalog';
 
 function sku(overrides: Partial<ErpSku> & { sku: string }): ErpSku {
   return {
@@ -165,5 +165,55 @@ describe('applyFilters', () => {
   });
   it('价格降序', () => {
     expect(applyFilters(items, { sort: 'price_desc' }).map((i) => i.id)).toEqual(['b', 'c', 'a']);
+  });
+});
+
+
+describe('选品规则回归', () => {
+  it('有等级组但 VIP 缺价时不回退到通用 SKU 价', () => {
+    const p = product({ id: 'p1', pricingGroups: [group('批发', 9)], prodSkuList: [sku({ sku: 's1', price: 1 })] });
+    expect(resolveProductTierPrice(p, 'VIP')).toBeNull();
+    expect(buildCatalog([p], 'VIP', emptyData()).items).toHaveLength(0);
+    expect(getCatalogItem(p, 'VIP', emptyData())).toBeNull();
+  });
+
+  it('POD 缺少等级组时不回退到通用价', () => {
+    const p = product({ id: 'p1', pricingMode: 'pod_only', prodSkuList: [sku({ sku: 's1', price: 1 })] });
+    expect(resolveProductTierPrice(p, 'VIP')).toBeNull();
+  });
+
+  it.each(['null', '[]', '{"S~2XL":null}', '{"S~2XL":{"colorTiers":{"ct_x":null}}}', '{bad json'])('畸形 printPriceJson 不崩溃：%s', (json) => {
+    const g = group('VIP', 8);
+    g.rules[0].printPriceJson = json;
+    expect(resolveProductTierPrice(product({ id: 'p1', pricingGroups: [g] }), 'VIP')).toBeNull();
+  });
+
+  it('非 POD 直接价排除非有限数和负数，保留合法零价', () => {
+    const p = product({ id: 'p1', prodSkuList: [
+      sku({ sku: 'bad1', price: NaN }), sku({ sku: 'bad2', price: Infinity }),
+      sku({ sku: 'bad3', price: -1 }), sku({ sku: 'free', price: 0 }),
+    ] });
+    expect(resolveProductTierPrice(p, 'VIP')).toEqual({ min: 0, max: 0 });
+  });
+
+  it('列表与详情 MOQ 只取可见且有货的 SKU', () => {
+    const p = product({ id: 'p1', pricingGroups: [group('VIP', 5)], prodSkuList: [sku({ sku: 'hidden' }), sku({ sku: 'available' })] });
+    const data = emptyData();
+    data.hiddenSkusForTier.add('hidden');
+    data.moq.set('hidden', { minQty: 100, minAmount: null });
+    data.moq.set('available', { minQty: 10, minAmount: null });
+    const item = getCatalogItem(p, 'VIP', data);
+    expect(item?.moqQty).toBe(10);
+    expect(buildCatalog([p], 'VIP', data).items).toEqual([item]);
+  });
+
+  it('全隐藏或无货产品详情不再泄露价格与属性', () => {
+    const p = product({ id: 'p1', pricingGroups: [group('VIP', 5)] });
+    const hidden = emptyData();
+    hidden.hiddenSkusForTier.add('s1');
+    expect(getCatalogItem(p, 'VIP', hidden)).toBeNull();
+    const outOfStock = emptyData();
+    outOfStock.stock.set('s1', false);
+    expect(getCatalogItem(p, 'VIP', outOfStock)).toBeNull();
   });
 });

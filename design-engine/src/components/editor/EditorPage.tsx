@@ -23,7 +23,8 @@ import { useHistory } from '@/hooks/useHistory';
 import type { ValidationResult } from '@/core/design/DesignValidator';
 import type { DesignLayer } from '@/types/design';
 import type { EditorConfig } from '@/types/editor-config';
-import { DESIGN_EDITOR_MESSAGE } from '@creator-commerce/shared';
+import { DESIGN_EDITOR_MESSAGE, readProductCost } from '@creator-commerce/shared';
+import type { DesignEditorProductMeta } from '@creator-commerce/shared';
 import {
   Layers, Package, Upload, X, Undo2, Redo2, ZoomIn, ZoomOut, Save,
   AlignCenterVertical, AlignCenterHorizontal,
@@ -384,7 +385,7 @@ function EditorPageInner() {
               template_id: entry.template.id,
               name: entry.template.name,
               description: entry.template.description || '',
-              base_cost: parseFloat(String(entry.template.metadata?.price ?? 0)) || 0,
+              base_cost: readProductCost(entry.template.metadata?.price),
               thumbnail,
               layers: allLayers,
               artwork_urls: artworkUrls,
@@ -421,7 +422,7 @@ function EditorPageInner() {
           template_id: selectedTemplate?.id ?? '',
           name: selectedTemplate?.name ?? '',
           description: selectedTemplate?.description || '',
-          base_cost: 0,
+          base_cost: readProductCost(selectedTemplate?.metadata?.price),
           thumbnail: currentMockup || artworkUrl,
           layers: allLayers,
           artwork_urls: artworkUrls,
@@ -453,10 +454,11 @@ function EditorPageInner() {
       const titlePrefix = params.get('title_prefix') || 'Design';
 
       // Merge Portal metadata with editor layer data
-      let portalProducts: { id: string; name: string; base_cost: number; source: string; thumbnail: string | null }[] = [];
+      let portalProducts: DesignEditorProductMeta[] = [];
       if (productsMeta) {
         try {
-          portalProducts = JSON.parse(decodeURIComponent(productsMeta));
+          const parsed: unknown = JSON.parse(productsMeta);
+          if (Array.isArray(parsed)) portalProducts = parsed.filter((product): product is DesignEditorProductMeta => product != null && typeof product.id === 'string');
         } catch { /* ignore */ }
       }
 
@@ -465,7 +467,7 @@ function EditorPageInner() {
         return {
           template_id: p.template_id,
           name: portalMatch?.name || p.name,
-          base_cost: portalMatch?.base_cost || p.base_cost,
+          base_cost: readProductCost(portalMatch?.base_cost ?? p.base_cost),
           thumbnail: p.thumbnail || portalMatch?.thumbnail,
           layers: p.layers,
           artwork_urls: p.artwork_urls,
@@ -530,7 +532,7 @@ function EditorPageInner() {
         const payloadObj = {
           design_id: editorConfig.designId,
           products: mergedProducts,
-          title_prefix: decodeURIComponent(titlePrefix),
+          title_prefix: titlePrefix,
         };
 
         // "Add to cart": hand the design back to the host (ghostyle) so it adds

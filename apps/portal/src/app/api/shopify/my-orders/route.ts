@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireCreator } from '@/lib/server/auth';
 import { SHOPIFY_API_VERSION } from '@/lib/constants';
+import type { BuyerOrder, BuyerOrdersResponse } from '@/lib/types/buyer-order';
 
 const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN ?? '';
 const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN ?? '';
@@ -54,7 +55,7 @@ export async function GET() {
     line_items?: ShopLineItem[];
   };
 
-  const orders = ((data.orders ?? []) as ShopOrder[]).map((o) => ({
+  const orders: BuyerOrder[] = ((data.orders ?? []) as ShopOrder[]).map((o) => ({
     id: o.id,
     name: o.name,
     createdAt: o.created_at,
@@ -71,5 +72,5 @@ export async function GET() {
     })),
   }));
 
-  return NextResponse.json({ linked: true, orders });
+  return NextResponse.json<BuyerOrdersResponse>({ linked: true, orders });
 }

@@ -7,7 +7,11 @@ export const DEFAULT_LOCALE: Locale = 'zh';
 
 const dict = {
   'app.title': { zh: '选品平台', en: 'Product Catalog' },
+  'app.description': { zh: '中国卖家上架选品系统', en: 'Product catalog for Chinese sellers' },
   'nav.products': { zh: '选品', en: 'Products' },
+  'image.empty': { zh: '暂无图片', en: 'No image' },
+  'pagination.previous': { zh: '上一页', en: 'Previous' },
+  'pagination.next': { zh: '下一页', en: 'Next' },
 
   // 列表页
   'list.title': { zh: '产品选品', en: 'Browse Products' },
@@ -44,6 +48,7 @@ const dict = {
     en: 'Ship-from address is fixed and cannot be changed.',
   },
   'detail.addToCart': { zh: '加入购物车', en: 'Add to cart' },
+  'detail.cartPending': { zh: '下单模块开发中，稍后接入。', en: 'Ordering is under development.' },
   'detail.back': { zh: '返回选品', en: 'Back to products' },
   'detail.notFound': { zh: '产品不存在或已下架', en: 'Product not found or delisted' },
 

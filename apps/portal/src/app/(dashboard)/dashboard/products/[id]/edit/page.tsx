@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
-import EditDesignWizard from './EditDesignWizard';
+import EditDesignWizard from '@/components/products/edit/EditDesignWizard';
 
 export default async function EditDesignPage({
   params,

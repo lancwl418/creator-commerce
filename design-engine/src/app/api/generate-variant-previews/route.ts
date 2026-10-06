@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
+import { erpBaseUrlFromEnv, resolveErpImageSource } from '@creator-commerce/shared/erp';
 import { uploadVariantPreview } from '@/lib/r2';
-
-const ERP_IMAGE_BASE = 'http://118.195.245.201:8081/ideamax/sys/common/static/';
 
 interface VariantInput {
   id: string;
@@ -174,7 +173,9 @@ async function fetchImage(url: string): Promise<Buffer | null> {
     }
 
     // ERP relative paths → prepend base URL
-    const fetchUrl = url.startsWith('http') ? url : `${ERP_IMAGE_BASE}${url}`;
+    const fetchUrl = url.startsWith('http')
+      ? url : resolveErpImageSource(url, erpBaseUrlFromEnv())?.href;
+    if (!fetchUrl) return null;
 
     const res = await fetch(fetchUrl);
     if (!res.ok) {

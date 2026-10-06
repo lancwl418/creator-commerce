@@ -28,29 +28,30 @@ function collectGroupPrices(group: ErpPricingGroup): number[] {
   // tierCode → blankPrice（空白衣售价）
   const blankByTier = new Map<string, number>();
   for (const pt of group.pricingTiers ?? []) {
-    blankByTier.set(pt.tierCode, typeof pt.blankPrice === 'number' ? pt.blankPrice : 0);
+    if (isPrice(pt.blankPrice)) blankByTier.set(pt.tierCode, pt.blankPrice);
   }
 
   const prices: number[] = [];
 
   for (const rule of group.rules ?? []) {
     if (!rule.printPriceJson) continue;
-    let parsed: Record<string, unknown>;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(rule.printPriceJson);
     } catch {
       continue;
     }
 
-    for (const [tierCode, tierValRaw] of Object.entries(parsed)) {
+    if (!isRecord(parsed)) continue;
+    for (const [tierCode, tierVal] of Object.entries(parsed)) {
+      if (!isRecord(tierVal)) continue;
       const blank = blankByTier.get(tierCode) ?? 0;
-      const tierVal = tierValRaw as Record<string, unknown>;
 
       // 收集本档下的所有 face_1（可能按色档嵌套）
       const faceSources: Record<string, unknown>[] = [];
-      if (tierVal.colorTiers && typeof tierVal.colorTiers === 'object') {
-        for (const ct of Object.values(tierVal.colorTiers as Record<string, unknown>)) {
-          faceSources.push(ct as Record<string, unknown>);
+      if (isRecord(tierVal.colorTiers)) {
+        for (const ct of Object.values(tierVal.colorTiers)) {
+          if (isRecord(ct)) faceSources.push(ct);
         }
       } else {
         faceSources.push(tierVal);
@@ -58,7 +59,7 @@ function collectGroupPrices(group: ErpPricingGroup): number[] {
 
       for (const src of faceSources) {
         const face = pickFace(src);
-        if (face != null) prices.push(blank + face);
+        if (face != null && isPrice(blank + face)) prices.push(blank + face);
       }
     }
   }
@@ -66,11 +67,19 @@ function collectGroupPrices(group: ErpPricingGroup): number[] {
   return prices;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPrice(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
 /** 取 face_1；没有则取最小的 face_* 数值 */
 function pickFace(src: Record<string, unknown>): number | null {
-  if (typeof src.face_1 === 'number') return src.face_1;
+  if (isPrice(src.face_1)) return src.face_1;
   const faces = Object.entries(src)
-    .filter(([k, v]) => k.startsWith('face_') && typeof v === 'number')
+    .filter(([k, v]) => k.startsWith('face_') && isPrice(v))
     .map(([, v]) => v as number);
   return faces.length ? Math.min(...faces) : null;
 }
@@ -100,10 +109,13 @@ export function resolveProductTierPrice(
     return { min: Math.min(...prices), max: Math.max(...prices) };
   }
 
-  // 非 POD / 无分级组的兜底：SKU 上若有直接价则用最低价
+  // 有分级定价/POD 的产品不能用通用 SKU 价绕过该等级缺价规则。
+  if (product.pricingGroups?.length || product.pricingMode === 'pod_only') return null;
+
+  // 非 POD、无分级组时，SKU 直接价才可作为兜底。
   const skuPrices = (product.prodSkuList ?? [])
     .map((s) => s.price)
-    .filter((p): p is number => typeof p === 'number');
+    .filter(isPrice);
   if (skuPrices.length > 0) {
     return { min: Math.min(...skuPrices), max: Math.max(...skuPrices) };
   }

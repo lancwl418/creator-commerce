@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import type { OrderDetailData, OrderListData } from '@/lib/types/order';
 
 export async function getOrders(creatorId: string) {
   const supabase = await createClient();
@@ -11,7 +12,8 @@ export async function getOrders(creatorId: string) {
     `)
     .eq('creator_id', creatorId)
     .order('order_placed_at', { ascending: false })
-    .limit(100);
+    .limit(100)
+    .returns<OrderListData[]>();
 
   return data || [];
 }
@@ -45,7 +47,7 @@ export async function getOrderById(orderId: string, creatorId?: string) {
 
   if (creatorId) query = query.eq('creator_id', creatorId);
 
-  const { data } = await query.single();
+  const { data } = await query.single<OrderDetailData>();
 
   return data;
 }

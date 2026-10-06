@@ -1,13 +1,5 @@
-export interface ErpSku {
-  id: string;
-  sku: string;
-  price: number;
-  option1: string | null;
-  option2: string | null;
-  option3: string | null;
-  inQty: number;
-  skuImage: string | null;
-}
+import type { ErpSku } from '@creator-commerce/shared/erp/types';
+export type { ErpSku } from '@creator-commerce/shared/erp/types';
 
 export interface SkuSelection {
   sku_id: string;
@@ -57,4 +49,46 @@ export interface Listing {
   status: string;
   error_message?: string;
   creator_store_connections?: { platform: string; store_name: string | null };
+}
+
+export interface ProductListItem {
+  id: string;
+  title: string | null;
+  status: string;
+  created_at: string;
+  retail_price: number | null;
+  preview_urls: unknown;
+  design_artwork_urls: unknown;
+  designs: { id: string; title: string | null } | null;
+  channel_listings: Listing[] | null;
+}
+
+export interface ProductsPageProps {
+  searchParams: Promise<{ tab?: string }>;
+}
+
+export interface ProductDetailPageProps {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}
+
+export type WizardStep = 'product' | 'design' | 'detail' | 'price';
+
+export interface ProductVariantsResponse {
+  skus: ErpSku[];
+  option_names: string[];
+}
+
+export interface ProductDraftInput {
+  erpSkus: ErpSku[];
+  enabledSkuIds: Set<string>;
+  variantPrices: Record<string, string>;
+  optionNames: string[];
+  title: string;
+  description: string;
+  tags: string[];
+  selectedImageIds: Set<string>;
+  retailPrice: number;
+  shippingCost: number;
+  costMin: number | null;
 }

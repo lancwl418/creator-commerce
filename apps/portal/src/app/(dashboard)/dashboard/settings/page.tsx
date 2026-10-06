@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
 import { getCreatorProfile } from '@/lib/queries/creators';
-import SettingsClient from './SettingsClient';
+import SettingsClient from '@/components/settings/SettingsClient';
 
 export default async function SettingsPage() {
   let user, creator;

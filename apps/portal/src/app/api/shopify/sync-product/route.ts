@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SkuSelection } from '@/lib/types';
-import { SHOPIFY_API_VERSION, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, DEFAULT_COST } from '@/lib/constants';
+import { SHOPIFY_API_VERSION, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET } from '@/lib/constants';
+import { validateListingPrices } from '@/lib/products/listingPrices';
 import { createClient } from '@/lib/supabase/server';
 
 interface ShopifyCreatedProduct {
@@ -42,7 +43,7 @@ async function createProductViaGraphQL(
     if (sku.option3 && optionSets[2]) optionValues.push({ optionName: optionSets[2].name, name: sku.option3 });
 
     // Use per-variant price from custom_product_skus, fallback to sku override, then product price
-    const variantPrice = skuPriceMap?.get(sku.sku_id) ?? Number(sku.price ?? retailPrice ?? 25);
+    const variantPrice = skuPriceMap?.get(sku.sku_id) ?? Number(sku.price ?? retailPrice);
 
     return {
       optionValues: optionValues.length > 0 ? optionValues : [{ optionName: optionSets[0]?.name || 'Title', name: 'Default Title' }],
@@ -531,6 +532,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  try {
+    validateListingPrices(selectedSkus, product.retail_price ?? product.base_price_suggestion);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid variant prices' }, { status: 400 });
+  }
+
   // Use base_price_suggestion as fallback for retail_price
   if (!product.retail_price && product.base_price_suggestion) {
     product.retail_price = product.base_price_suggestion;
@@ -551,8 +558,8 @@ export async function POST(req: NextRequest) {
     option3: sku.option3,
     // R2 design preview for this variant (design composited on this color)
     preview_image_url: (sku.option1 ? variantPreviewMap[sku.option1] : null) || null,
-    sale_price: sku.price ?? product.retail_price ?? 25,
-    base_cost_snapshot: sku.erpPrice ?? DEFAULT_COST,
+    sale_price: sku.price ?? product.retail_price,
+    base_cost_snapshot: sku.erpPrice,
     creator_store_connection_id: store_connection_id,
     is_active: true,
     erp_sync_status: 'pending',
@@ -672,7 +679,7 @@ export async function POST(req: NextRequest) {
       shopifyProduct,
       selectedSkus,
       optionSets,
-      product.retail_price ?? 25,
+      product.retail_price,
       skuPriceMap,
       variantImageMap,
     );

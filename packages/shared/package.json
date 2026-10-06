@@ -6,7 +6,9 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./erp": "./src/erp/index.ts"
+    "./erp": "./src/erp/index.ts",
+    "./erp/types": "./src/erp/types.ts",
+    "./erp/pricing": "./src/erp/pricing.ts"
   },
   "scripts": {}
 }

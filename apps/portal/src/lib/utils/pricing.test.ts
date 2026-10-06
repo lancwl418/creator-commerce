@@ -21,13 +21,13 @@ describe('pricing utilities', () => {
       expect(getSkuCost(sku('s1', 4.5))).toBe(4.5);
     });
 
-    it('falls back to DEFAULT_COST when price is undefined or null', () => {
-      expect(getSkuCost(sku('s1'))).toBe(10);
-      expect(getSkuCost(sku('s1', null))).toBe(10);
+    it('keeps missing cost unknown', () => {
+      expect(getSkuCost(sku('s1'))).toBeNull();
+      expect(getSkuCost(sku('s1', null))).toBeNull();
     });
 
-    it('falls back to DEFAULT_COST when price is 0', () => {
-      expect(getSkuCost(sku('s1', 0))).toBe(10);
+    it('preserves a supplied zero cost', () => {
+      expect(getSkuCost(sku('s1', 0))).toBe(0);
     });
   });
 
@@ -70,6 +70,9 @@ describe('pricing utilities', () => {
   });
 
   describe('calculateProfitRange', () => {
+    it('does not show a profit estimate when an enabled SKU has no cost', () => {
+      expect(calculateProfitRange([sku('known', 4), sku('missing', null)], new Set(['known', 'missing']), {}, 20)).toBeNull();
+    });
     it('returns a zero uniform range when no skus are enabled', () => {
       expect(calculateProfitRange([sku('s1', 4)], new Set(), {}, 20)).toEqual({
         min: 0,
@@ -211,8 +214,8 @@ describe('pricing utilities', () => {
         minMargin: 40,
         maxMargin: 70,
       });
-      expect(withShipping.min).toBe(withoutShipping.min - 2);
-      expect(withShipping.max).toBe(withoutShipping.max - 2);
+      expect(withShipping!.min).toBe(withoutShipping!.min - 2);
+      expect(withShipping!.max).toBe(withoutShipping!.max - 2);
     });
   });
 

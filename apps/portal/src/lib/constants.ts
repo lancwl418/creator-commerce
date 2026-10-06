@@ -1,11 +1,6 @@
 // ── Pricing ──
-export const DEFAULT_COST = 10.00;
 export const PRICE_MULTIPLIER = 2.5;
 export const ROYALTY_RATE = 0.15;
-
-// ── ERP ──
-export const ERP_API_BASE_URL = process.env.ERP_API_BASE_URL ?? 'http://118.195.245.201:8081/ideamax';
-export const ERP_IMAGE_BASE_URL = `${ERP_API_BASE_URL}/sys/common/static/`;
 
 // ── Shopify ──
 export const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION ?? '2024-10';

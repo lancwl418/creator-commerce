@@ -1,8 +1,7 @@
 import { cookies } from 'next/headers';
-import type { SellerTier } from '@creator-commerce/shared/erp';
+import type { SellerTier } from '@creator-commerce/shared/erp/pricing';
 
 const TIER_COOKIE = 'cn_seller_tier';
-const VALID_TIERS: SellerTier[] = ['VIP', 'WHOLESALE'];
 
 /**
  * 解析当前登录卖家的等级。
@@ -18,7 +17,7 @@ const VALID_TIERS: SellerTier[] = ['VIP', 'WHOLESALE'];
  */
 export async function getCurrentSellerTier(): Promise<SellerTier> {
   const store = await cookies();
-  const raw = store.get(TIER_COOKIE)?.value as SellerTier | undefined;
-  if (raw && VALID_TIERS.includes(raw)) return raw;
+  const raw = store.get(TIER_COOKIE)?.value;
+  if (raw === 'VIP' || raw === 'WHOLESALE') return raw;
   return 'VIP';
 }

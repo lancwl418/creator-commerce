@@ -1,52 +1,60 @@
 import {
   fetchProducts,
   findProductById,
-  type ErpProduct,
   type SellerTier,
 } from '@creator-commerce/shared/erp';
-import { erpConfig } from './erp';
+import { getErpConfig } from './erp';
 import { createClient } from './supabase/server';
-import { buildCatalog, type CatalogResult, type PlatformData } from './catalog';
+import { buildCatalog } from './catalog';
+import type { CatalogPage, PlatformData, ProductDetailData } from './types/catalog';
+import { loadAllRows } from './platform-data';
 
 /** 从平台 3 张薄表装配 PlatformData（按当前等级） */
 export async function loadPlatformData(tier: SellerTier): Promise<PlatformData> {
   const supabase = await createClient();
 
-  const [visRes, stockRes, moqRes] = await Promise.all([
-    supabase
-      .from('seller_product_visibility')
-      .select('sku, visible')
-      .eq('seller_tier', tier)
-      .eq('visible', false),
-    supabase.from('product_stock_snapshot').select('sku, in_stock'),
-    supabase.from('product_moq').select('sku, min_qty, min_amount'),
+  const [visibilityRows, stockRows, moqRows] = await Promise.all([
+    loadAllRows<{ sku: string }>('seller_product_visibility', (from, to) =>
+      supabase
+        .from('seller_product_visibility')
+        .select('sku, visible')
+        .eq('seller_tier', tier)
+        .eq('visible', false)
+        .order('sku')
+        .range(from, to)
+    ),
+    loadAllRows<{ sku: string; in_stock: boolean }>('product_stock_snapshot', (from, to) =>
+      supabase
+        .from('product_stock_snapshot')
+        .select('sku, in_stock')
+        .order('sku')
+        .range(from, to)
+    ),
+    loadAllRows<{ sku: string; min_qty: number | null; min_amount: number | null }>(
+      'product_moq', (from, to) =>
+        supabase
+          .from('product_moq')
+          .select('sku, min_qty, min_amount')
+          .order('sku')
+          .range(from, to)
+    ),
   ]);
 
   const hiddenSkusForTier = new Set<string>(
-    (visRes.data ?? []).map((r: { sku: string }) => r.sku)
+    visibilityRows.map((r) => r.sku)
   );
 
   const stock = new Map<string, boolean>();
-  for (const r of (stockRes.data ?? []) as { sku: string; in_stock: boolean }[]) {
+  for (const r of stockRows) {
     stock.set(r.sku, r.in_stock);
   }
 
   const moq = new Map<string, { minQty: number | null; minAmount: number | null }>();
-  for (const r of (moqRes.data ?? []) as {
-    sku: string;
-    min_qty: number | null;
-    min_amount: number | null;
-  }[]) {
+  for (const r of moqRows) {
     moq.set(r.sku, { minQty: r.min_qty, minAmount: r.min_amount });
   }
 
   return { hiddenSkusForTier, stock, moq };
-}
-
-export interface CatalogPage extends CatalogResult {
-  total: number;
-  pages: number;
-  page: number;
 }
 
 /** 选品列表页数据 */
@@ -56,7 +64,7 @@ export async function getCatalogPage(
   pageSize = 40
 ): Promise<CatalogPage> {
   const [page, data] = await Promise.all([
-    fetchProducts(erpConfig, pageNo, pageSize),
+    fetchProducts(getErpConfig(), pageNo, pageSize),
     loadPlatformData(tier),
   ]);
   const result = buildCatalog(page.records, tier, data);
@@ -67,9 +75,9 @@ export async function getCatalogPage(
 export async function getProductDetail(
   erpProductId: string,
   tier: SellerTier
-): Promise<{ product: ErpProduct | null; data: PlatformData }> {
+): Promise<ProductDetailData> {
   const [product, data] = await Promise.all([
-    findProductById(erpConfig, erpProductId),
+    findProductById(getErpConfig(), erpProductId),
     loadPlatformData(tier),
   ]);
   return { product, data };

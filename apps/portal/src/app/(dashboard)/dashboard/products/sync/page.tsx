@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
-import SyncFromDesign from './SyncFromDesign';
+import SyncFromDesign from '@/components/products/sync/SyncFromDesign';
 
 export default async function SyncFromDesignPage() {
   let creator;

@@ -1,26 +1,39 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import type { ErpProduct, ErpProductPage } from './types';
 
 // ── ERP 网关配置 ──
 // 与现有 apps/portal 保持一致：openapi/call/{code} + appkey + md5 签名。
-// 生产环境应通过环境变量注入，defaults 仅用于本地联调。
+// 所有环境都从环境变量读取；源码不提供凭据或部署地址兜底。
 export interface ErpConfig {
   baseUrl: string;
   appKey: string;
   secretKey: string;
 }
 
-export function erpConfigFromEnv(env: NodeJS.ProcessEnv = process.env): ErpConfig {
-  return {
-    baseUrl: env.ERP_API_BASE_URL ?? 'http://118.195.245.201:8081/ideamax',
-    appKey: env.ERP_APP_KEY ?? 'ak-OwVVN4U4gJINJ4nK',
-    secretKey: env.ERP_SECRET_KEY ?? 'QSd7yhGrQ1YyPIFJ9LJXHAbOU67C1A7K',
-  };
+type ErpEnv = Record<string, string | undefined>;
+
+function requiredEnv(env: ErpEnv, name: string): string {
+  const value = env[name]?.trim();
+  if (!value) throw new Error(`Missing environment variable: ${name}`);
+  return value;
 }
 
-/** ERP 图片代理基址（原图路径需拼在其后） */
-export function erpImageBaseUrl(cfg: ErpConfig): string {
-  return `${cfg.baseUrl}/sys/common/static/`;
+export function erpBaseUrlFromEnv(env: ErpEnv = process.env): string {
+  const url = new URL(requiredEnv(env, 'ERP_API_BASE_URL'));
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+    throw new Error('ERP_API_BASE_URL must be an HTTP(S) URL without credentials');
+  }
+  url.search = '';
+  url.hash = '';
+  return url.toString().replace(/\/$/, '');
+}
+
+export function erpConfigFromEnv(env: ErpEnv = process.env): ErpConfig {
+  return {
+    baseUrl: erpBaseUrlFromEnv(env),
+    appKey: requiredEnv(env, 'ERP_APP_KEY'),
+    secretKey: requiredEnv(env, 'ERP_SECRET_KEY'),
+  };
 }
 
 /** 计算 ERP 网关签名：md5(appKey + secretKey + timestamp) */
@@ -34,10 +47,17 @@ export function erpSign(cfg: ErpConfig, timestamp: string): string {
 /** 已知接口 code：产品主数据（含 prodSkuList / prodImageList） */
 const PRODUCTS_ENDPOINT_CODE = 'K5iOWd6y';
 
-interface ErpEnvelope<T> {
+export interface ErpEnvelope<T> {
   success: boolean;
   result?: T;
   message?: string;
+}
+
+export class ErpApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'ErpApiError';
+  }
 }
 
 async function erpGet<T>(
@@ -62,17 +82,36 @@ async function erpGet<T>(
   } as RequestInit);
 
   if (!res.ok) {
-    throw new Error(`ERP API returned ${res.status}`);
+    throw new ErpApiError(`ERP API returned ${res.status}`, res.status);
   }
-  return (await res.json()) as ErpEnvelope<T>;
+  const data = (await res.json()) as ErpEnvelope<T>;
+  if (!data.success || !data.result) {
+    throw new ErpApiError(data.message || 'ERP API returned no data', 502);
+  }
+  return data;
 }
 
-interface RawProductPage {
+export interface RawProductPage {
   records?: ErpProduct[];
   list?: ErpProduct[];
   total?: number;
   pages?: number;
   current?: number;
+}
+
+/** 保留 ERP 原始响应结构，供各 app 的兼容路由使用。 */
+export async function fetchProductsEnvelope(
+  cfg: ErpConfig,
+  pageNo: string,
+  pageSize: string,
+  init?: { revalidate?: number }
+): Promise<ErpEnvelope<RawProductPage>> {
+  return erpGet<RawProductPage>(
+    cfg,
+    PRODUCTS_ENDPOINT_CODE,
+    { pageNo, pageSize },
+    init
+  );
 }
 
 /** 拉取产品分页列表 */
@@ -81,10 +120,10 @@ export async function fetchProducts(
   pageNo = 1,
   pageSize = 40
 ): Promise<ErpProductPage> {
-  const data = await erpGet<RawProductPage>(
+  const data = await fetchProductsEnvelope(
     cfg,
-    PRODUCTS_ENDPOINT_CODE,
-    { pageNo: String(pageNo), pageSize: String(pageSize) },
+    String(pageNo),
+    String(pageSize),
     { revalidate: 300 }
   );
   const result = data.result ?? {};
@@ -96,17 +135,19 @@ export async function fetchProducts(
 
 /**
  * 按 id 找单个产品。
- * ERP 当前无按 id 查询的接口，沿用现有 portal 做法：拉一页 100 条后匹配。
+ * ERP 当前无按 id 查询的接口，逐页查找，避免第 100 条以后的产品无法打开。
  * 如后续 ERP 提供 detail 接口，替换此实现即可。
  */
 export async function findProductById(
   cfg: ErpConfig,
   erpProductId: string
 ): Promise<ErpProduct | null> {
-  const data = await erpGet<RawProductPage>(cfg, PRODUCTS_ENDPOINT_CODE, {
-    pageNo: '1',
-    pageSize: '100',
-  });
-  const records = data.result?.records ?? data.result?.list ?? [];
-  return records.find((p) => p.id === erpProductId) ?? null;
+  let pageNo = 1;
+  while (true) {
+    const page = await fetchProducts(cfg, pageNo, 100);
+    const product = page.records.find((p) => p.id === erpProductId);
+    if (product) return product;
+    if (page.records.length === 0 || pageNo >= page.pages) return null;
+    pageNo += 1;
+  }
 }

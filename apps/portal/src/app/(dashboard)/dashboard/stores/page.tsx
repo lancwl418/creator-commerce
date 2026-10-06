@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
 import { getStoreConnections } from '@/lib/queries/stores';
-import StoresClient from './StoresClient';
+import StoresClient from '@/components/stores/StoresClient';
 
 export default async function StoresPage() {
   let creator;
@@ -13,5 +13,5 @@ export default async function StoresPage() {
 
   const stores = await getStoreConnections(creator.id);
 
-  return <StoresClient creatorId={creator.id} initialStores={stores} />;
+  return <StoresClient initialStores={stores} />;
 }

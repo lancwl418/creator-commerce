@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
-import CreateWizard from './CreateWizard';
+import CreateWizard from '@/components/products/create/CreateWizard';
 
 export default async function CreateProductPage({
   searchParams,

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
-import DesignUploadFlow from './DesignUploadFlow';
+import DesignUploadFlow from '@/components/designs/DesignUploadFlow';
 
 export default async function NewDesignPage() {
   let creator;

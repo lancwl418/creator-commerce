@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDesignById } from '@/lib/queries/designs';
-import { PromoteButton } from '../PromoteButton';
+import { PromoteButton } from '@/components/designs/PromoteButton';
 
 export default async function DesignDetailPage({
   params,

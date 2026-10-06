@@ -73,3 +73,66 @@ export interface OrderFulfillment {
   fulfilled_at: string | null;
   line_item_ids: string[];
 }
+
+export interface OrderDetailItem extends OrderItem {
+  channel_listing_variants: {
+    id: string;
+    external_variant_id: string;
+    custom_product_skus: {
+      id: string;
+      erp_product_id: string;
+      erp_sku_id: string;
+      sku_code: string;
+      erp_synced_sku_id: string | null;
+      erp_sync_status: string;
+      preview_image_url: string | null;
+    } | null;
+  } | null;
+}
+
+export interface OrderStore {
+  id: string;
+  platform: string;
+  store_name: string | null;
+  store_url: string | null;
+}
+
+export interface OrderDetailData extends OrderData {
+  creator_store_connections: OrderStore | null;
+  creator_order_items: OrderDetailItem[];
+  creator_order_logs: OrderLog[];
+  creator_order_fulfillments: Omit<OrderFulfillment, 'line_item_ids'>[];
+}
+
+export interface OrderListData extends OrderData {
+  creator_store_connections: OrderStore | null;
+  creator_order_items: Pick<OrderItem, 'id' | 'title' | 'variant_title' | 'quantity' | 'unit_price' | 'total_price' | 'earnings_amount'>[];
+}
+
+export interface OrderDetailPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export interface OrderEditField {
+  key: string;
+  label: string;
+  value: string;
+  type?: 'text' | 'select' | 'textarea';
+  options?: { value: string; label: string }[];
+}
+
+export type FulfillmentItem = Pick<OrderItem, 'shopify_line_item_id' | 'title' | 'variant_title' | 'sku'>;
+
+export interface OrderFulfillmentInput {
+  tracking_number: string;
+  carrier: string;
+  tracking_url?: string;
+  line_item_ids: string[];
+  note?: string;
+}
+
+export interface OrderSyncStore {
+  id: string;
+  name: string;
+  platform: string;
+}

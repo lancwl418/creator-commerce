@@ -56,6 +56,15 @@ export interface DesignEditorPayload {
   title_prefix?: string;
 }
 
+/** Optional host hints for templates; URLSearchParams handles their encoding. */
+export interface DesignEditorProductMeta {
+  id: string;
+  name: string;
+  base_cost?: number;
+  source?: string;
+  thumbnail?: string | null;
+}
+
 // ── editor → host messages ──
 
 export interface DesignEditorReadyMessage {

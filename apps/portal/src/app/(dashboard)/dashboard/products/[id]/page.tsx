@@ -1,16 +1,11 @@
+import type { ProductDetailPageProps } from '@/lib/types/product';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getProductById, getProductArtwork } from '@/lib/queries/products';
-import ProductEditor from './ProductEditor';
-import { BackButton } from './BackButton';
+import ProductEditor from '@/components/products/ProductEditor';
+import { BackButton } from '@/components/products/BackButton';
 
-export default async function ProductDetailPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string }>;
-}) {
+export default async function ProductDetailPage({ params, searchParams }: ProductDetailPageProps) {
   const { id } = await params;
   const { from } = await searchParams;
 
@@ -39,6 +34,7 @@ export default async function ProductDetailPage({
       </div>
 
       <ProductEditor
+        key={product.id}
         product={{
           id: product.id,
           title: product.title,

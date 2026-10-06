@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { requireCreator } from '@/lib/server/auth';
 import { getOrders } from '@/lib/queries/orders';
 import { ORDER_STATUS_COLORS, FULFILLMENT_STATUS_COLORS } from '@/lib/constants';
-import SyncOrdersButton from './SyncOrdersButton';
+import SyncOrdersButton from '@/components/orders/SyncOrdersButton';
 
 export default async function OrdersPage() {
   let creator;
@@ -142,7 +142,7 @@ export default async function OrdersPage() {
                     <td className="px-5 py-3.5">
                       <div className="flex flex-col gap-1">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold w-fit ${
-                          ORDER_STATUS_COLORS[order.financial_status] || 'bg-gray-100 text-gray-600'
+                          ORDER_STATUS_COLORS[order.financial_status || 'unknown'] || 'bg-gray-100 text-gray-600'
                         }`}>
                           {order.financial_status || 'unknown'}
                         </span>

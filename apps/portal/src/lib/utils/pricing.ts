@@ -1,4 +1,3 @@
-import { DEFAULT_COST } from '@/lib/constants';
 import type { ErpSku } from '@/lib/types';
 
 export interface ProfitRange {
@@ -11,9 +10,9 @@ export interface ProfitRange {
   uniform: boolean;
 }
 
-/** Get the ERP cost for a SKU, falling back to DEFAULT_COST */
-export function getSkuCost(sku: ErpSku): number {
-  return sku.price || DEFAULT_COST;
+/** Missing costs stay unknown; zero is a valid supplied cost. */
+export function getSkuCost(sku: ErpSku): number | null {
+  return sku.price != null && Number.isFinite(sku.price) && sku.price >= 0 ? sku.price : null;
 }
 
 /** Get the effective sale price for a variant (custom override or product-level price) */
@@ -50,7 +49,7 @@ export function calculateProfitRange(
   variantPrices: Record<string, string>,
   productPrice: number,
   shippingCost = 0,
-): ProfitRange {
+): ProfitRange | null {
   const enabledSkus = skus.filter(s => enabledSkuIds.has(s.id));
   if (enabledSkus.length === 0) {
     return { min: 0, max: 0, minMargin: 0, maxMargin: 0, costMin: 0, costMax: 0, uniform: true };
@@ -63,6 +62,7 @@ export function calculateProfitRange(
 
   for (const sku of enabledSkus) {
     const cost = getSkuCost(sku);
+    if (cost == null) return null;
     const salePrice = getEffectivePrice(sku.id, variantPrices, productPrice);
     const profit = salePrice - cost - shippingCost;
     if (profit < minProfit) minProfit = profit;
