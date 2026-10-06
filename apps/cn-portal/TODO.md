@@ -20,12 +20,12 @@
 
 ## 二、待接入（工程）
 
-- [ ] **应用 migration 023**：当前 Supabase 项目里没有 `seller_product_visibility`、
-      `product_stock_snapshot`、`product_moq` 三张表，列表页会显示「产品加载失败」、详情页报错。
-      在根目录 `.env` 配好 `DATABASE_URL` 后执行 `pnpm db:migrate`。
+- [x] **应用 migration 023 / 024**：2026-10-06 已在生产库执行。024 为三张表开启 RLS、只开放读取，
+      写入需走服务端密钥。注意 `_migrations` 里没有 020–022 的记录（它们已手动应用），
+      直接跑 `pnpm db:migrate` 会重跑这三个，执行前先看 `pnpm db:status`。
 - [ ] **上线前访问控制**：当前 cookie 可由访问者修改，默认 VIP 也不是认证结果，不能作为
-      生产价格权限来源。接入真实身份后，删除 cookie/default 占位，并为 migration 023 的三张表
-      增加 RLS/写入权限策略（当前 migration 没有定义），库存/可见性/MOQ 仅由运营修改。
+      生产价格权限来源。接入真实身份后，删除 cookie/default 占位。三张表的 RLS 已由 migration 024 开启
+      （任何人可读、仅服务端密钥可写）；可见性表目前所有等级的行都可读，接入身份后按等级收紧。
 - [ ] **卖家 auth + ERP 真实 tier 解析**：把 `src/lib/seller.ts` 里的 cookie 占位（`cn_seller_tier`）
       换成「登录 → 调 ERP customer 接口读价格等级 → 映射 SellerTier」。
       ERP 已提供客户档案分页接口（`UmrAedIA`，含 custStageId / vipStage）和客户等级分页接口（`wfi8Vrp4`）；
