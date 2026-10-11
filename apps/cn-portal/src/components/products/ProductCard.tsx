@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { CatalogItem } from '@/lib/types/catalog';
 import { erpImage } from '@/lib/image';
@@ -14,12 +15,14 @@ export default function ProductCard({ item }: { item: CatalogItem }) {
     >
       <div className="aspect-square bg-surface-secondary flex items-center justify-center">
         {img ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          // ERP 主图动辄 500KB 的 PNG，一页 40 张；经 next/image 缩成卡片尺寸的 webp 并在服务端缓存
+          <Image
             src={img}
             alt={item.name}
+            width={320}
+            height={320}
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
             className="w-full h-full object-contain p-4"
-            loading="lazy"
           />
         ) : (
           <span className="text-gray-300 text-xs">{t('image.empty')}</span>

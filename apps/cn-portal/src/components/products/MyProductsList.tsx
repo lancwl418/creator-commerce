@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { MyProductRow } from '@/lib/types/product';
+import Image from 'next/image';
 import { erpImage } from '@/lib/image';
 import { t } from '@/lib/i18n';
 import ProductPrice from './ProductPrice';
@@ -35,8 +36,7 @@ export default function MyProductsList({ products, highlightId }: { products: My
           return (
             <li key={product.id} className={`flex items-center gap-4 px-5 py-4 ${product.id === highlightId ? 'bg-brand-50' : ''}`}>
               <div className="w-14 h-14 rounded-lg bg-surface-secondary overflow-hidden shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {src && <img src={src} alt="" className="w-full h-full object-contain p-1" />}
+                {src && <Image src={src} alt="" width={56} height={56} className="w-full h-full object-contain p-1" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">{product.title ?? '—'}</p>

@@ -1,37 +1,9 @@
-import {
-  fetchProducts,
-  findProductById,
-  type ErpProduct,
-  type ErpProductPage,
-  type ErpSku,
-  type SellerTier,
-} from '@creator-commerce/shared/erp';
-import { getErpConfig } from './erp';
+import type { ErpProduct, ErpSku, SellerTier } from '@creator-commerce/shared/erp';
 import { createClient } from './supabase/server';
 import { buildCatalog, getCatalogItem, getListableSkus } from './catalog';
 import type { CatalogResult, PlatformData, ProductDetailData } from './types/catalog';
 import { loadAllRows } from './platform-data';
-import { createTtlCache } from './ttl-cache';
-
-// ERP 产品数据与卖家等级无关，可以跨请求共用；等级价格、可见性、库存在其后按请求计算。
-const ERP_CACHE_TTL_MS = 5 * 60 * 1000;
-const ERP_PAGE_CACHE_ENTRIES = 50;
-const ERP_PRODUCT_CACHE_ENTRIES = 1000;
-const erpPageCache = createTtlCache<ErpProductPage>(ERP_CACHE_TTL_MS, ERP_PAGE_CACHE_ENTRIES);
-const erpProductCache = createTtlCache<ErpProduct | null>(ERP_CACHE_TTL_MS, ERP_PRODUCT_CACHE_ENTRIES);
-
-function loadErpPage(pageNo: number, pageSize: number): Promise<ErpProductPage> {
-  return erpPageCache.get(`${pageNo}:${pageSize}`, async () => {
-    const page = await fetchProducts(getErpConfig(), pageNo, pageSize);
-    // 列表记录与详情接口返回的结构一致，顺带写入详情缓存，从列表点进详情不必再请求 ERP。
-    for (const product of page.records) erpProductCache.set(product.id, product);
-    return page;
-  });
-}
-
-function loadErpProduct(erpProductId: string): Promise<ErpProduct | null> {
-  return erpProductCache.get(erpProductId, () => findProductById(getErpConfig(), erpProductId));
-}
+import { loadAllErpProducts, loadErpProduct } from './erp-products.server';
 
 /** 从平台 3 张薄表装配 PlatformData（按当前等级） */
 export async function loadPlatformData(tier: SellerTier): Promise<PlatformData> {
@@ -79,20 +51,6 @@ export async function loadPlatformData(tier: SellerTier): Promise<PlatformData> 
   }
 
   return { hiddenSkusForTier, stock, moq };
-}
-
-// ERP 产品列表接口只有分页参数，不能按业务线筛选；目录要先取回全部产品再在本地筛选、
-// 排序和分页。各页走上面的 5 分钟缓存。
-const ERP_SCAN_PAGE_SIZE = 100;
-
-async function loadAllErpProducts(): Promise<ErpProduct[]> {
-  const first = await loadErpPage(1, ERP_SCAN_PAGE_SIZE);
-  const rest = await Promise.all(
-    Array.from({ length: Math.max(0, first.pages - 1) }, (_, index) =>
-      loadErpPage(index + 2, ERP_SCAN_PAGE_SIZE)
-    )
-  );
-  return [first, ...rest].flatMap((page) => page.records);
 }
 
 /** 该等级卖家可选的全部产品（未筛选、未分页） */
