@@ -48,8 +48,8 @@
       `/api/erp/products-cache` 下发，已去掉供应商报价、定价分组、SKU 成本）→ 保存后用共享的
       `createProductsFromDesignPayload` 建草稿（预览图经 `/api/upload-r2` 上 R2）→ `/my-products/[id]/sync`
       设售价、同步。带设计的成本 = 空白件价 + 第一种工艺的单面印花价（与目录起价口径一致）。
-      **部署前**：cn-portal 服务需配 R2_*（环境组里没有，只在 design-engine 服务上），
-      Design Engine 的 `NEXT_PUBLIC_ALLOWED_ORIGINS` 要包含 `https://cn-portal.onrender.com`。
+      **部署前**：cn-portal 服务需配 R2_*（环境组里没有，只在 design-engine 服务上）。Design Engine 的
+      `NEXT_PUBLIC_ALLOWED_ORIGINS` 只管它自己的 API 的 CORS，cn-portal 不调那些接口，不用改。
 - [x] **第 3 步 · 订单页**：`/orders` 列出 `creator_orders`（店铺订单经 Creator Portal 的 webhook 回流）。
       仅列表，无详情和发货操作。
 - [ ] **第 4 步 · 下单**（等支付方案：Plaid 或 Stripe）：白板 bulk order；上传设计的定制单；推 ERP「创建订单」。
