@@ -1,5 +1,11 @@
 import crypto from 'node:crypto';
-import type { ErpProduct, ErpProductPage } from './types';
+import type {
+  ErpCustomerCreateInput,
+  ErpCustomerCreateResult,
+  ErpCustomerLevel,
+  ErpProduct,
+  ErpProductPage,
+} from './types';
 
 // ── ERP 网关配置 ──
 // 与现有 apps/portal 保持一致：openapi/call/{code} + appkey + md5 签名。
@@ -50,6 +56,10 @@ const PRODUCTS_ENDPOINT_CODE = 'K5iOWd6y';
 const PRODUCT_DETAIL_ENDPOINT_CODE = 'rcdCIqkQ';
 // ERP 对「产品不存在」返回 HTTP 200 + success=false，只能靠 message 区分（接口文档错误码表）。
 const PRODUCT_NOT_FOUND_MESSAGE = '未找到对应商品数据';
+/** 已知接口 code：客户等级分页列表 */
+const CUSTOMER_LEVELS_ENDPOINT_CODE = 'wfi8Vrp4';
+/** 已知接口 code：新增客户（需要 ERP 给 appKey 授权） */
+const CUSTOMER_CREATE_ENDPOINT_CODE = 'RIv0P9vK';
 
 export interface ErpEnvelope<T> {
   success: boolean;
@@ -69,25 +79,41 @@ export class ErpApiError extends Error {
 async function erpRequest<T>(
   cfg: ErpConfig,
   code: string,
-  params: Record<string, string>
+  params: Record<string, string>,
+  body?: unknown
 ): Promise<ErpEnvelope<T>> {
   const timestamp = String(Date.now());
   const url = new URL(`${cfg.baseUrl}/openapi/call/${code}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
   const res = await fetch(url.toString(), {
+    method: body === undefined ? 'GET' : 'POST',
     headers: {
       'Content-Type': 'application/json',
       appkey: cfg.appKey,
       signature: erpSign(cfg, timestamp),
       timestamp,
     },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   if (!res.ok) {
-    throw new ErpApiError(`ERP API returned ${res.status}`, res.status);
+    throw new ErpApiError(await describeHttpFailure(res), res.status);
   }
   return (await res.json()) as ErpEnvelope<T>;
+}
+
+/** 网关层错误（如 appKey 未授权）以 HTTP 500 + 异常信息返回，把原因带进错误里便于排查。 */
+async function describeHttpFailure(res: Response): Promise<string> {
+  const fallback = `ERP API returned ${res.status}`;
+  try {
+    const body = (await res.json()) as { message?: unknown; trace?: unknown };
+    const trace = typeof body.trace === 'string' ? body.trace.split('\n')[0].replace(/^[\w.$]+Exception:\s*/, '') : '';
+    const message = typeof body.message === 'string' && body.message ? body.message : trace;
+    return message ? `${fallback}: ${message.trim()}` : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 async function erpGet<T>(
@@ -95,7 +121,14 @@ async function erpGet<T>(
   code: string,
   params: Record<string, string>
 ): Promise<ErpEnvelope<T>> {
-  const data = await erpRequest<T>(cfg, code, params);
+  return requireResult(await erpRequest<T>(cfg, code, params));
+}
+
+async function erpPost<T>(cfg: ErpConfig, code: string, body: unknown): Promise<ErpEnvelope<T>> {
+  return requireResult(await erpRequest<T>(cfg, code, {}, body));
+}
+
+function requireResult<T>(data: ErpEnvelope<T>): ErpEnvelope<T> {
   if (!data.success || !data.result) {
     throw new ErpApiError(data.message || 'ERP API returned no data', 502);
   }
@@ -145,4 +178,22 @@ export async function findProductById(
   }
   if (data.message?.includes(PRODUCT_NOT_FOUND_MESSAGE)) return null;
   throw new ErpApiError(data.message || 'ERP API returned no data', 502);
+}
+
+/** ERP 客户等级列表（零售 / 批发 / VIP / 中国商家…） */
+export async function fetchCustomerLevels(cfg: ErpConfig): Promise<ErpCustomerLevel[]> {
+  const data = await erpGet<{ records?: ErpCustomerLevel[] }>(cfg, CUSTOMER_LEVELS_ENDPOINT_CODE, {
+    pageNo: '1',
+    pageSize: '100',
+  });
+  return data.result?.records ?? [];
+}
+
+/** 在 ERP 创建客户档案，返回 ERP 客户 id。 */
+export async function createCustomer(
+  cfg: ErpConfig,
+  input: ErpCustomerCreateInput
+): Promise<ErpCustomerCreateResult> {
+  const data = await erpPost<ErpCustomerCreateResult>(cfg, CUSTOMER_CREATE_ENDPOINT_CODE, input);
+  return data.result as ErpCustomerCreateResult;
 }

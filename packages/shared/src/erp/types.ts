@@ -129,3 +129,41 @@ export interface ErpProductPage {
   pages: number;
   current: number;
 }
+
+// ── 客户档案（接口文档「客户档案」「客户等级分页列表查询」） ──
+
+export interface ErpCustomerLevel {
+  id: string;
+  /** 等级编码，如 'VIP'、'wholesale'；部分等级为 null */
+  levelId: string | null;
+  levelName: string;
+  multiplier?: number | null;
+}
+
+/**
+ * 新增客户的请求体。字段名以 ERP 现有客户记录为准（等级字段是 custStageId / vipStage，
+ * 示例代码里的 vipStageId 在记录中不存在）。
+ */
+export interface ErpCustomerCreateInput {
+  createBy: string;
+  sysOrgCode: string;
+  custName: string;
+  custContact: string;
+  custTel: string;
+  custPhone: string;
+  custEmail: string;
+  custState: 'active' | 'suspended' | 'pending_review';
+  custSource: string;
+  /** 审核状态，接口文档：默认为 2 */
+  status: number;
+  custStageId: string;
+  vipStage: string;
+  [field: string]: string | number | undefined;
+}
+
+export interface ErpCustomerCreateResult {
+  id: string;
+  custId?: string;
+  custName?: string;
+  message?: string;
+}

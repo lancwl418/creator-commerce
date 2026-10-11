@@ -1,7 +1,7 @@
 import { isSellerTier } from '@creator-commerce/shared/erp/pricing';
 import type { Seller, SellerRow } from '../types/seller';
 
-export const SELLER_COLUMNS = 'id, email, company_name, contact_name, phone, seller_tier, erp_customer_id';
+export const SELLER_COLUMNS = 'id, email, company_name, contact_name, phone, seller_tier, erp_customer_id, erp_sync_status';
 
 export function toSeller(row: SellerRow): Seller {
   // 等级决定价格：数据库里出现代码不认识的等级时报错，不默认成某个等级。
@@ -16,5 +16,6 @@ export function toSeller(row: SellerRow): Seller {
     phone: row.phone,
     tier: row.seller_tier,
     erpCustomerId: row.erp_customer_id,
+    erpSyncStatus: row.erp_sync_status === 'synced' || row.erp_sync_status === 'failed' ? row.erp_sync_status : 'pending',
   };
 }

@@ -3,23 +3,12 @@
 import { redirect } from 'next/navigation';
 import { t } from '../i18n';
 import { getRequestOrigin } from '../request-origin';
+import { getCurrentSeller } from '../queries/sellers';
 import { createClient } from '../supabase/server';
 import type { AuthFormState } from '../types/seller';
 import { syncSellerToErp } from './erp-sync';
 import { RESET_PASSWORD_PATH, emailRedirectUrl, parseNewPassword } from './password-reset';
 import { authErrorMessage, parseRegistration, refillValues, safeReturnPath, signupMetadata } from './registration';
-
-type Supabase = Awaited<ReturnType<typeof createClient>>;
-
-async function hasSellerAccount(supabase: Supabase, authUserId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('cn_sellers')
-    .select('id')
-    .eq('auth_user_id', authUserId)
-    .maybeSingle();
-  if (error) throw new Error(`Failed to load seller account: ${error.message}`);
-  return data != null;
-}
 
 export async function signUpSeller(_state: AuthFormState, form: FormData): Promise<AuthFormState> {
   const values = refillValues(form);
@@ -53,19 +42,15 @@ export async function signUpSeller(_state: AuthFormState, form: FormData): Promi
   // 开启邮箱验证时，已注册的邮箱不会报错，而是返回一个没有 identity 的用户。
   if (!data.user || data.user.identities?.length === 0) return { error: t('auth.error.emailTaken'), values };
 
-  try {
-    await syncSellerToErp({
-      authUserId: data.user.id,
-      email: registration.email,
-      companyName: registration.companyName,
-      contactName: registration.contactName,
-      phone: registration.phone,
-      tier: 'CN_MERCHANT',
-    });
-  } catch (syncError) {
-    // ERP 同步失败不影响注册，账户已经建好，可以事后补同步。
-    console.error('Failed to sync seller to ERP', syncError);
-  }
+  // 同步失败不影响注册：账户已建好，状态记为 failed，登录时重试。
+  await syncSellerToErp({
+    authUserId: data.user.id,
+    email: registration.email,
+    companyName: registration.companyName,
+    contactName: registration.contactName,
+    phone: registration.phone,
+    tier: 'CN_MERCHANT',
+  });
 
   // 项目开启了邮箱验证时注册后没有会话，需要先验证邮箱再登录。
   if (!data.session) return { notice: t('auth.notice.confirmEmail') };
@@ -85,9 +70,21 @@ export async function signInSeller(_state: AuthFormState, form: FormData): Promi
   }
 
   // 与 Creator Portal 共用登录体系：只有建了卖家账户的用户才能进卖家平台。
-  if (!(await hasSellerAccount(supabase, data.user.id))) {
+  const seller = await getCurrentSeller();
+  if (!seller) {
     await supabase.auth.signOut();
     return { error: t('auth.error.notSeller'), values };
+  }
+  // 注册时没同步成功的账户，登录时补一次。
+  if (seller.erpSyncStatus !== 'synced') {
+    await syncSellerToErp({
+      authUserId: data.user.id,
+      email: seller.email,
+      companyName: seller.companyName,
+      contactName: seller.contactName,
+      phone: seller.phone,
+      tier: seller.tier,
+    });
   }
   redirect(safeReturnPath(form.get('next') as string | null));
 }

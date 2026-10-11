@@ -9,8 +9,9 @@ export interface Seller {
   phone: string;
   /** 价格等级，决定卖家看到哪一档价格 */
   tier: SellerTier;
-  /** ERP 客户档案 id；对接 ERP 前为 null */
+  /** ERP 客户档案 id；同步成功前为 null */
   erpCustomerId: string | null;
+  erpSyncStatus: 'pending' | 'synced' | 'failed';
 }
 
 export interface SellerRow {
@@ -21,6 +22,7 @@ export interface SellerRow {
   phone: string;
   seller_tier: string;
   erp_customer_id: string | null;
+  erp_sync_status: string;
 }
 
 export interface SellerRegistration {

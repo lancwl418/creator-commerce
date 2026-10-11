@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { erpConfigFromEnv, erpSign, fetchProducts, findProductById } from '@creator-commerce/shared/erp';
+import { createCustomer, erpConfigFromEnv, erpSign, fetchCustomerLevels, fetchProducts, findProductById } from '@creator-commerce/shared/erp';
 
 const config = { baseUrl: 'https://erp.example.test/ideamax', appKey: 'test-app', secretKey: 'test-secret' };
 
@@ -53,5 +53,32 @@ describe('共享 ERP client', () => {
   it('详情接口的其他失败不能当成产品不存在', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ success: false, code: 500, message: 'Permission denied' })));
     await expect(findProductById(config, 'p1')).rejects.toThrow('Permission denied');
+  });
+
+  it('客户等级列表按签名 GET 读取', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ success: true, result: { records: [{ id: 'l1', levelId: null, levelName: '中国商家' }] } }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await fetchCustomerLevels(config)).toEqual([{ id: 'l1', levelId: null, levelName: '中国商家' }]);
+    expect(new URL(fetchMock.mock.calls[0][0]).pathname).toBe('/ideamax/openapi/call/wfi8Vrp4');
+    expect(fetchMock.mock.calls[0][1].method).toBe('GET');
+  });
+
+  it('新增客户按 JSON POST，返回 ERP 客户 id', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ success: true, result: { id: 'c1', custId: 'CU1' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const input = { createBy: 'cn-portal', sysOrgCode: 'A02A04', custName: 'ACME', custContact: 'A', custTel: '1', custPhone: '1', custEmail: 'a@b.c', custState: 'active' as const, custSource: 'cn-portal', status: 2, custStageId: 'l1', vipStage: '中国商家' };
+    expect(await createCustomer(config, input)).toEqual({ id: 'c1', custId: 'CU1' });
+    const [requestUrl, init] = fetchMock.mock.calls[0];
+    expect(new URL(requestUrl).pathname).toBe('/ideamax/openapi/call/RIv0P9vK');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual(input);
+  });
+
+  it('网关层拒绝（如 appKey 未授权）时把原因带进错误信息', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(
+      { status: 500, error: 'Internal Server Error', trace: 'org.jeecg.common.exception.JeecgBootException: 该appKey未授权当前接口\r\n\tat org.jeecg...' },
+      { status: 500 }
+    )));
+    await expect(fetchCustomerLevels(config)).rejects.toThrow('ERP API returned 500: 该appKey未授权当前接口');
   });
 });

@@ -33,7 +33,9 @@
 - [x] **应用 migration 023 / 024**：2026-10-06 已在生产库执行。024 为三张表开启 RLS、只开放读取，
       写入需走服务端密钥。注意 `_migrations` 里没有 020–022 的记录（它们已手动应用），
       直接跑 `pnpm db:migrate` 会重跑这三个，执行前先看 `pnpm db:status`。
-- [ ] **应用 migration 025 / 026**（先 025 后 026，执行完再部署）：
+- [ ] **应用 migration 027**（部署本次改动前执行）：给 `cn_sellers` 加 `erp_customer_level_id`、
+      `erp_sync_status`、`erp_sync_error`。未执行时登录会因为读不到 `erp_sync_status` 列而失败。
+- [x] **应用 migration 025 / 026**（2026-10-06 已执行）：
       025 给 `cn_seller_tier` 枚举增加 `CN_MERCHANT`，未执行时按该等级查询 `seller_product_visibility`
       会报错（22P02），选品页打不开。026 新建卖家账户表 `cn_sellers`，并修改 auth.users 的注册触发器
       `handle_new_user`：从 cn-portal 注册的用户只建卖家账户，不再建 Creator 记录。
@@ -50,13 +52,14 @@
       `https://<cn-portal 域名>/auth/confirm`（本地开发加 `http://localhost:3002/auth/confirm`），
       否则链接会跳回项目默认站点（Creator Portal）。可用 `CN_PORTAL_PUBLIC_URL` 固定回跳域名。
       邮件链接需在发起申请的同一浏览器里打开（PKCE）。
-- [ ] **卖家账户对接 ERP 客户档案**：对接口是 `src/lib/sellers/erp-sync.ts` 的 `syncSellerToErp`，
-      注册成功后调用，目前直接返回 skipped；`cn_sellers.erp_customer_id / erp_synced_at` 已预留。
-      接入时调「新增客户」接口（`RIv0P9vK`）写入等级，并用服务端密钥回写 ERP 客户 id。
-      ERP 已提供客户档案分页接口（`UmrAedIA`，含 custStageId / vipStage）和客户等级分页接口（`wfi8Vrp4`）；
-      等级匹配建议同时改为按 `pricingGroups[].customerLevelId`，不再按分组名称。
-      2026-10-06 时 ERP 现有 2328 个客户的 custStageId / vipStage 全为空。接口文档里等级 id 的字段名
-      不一致（数据字典 `custStageId`，示例代码 `vipStageId`），写入前需与 ERP 确认。
+- [ ] **卖家账户对接 ERP 客户档案**（代码已接好，等 ERP 给 appKey 授权）：注册成功后 `syncSellerToErp`
+      取 ERP 客户等级列表、按等级名找到「中国商家」（id `2094267395165773826`），调「新增客户」（`RIv0P9vK`）
+      写入 `custStageId / vipStage`，再用服务端密钥回写 `cn_sellers.erp_customer_id / erp_customer_level_id`；
+      失败记为 `erp_sync_status = failed` 并保留原因，登录时重试（migration 027）。
+      2026-10-11 实测：当前 appKey 调「新增客户」返回「该appKey未授权当前接口」，等级列表和客户详情可读。
+      需要 ERP 侧：① 给 appKey 授权 `RIv0P9vK`（后续编辑客户 `9EqmqMxD` 也要）；② 确认必填字段——示例说 11 个，
+      注册只收集公司名、联系人、手机号、邮箱，请求体不编造地址等；③ 确认 `sysOrgCode`（文档 A02A04，
+      现有客户记录都是 A02A01）和客户分类 `custSortId`。字段名以现有客户记录为准：等级是 `custStageId / vipStage`。
 - [ ] **可见性表按等级收紧 RLS**：三张表的 RLS 已由 migration 024 开启（任何人可读、仅服务端密钥可写）；
       `seller_product_visibility` 目前所有等级的行都可读，可改为只读自己等级的行。
 - [x] **详情页 variant 精确价**：详情页新增「价格明细」表，按「尺码档 × 色档」列出该等级的空白件售价

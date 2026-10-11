@@ -73,13 +73,13 @@ describe('Supabase Auth 错误码', () => {
 describe('卖家账户', () => {
   const row = {
     id: 's1', email: 'seller@example.com', company_name: 'ACME', contact_name: '张三', phone: '13800000000',
-    seller_tier: 'WHOLESALE', erp_customer_id: null,
+    seller_tier: 'WHOLESALE', erp_customer_id: null, erp_sync_status: 'pending',
   };
 
   it('价格等级取自账户', () => {
     expect(toSeller(row)).toEqual({
       id: 's1', email: 'seller@example.com', companyName: 'ACME', contactName: '张三', phone: '13800000000',
-      tier: 'WHOLESALE', erpCustomerId: null,
+      tier: 'WHOLESALE', erpCustomerId: null, erpSyncStatus: 'pending',
     });
   });
 
