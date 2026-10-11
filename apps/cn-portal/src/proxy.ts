@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const SELLER_PATH_PREFIXES = ['/products', '/stores'];
+const SELLER_PATH_PREFIXES = ['/products', '/stores', '/my-products'];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

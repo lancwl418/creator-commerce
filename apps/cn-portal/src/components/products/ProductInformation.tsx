@@ -1,7 +1,7 @@
 import type { SellerTier } from '@creator-commerce/shared/erp/pricing';
 import type { ProductDetailView } from '@/lib/types/catalog';
 import { t } from '@/lib/i18n';
-import AddToCart from './AddToCart';
+import ProductActions from './ProductActions';
 import ProductAttributes from './ProductAttributes';
 import ProductPrice from './ProductPrice';
 import MoqHint from './MoqHint';
@@ -9,9 +9,10 @@ import MoqHint from './MoqHint';
 interface ProductInformationProps {
   details: ProductDetailView;
   tier: SellerTier;
+  canSyncBlank: boolean;
 }
 
-export default function ProductInformation({ details, tier }: ProductInformationProps) {
+export default function ProductInformation({ details, tier, canSyncBlank }: ProductInformationProps) {
   const { item } = details;
   const { fromPrice: minPrice, maxPrice, moqQty } = item;
   return (
@@ -51,10 +52,7 @@ export default function ProductInformation({ details, tier }: ProductInformation
         </p>
       </div>
 
-      {/* 加入购物车 */}
-      <div className="mt-6">
-        <AddToCart />
-      </div>
+      <ProductActions productId={item.id} canSyncBlank={canSyncBlank} />
     </div>
   );
 }

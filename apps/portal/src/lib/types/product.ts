@@ -1,17 +1,8 @@
 import type { ErpSku } from '@creator-commerce/shared/erp/types';
 export type { ErpSku } from '@creator-commerce/shared/erp/types';
 
-export interface SkuSelection {
-  sku_id: string;
-  sku: string;
-  option1: string | null;
-  option2: string | null;
-  option3: string | null;
-  enabled: boolean;
-  price?: number | null;
-  erpPrice?: number | null;
-  skuImage?: string | null;
-}
+import type { SkuSelection } from '@creator-commerce/shared/shopify/listing-prices';
+export type { SkuSelection } from '@creator-commerce/shared/shopify/listing-prices';
 
 export interface ProductImage {
   id: string;

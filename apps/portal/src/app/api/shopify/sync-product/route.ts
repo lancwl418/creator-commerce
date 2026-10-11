@@ -1,428 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { SkuSelection } from '@/lib/types';
-import { SHOPIFY_API_VERSION, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET } from '@/lib/constants';
-import { validateListingPrices } from '@/lib/products/listingPrices';
+import {
+  ProductSyncError,
+  shopifyAppConfigFromEnv,
+  syncProductToStore,
+  type SyncableProduct,
+  type SyncableStoreConnection,
+} from '@creator-commerce/shared/shopify';
 import { createClient } from '@/lib/supabase/server';
 
-interface ShopifyCreatedProduct {
-  id: number | string;
-  handle: string;
-  variants: { id: number | string; sku: string; option1?: string; option2?: string; option3?: string }[];
-}
-
 /**
- * Extract numeric Shopify ID from a GID string like "gid://shopify/Product/123"
+ * ERP images are on an HTTP internal server that Shopify can't access.
+ * Proxy them through our app's /api/erp/image endpoint (public HTTPS).
  */
-function gidToId(gid: string): string {
-  const match = gid.match(/(\d+)$/);
-  return match ? match[1] : gid;
-}
-
-/**
- * Create a Shopify product via GraphQL Admin API (supports >100 variants).
- * Uses the productSet mutation available in API version 2024-04+.
- */
-async function createProductViaGraphQL(
-  shopDomain: string,
-  accessToken: string,
-  shopifyProduct: Record<string, unknown>,
-  selectedSkus: SkuSelection[],
-  optionSets: { name: string; values: string[] }[],
-  retailPrice: number,
-  skuPriceMap?: Map<string, number>,
-  variantImageMap?: Map<string, string>,
-): Promise<ShopifyCreatedProduct> {
-  const graphqlUrl = `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`;
-
-  // Build productSet input
-  // Shopify VariantOptionValueInput uses { optionName: "Color", name: "Red" }
-  const variants = selectedSkus.map(sku => {
-    const optionValues: { optionName: string; name: string }[] = [];
-    if (sku.option1 && optionSets[0]) optionValues.push({ optionName: optionSets[0].name, name: sku.option1 });
-    if (sku.option2 && optionSets[1]) optionValues.push({ optionName: optionSets[1].name, name: sku.option2 });
-    if (sku.option3 && optionSets[2]) optionValues.push({ optionName: optionSets[2].name, name: sku.option3 });
-
-    // Use per-variant price from custom_product_skus, fallback to sku override, then product price
-    const variantPrice = skuPriceMap?.get(sku.sku_id) ?? Number(sku.price ?? retailPrice);
-
-    return {
-      optionValues: optionValues.length > 0 ? optionValues : [{ optionName: optionSets[0]?.name || 'Title', name: 'Default Title' }],
-      price: variantPrice.toFixed(2),
-      sku: sku.sku || undefined,
-    };
-  });
-
-  const images = shopifyProduct.images as { src: string }[] | undefined;
-  const media = images?.map(img => ({
-    originalSource: img.src,
-    mediaContentType: 'IMAGE',
-  })) || [];
-
-  const productSetInput: Record<string, unknown> = {
-    title: shopifyProduct.title || 'Untitled',
-    descriptionHtml: shopifyProduct.body_html || '',
-    vendor: (shopifyProduct.vendor as string) || undefined,
-    tags: typeof shopifyProduct.tags === 'string' ? shopifyProduct.tags.split(',').map((t: string) => t.trim()) : [],
-    status: (shopifyProduct.status as string) === 'draft' ? 'DRAFT' : 'ACTIVE',
-    productOptions: optionSets.map(o => ({
-      name: o.name,
-      values: o.values.map(v => ({ name: v })),
-    })),
-    variants,
-  };
-
-  const mutation = `
-    mutation productSet($input: ProductSetInput!) {
-      productSet(input: $input) {
-        product {
-          id
-          handle
-          variants(first: 250) {
-            edges {
-              node {
-                id
-                sku
-                selectedOptions {
-                  name
-                  value
-                }
-              }
-            }
-          }
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-  `;
-
-  // productSet may need pagination for >250 variants; for now handle up to 250 in first response
-  const res = await fetch(graphqlUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Shopify-Access-Token': accessToken,
-    },
-    body: JSON.stringify({
-      query: mutation,
-      variables: { input: productSetInput },
-    }),
-  });
-
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new Error(`Shopify GraphQL HTTP error (${res.status}): ${errorBody}`);
+function toPublicUrl(path: string): string {
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+  if (!path) return '';
+  if (path.startsWith('https://')) return path;
+  if (path.startsWith('http://')) {
+    // Already a full HTTP URL — extract the relative path for the proxy
+    const match = path.match(/\/sys\/common\/static\/(.+)$/);
+    if (match) path = match[1];
+    else return ''; // Can't proxy unknown HTTP URLs
   }
-
-  const gqlResponse = await res.json();
-
-  if (gqlResponse.errors) {
-    throw new Error(`Shopify GraphQL errors: ${JSON.stringify(gqlResponse.errors)}`);
-  }
-
-  const productSet = gqlResponse.data?.productSet;
-  if (productSet?.userErrors?.length > 0) {
-    throw new Error(`Shopify productSet errors: ${JSON.stringify(productSet.userErrors)}`);
-  }
-
-  const gqlProduct = productSet?.product;
-  if (!gqlProduct) {
-    throw new Error('Shopify GraphQL returned no product');
-  }
-
-  // Publish to Online Store and other sales channels if status is active
-  if ((shopifyProduct.status as string) !== 'draft') {
-    try {
-      // Get all publications (sales channels)
-      const pubQuery = `
-        query { publications(first: 20) { edges { node { id name } } } }
-      `;
-      const pubRes = await fetch(graphqlUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-        body: JSON.stringify({ query: pubQuery }),
-      });
-      if (pubRes.ok) {
-        const pubData = await pubRes.json();
-        const publications = (pubData.data?.publications?.edges || [])
-          .map((e: { node: { id: string; name: string } }) => e.node);
-
-        if (publications.length > 0) {
-          const publishMutation = `
-            mutation publishablePublish($id: ID!, $input: [PublicationInput!]!) {
-              publishablePublish(id: $id, input: $input) {
-                userErrors { field message }
-              }
-            }
-          `;
-          await fetch(graphqlUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-            body: JSON.stringify({
-              query: publishMutation,
-              variables: {
-                id: gqlProduct.id,
-                input: publications.map((p: { id: string }) => ({ publicationId: p.id })),
-              },
-            }),
-          });
-          console.log(`[Shopify Sync] Published to ${publications.length} channels: ${publications.map((p: { name: string }) => p.name).join(', ')}`);
-        }
-      }
-    } catch (e) {
-      console.warn('[Shopify Sync] Publication failed (non-blocking):', e);
-    }
-  }
-
-  // Fetch remaining variants if >250
-  let allVariantEdges = gqlProduct.variants.edges;
-  let hasNextPage = gqlProduct.variants.edges.length === 250;
-  let cursor = allVariantEdges[allVariantEdges.length - 1]?.cursor;
-
-  while (hasNextPage && cursor) {
-    const paginationQuery = `
-      query getVariants($productId: ID!, $cursor: String!) {
-        product(id: $productId) {
-          variants(first: 250, after: $cursor) {
-            edges {
-              node { id sku selectedOptions { name value } }
-              cursor
-            }
-            pageInfo { hasNextPage }
-          }
-        }
-      }
-    `;
-    const pageRes = await fetch(graphqlUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-      body: JSON.stringify({ query: paginationQuery, variables: { productId: gqlProduct.id, cursor } }),
-    });
-    if (!pageRes.ok) break;
-    const pageData = await pageRes.json();
-    const pageVariants = pageData.data?.product?.variants;
-    if (!pageVariants) break;
-    allVariantEdges = [...allVariantEdges, ...pageVariants.edges];
-    hasNextPage = pageVariants.pageInfo?.hasNextPage;
-    cursor = pageVariants.edges[pageVariants.edges.length - 1]?.cursor;
-  }
-
-  // Upload images via staged uploads (push to Shopify instead of Shopify pulling from URL)
-  if (media.length > 0) {
-    console.log(`[Shopify Sync] Uploading ${media.length} images via staged uploads`);
-
-    // Step 1: Create staged upload targets
-    const stagedMutation = `
-      mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
-        stagedUploadsCreate(input: $input) {
-          stagedTargets {
-            url
-            resourceUrl
-            parameters { name value }
-          }
-          userErrors { field message }
-        }
-      }
-    `;
-
-    const stagedInput = media.map((m: { originalSource: string }) => ({
-      resource: 'IMAGE',
-      filename: m.originalSource.split('/').pop()?.split('?')[0] || 'image.jpg',
-      mimeType: m.originalSource.includes('.png') ? 'image/png' : 'image/jpeg',
-      httpMethod: 'PUT',
-    }));
-
-    const stagedRes = await fetch(graphqlUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-      body: JSON.stringify({ query: stagedMutation, variables: { input: stagedInput } }),
-    });
-
-    if (!stagedRes.ok) {
-      console.error('[Shopify Sync] Staged uploads request failed:', stagedRes.status);
-    } else {
-      const stagedData = await stagedRes.json();
-      const targets = stagedData.data?.stagedUploadsCreate?.stagedTargets || [];
-      const stagedErrors = stagedData.data?.stagedUploadsCreate?.userErrors || [];
-      if (stagedErrors.length > 0) {
-        console.error('[Shopify Sync] Staged upload errors:', JSON.stringify(stagedErrors));
-      }
-
-      // Step 2: Download each image and upload to Shopify's staged URL
-      const uploadedResourceUrls: string[] = [];
-
-      for (let i = 0; i < Math.min(media.length, targets.length); i++) {
-        const imageUrl = (media[i] as { originalSource: string }).originalSource;
-        const target = targets[i];
-
-        try {
-          // Download image from our URL (R2/proxy)
-          const imgRes = await fetch(imageUrl);
-          if (!imgRes.ok) {
-            console.error(`[Shopify Sync] Failed to download image: ${imageUrl.substring(0, 80)}`);
-            continue;
-          }
-          const imgBuffer = await imgRes.arrayBuffer();
-
-          // Upload to Shopify's staged URL
-          const uploadRes = await fetch(target.url, {
-            method: 'PUT',
-            headers: { 'Content-Type': imageUrl.includes('.png') ? 'image/png' : 'image/jpeg' },
-            body: imgBuffer,
-          });
-
-          if (uploadRes.ok) {
-            uploadedResourceUrls.push(target.resourceUrl);
-          } else {
-            console.error(`[Shopify Sync] Staged upload failed for image ${i}:`, uploadRes.status);
-          }
-        } catch (err) {
-          console.error(`[Shopify Sync] Error uploading image ${i}:`, err);
-        }
-      }
-
-      console.log(`[Shopify Sync] Staged uploads complete: ${uploadedResourceUrls.length}/${media.length}`);
-
-      // Step 3: Attach uploaded images to product
-      if (uploadedResourceUrls.length > 0) {
-        const attachMutation = `
-          mutation productCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
-            productCreateMedia(productId: $productId, media: $media) {
-              media { id }
-              mediaUserErrors { field message }
-            }
-          }
-        `;
-        const attachMedia = uploadedResourceUrls.map(url => ({
-          originalSource: url,
-          mediaContentType: 'IMAGE',
-        }));
-
-        const attachRes = await fetch(graphqlUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-          body: JSON.stringify({ query: attachMutation, variables: { productId: gqlProduct.id, media: attachMedia } }),
-        });
-
-        if (attachRes.ok) {
-          const attachData = await attachRes.json();
-          const attached = attachData.data?.productCreateMedia?.media || [];
-          const attachErrors = attachData.data?.productCreateMedia?.mediaUserErrors || [];
-          console.log(`[Shopify Sync] Attached ${attached.length} images to product, errors: ${attachErrors.length}`);
-          if (attachErrors.length > 0) {
-            console.error('[Shopify Sync] Attach errors:', JSON.stringify(attachErrors));
-          }
-        }
-
-        // Step 4: Associate variant images
-        if (variantImageMap && variantImageMap.size > 0) {
-          await new Promise(r => setTimeout(r, 3000));
-
-          const mediaQuery = `
-            query getProductMedia($productId: ID!) {
-              product(id: $productId) {
-                media(first: 100) {
-                  edges { node { ... on MediaImage { id image { url } } } }
-                }
-              }
-            }
-          `;
-          const mediaQueryRes = await fetch(graphqlUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-            body: JSON.stringify({ query: mediaQuery, variables: { productId: gqlProduct.id } }),
-          });
-
-          if (mediaQueryRes.ok) {
-            const mediaData = await mediaQueryRes.json();
-            const mediaEdges = mediaData.data?.product?.media?.edges || [];
-
-            const mediaIdByFilename = new Map<string, string>();
-            for (const edge of mediaEdges) {
-              const node = edge.node;
-              if (node?.id && node?.image?.url) {
-                const filename = node.image.url.split('/').pop()?.split('?')[0] || '';
-                mediaIdByFilename.set(filename, node.id);
-              }
-            }
-
-            const variantUpdates: { id: string; mediaId: string }[] = [];
-            for (const edge of allVariantEdges) {
-              const node = edge.node;
-              const colorOpt = node.selectedOptions?.[0]?.value;
-              if (!colorOpt) continue;
-              const imageUrl = variantImageMap.get(colorOpt);
-              if (!imageUrl) continue;
-              const imageFilename = imageUrl.split('/').pop()?.split('?')[0] || '';
-              const mediaId = mediaIdByFilename.get(imageFilename);
-              if (mediaId) {
-                variantUpdates.push({ id: node.id, mediaId });
-              }
-            }
-
-            if (variantUpdates.length > 0) {
-              const variantMediaMutation = `
-                mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-                  productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-                    userErrors { field message }
-                  }
-                }
-              `;
-              await fetch(graphqlUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-                body: JSON.stringify({
-                  query: variantMediaMutation,
-                  variables: {
-                    productId: gqlProduct.id,
-                    variants: variantUpdates.map(v => ({ id: v.id, mediaId: v.mediaId })),
-                  },
-                }),
-              });
-              console.log(`[Shopify Sync] Associated ${variantUpdates.length} variant images`);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Convert GQL variant format to match REST format for downstream compatibility
-  const mappedVariants = allVariantEdges.map((edge: { node: { id: string; sku: string; selectedOptions: { name: string; value: string }[] } }) => {
-    const node = edge.node;
-    const opts: Record<string, string> = {};
-    node.selectedOptions.forEach((opt: { name: string; value: string }, i: number) => {
-      opts[`option${i + 1}`] = opt.value;
-    });
-    return {
-      id: Number(gidToId(node.id)),
-      sku: node.sku || '',
-      ...opts,
-    };
-  });
-
-  return {
-    id: Number(gidToId(gqlProduct.id)),
-    handle: gqlProduct.handle,
-    variants: mappedVariants,
-  };
+  return `${appUrl}/api/erp/image?path=${encodeURIComponent(path)}`;
 }
 
 /**
  * POST /api/shopify/sync-product
- * Body: { product_instance_id, store_connection_id }
- *
- * 1. Creates custom_product_skus for each enabled variant
- * 2. Creates product on Shopify via Admin API
- * 3. Records channel_listing + channel_listing_variants
- * 4. Maps Shopify variant IDs back to custom SKUs
+ * Body: { product_instance_id, store_connection_id, publish_status? }
+ * The sync itself (custom SKUs → Shopify product → listing) lives in the shared package.
  */
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
 
-  // Auth
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -433,360 +44,59 @@ export async function POST(req: NextRequest) {
     .select('id')
     .eq('auth_user_id', user.id)
     .single();
-
   if (!creator) {
     return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
   }
 
   const body = await req.json();
   const { product_instance_id, store_connection_id, publish_status } = body;
-  const shopifyStatus = publish_status === 'draft' ? 'draft' : 'active';
-
   if (!product_instance_id || !store_connection_id) {
     return NextResponse.json({ error: 'Missing product_instance_id or store_connection_id' }, { status: 400 });
   }
 
-  // Fetch product
-  const { data: product, error: productError } = await supabase
+  const { data: product } = await supabase
     .from('sellable_product_instances')
     .select('*')
     .eq('id', product_instance_id)
     .eq('creator_id', creator.id)
-    .single();
-
-  if (productError || !product) {
+    .single<SyncableProduct>();
+  if (!product) {
     return NextResponse.json({ error: 'Product not found' }, { status: 404 });
   }
 
-  // Fetch store connection
-  const { data: connection, error: connError } = await supabase
+  const { data: connection } = await supabase
     .from('creator_store_connections')
     .select('*')
     .eq('id', store_connection_id)
     .eq('creator_id', creator.id)
-    .single();
-
-  if (connError || !connection) {
+    .single<SyncableStoreConnection>();
+  if (!connection) {
     return NextResponse.json({ error: 'Store connection not found' }, { status: 404 });
   }
 
-  if (connection.status !== 'connected' || !connection.access_token) {
-    return NextResponse.json({ error: 'Store is not connected. Please reconnect.' }, { status: 400 });
-  }
-
-  // Refresh token if expired
-  let accessToken = connection.access_token;
-  if (connection.token_expires_at && new Date(connection.token_expires_at) <= new Date()) {
-    if (!connection.refresh_token) {
-      return NextResponse.json({ error: 'Token expired and no refresh token. Please reconnect.' }, { status: 400 });
-    }
-    const shopDomainForRefresh = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
-    const refreshRes = await fetch(`https://${shopDomainForRefresh}/admin/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: SHOPIFY_CLIENT_ID,
-        client_secret: SHOPIFY_CLIENT_SECRET,
-        grant_type: 'refresh_token',
-        refresh_token: connection.refresh_token,
-      }),
+  try {
+    const result = await syncProductToStore({
+      supabase,
+      config: shopifyAppConfigFromEnv(),
+      product,
+      connection,
+      publishStatus: publish_status === 'draft' ? 'draft' : 'active',
+      toPublicUrl,
     });
-    if (!refreshRes.ok) {
-      console.error('[Shopify Sync] Token refresh failed:', await refreshRes.text());
-      await supabase.from('creator_store_connections').update({ status: 'expired' }).eq('id', store_connection_id);
-      return NextResponse.json({ error: 'Token refresh failed. Please reconnect your store.' }, { status: 401 });
-    }
-    const refreshData = await refreshRes.json();
-    accessToken = refreshData.access_token;
-    // Save new tokens
-    await supabase.from('creator_store_connections').update({
-      access_token: refreshData.access_token,
-      refresh_token: refreshData.refresh_token || connection.refresh_token,
-      token_expires_at: refreshData.expires_in
-        ? new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
-        : connection.token_expires_at,
-    }).eq('id', store_connection_id);
-  }
-
-  // Check if already synced
-  const { data: existingListing } = await supabase
-    .from('channel_listings')
-    .select('id, external_product_id')
-    .eq('sellable_product_instance_id', product_instance_id)
-    .eq('creator_store_connection_id', store_connection_id)
-    .single();
-
-  if (existingListing) {
-    return NextResponse.json({ error: 'Product is already synced to this store', listing: existingListing }, { status: 409 });
-  }
-
-  // ── Step 1: Resolve variants — only sync explicitly enabled ones ──
-  const selectedSkus = ((product.selected_skus as SkuSelection[]) || []).filter(s => s.enabled);
-  const erpProductId = (product.product_template_id as string)?.replace('erp-', '').replace('shopify-', '') || '';
-  const savedOptionNames: string[] = (product.option_names as string[]) || [];
-
-  if (selectedSkus.length === 0) {
-    return NextResponse.json(
-      { error: 'No variants selected. Please save your variant selection before syncing.' },
-      { status: 400 }
-    );
-  }
-
-  try {
-    validateListingPrices(selectedSkus, product.retail_price ?? product.base_price_suggestion);
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid variant prices' }, { status: 400 });
-  }
-
-  // Use base_price_suggestion as fallback for retail_price
-  if (!product.retail_price && product.base_price_suggestion) {
-    product.retail_price = product.base_price_suggestion;
-    await supabase.from('sellable_product_instances').update({
-      retail_price: product.retail_price,
-    }).eq('id', product_instance_id);
-  }
-
-  // Upsert custom SKUs for each enabled variant
-  const variantPreviewMap = (product.variant_preview_urls as Record<string, string>) || {};
-  const customSkuRows = selectedSkus.map(sku => ({
-    sellable_product_instance_id: product_instance_id,
-    erp_product_id: erpProductId,
-    erp_sku_id: sku.sku_id,
-    sku_code: sku.sku,
-    option1: sku.option1,
-    option2: sku.option2,
-    option3: sku.option3,
-    // R2 design preview for this variant (design composited on this color)
-    preview_image_url: (sku.option1 ? variantPreviewMap[sku.option1] : null) || null,
-    sale_price: sku.price ?? product.retail_price,
-    base_cost_snapshot: sku.erpPrice,
-    creator_store_connection_id: store_connection_id,
-    is_active: true,
-    erp_sync_status: 'pending',
-  }));
-
-  const { data: customSkus, error: skuError } = await supabase
-    .from('custom_product_skus')
-    .upsert(customSkuRows, { onConflict: 'sellable_product_instance_id,erp_sku_id,creator_store_connection_id' })
-    .select('*');
-
-  if (skuError) {
-    console.error('[Sync] Failed to create custom SKUs:', skuError);
-    return NextResponse.json({ error: 'Failed to create custom SKUs: ' + skuError.message }, { status: 500 });
-  }
-
-  // ── Step 2: Build & send Shopify product ──
-  // ERP images are on an HTTP internal server that Shopify can't access.
-  // Proxy them through our app's /api/erp/image endpoint (public HTTPS).
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
-  const toPublicUrl = (path: string) => {
-    if (!path) return '';
-    if (path.startsWith('https://')) return path;
-    // For ERP relative paths or HTTP URLs, proxy through our app
-    if (path.startsWith('http://')) {
-      // Already a full HTTP URL — extract the relative path for the proxy
-      const match = path.match(/\/sys\/common\/static\/(.+)$/);
-      if (match) path = match[1];
-      else return ''; // Can't proxy unknown HTTP URLs
-    }
-    return `${appUrl}/api/erp/image?path=${encodeURIComponent(path)}`;
-  };
-
-  const previewUrls = (product.preview_urls as string[]) || [];
-  const artworkUrls = (product.design_artwork_urls as string[]) || [];
-  // Selected ERP product images (user chose which to sync)
-  const productImages = ((product.product_images as { rawPath?: string; url?: string }[]) || [])
-    .map(img => img.rawPath ? toPublicUrl(img.rawPath) : (img.url || ''))
-    .filter(Boolean);
-  const imageUrls = [...previewUrls, ...artworkUrls, ...productImages].filter(
-    url => url && url.startsWith('http')
-  );
-
-  // Use design preview images for variants if available (from R2),
-  // fallback to ERP SKU images proxied through our HTTPS endpoint
-  const variantImageUrls = [...new Set(
-    selectedSkus
-      .map(s => {
-        // Try design preview by color (option1), then fallback to raw SKU image
-        const designPreview = s.option1 ? variantPreviewMap[s.option1] : null;
-        if (designPreview) return designPreview; // Already HTTPS R2 URL
-        return s.skuImage ? toPublicUrl(s.skuImage) : '';
-      })
-      .filter(Boolean)
-  )];
-
-  // Merge: product images first, then variant images (deduplicated)
-  const allImageUrls = [...new Set([...imageUrls, ...variantImageUrls])];
-
-  console.log('[Shopify Sync] Images debug:', {
-    previewUrls: previewUrls.length,
-    artworkUrls: artworkUrls.length,
-    variantImageUrls: variantImageUrls.length,
-    allImageUrls: allImageUrls.length,
-    firstImage: allImageUrls[0]?.substring(0, 80),
-  });
-
-  // Derive option definitions using real names from ERP (e.g. "Color", "Size")
-  const optionSets: { name: string; values: string[] }[] = [];
-  const optionKeys = ['option1', 'option2', 'option3'] as const;
-  for (let i = 0; i < optionKeys.length; i++) {
-    const key = optionKeys[i];
-    const values = [...new Set(selectedSkus.map(s => s[key]).filter(Boolean))] as string[];
-    if (values.length > 0) {
-      optionSets.push({ name: savedOptionNames[i] || `Option ${i + 1}`, values });
-    }
-  }
-
-  const productTags = Array.isArray(product.tags) ? (product.tags as string[]) : [];
-  const shopifyProduct: Record<string, unknown> = {
-    title: product.title || 'Untitled',
-    body_html: product.description || '',
-    vendor: 'ideamax',
-    tags: ['ideamax', ...productTags].join(', '),
-    images: allImageUrls.map(url => ({ src: url })),
-    status: shopifyStatus,
-  };
-
-  // Build a price lookup from custom_product_skus (per-variant sale_price is the source of truth)
-  const skuPriceMap = new Map<string, number>();
-  if (customSkus) {
-    for (const csku of customSkus) {
-      skuPriceMap.set(csku.erp_sku_id, Number(csku.sale_price));
-    }
-  }
-
-  const shopDomain = connection.store_url?.replace('https://', '').replace('http://', '').replace(/\/$/, '');
-
-  try {
-    // Build color → image URL map for variant image association
-    const variantImageMap = new Map<string, string>();
-    for (const sku of selectedSkus) {
-      if (!sku.option1) continue;
-      if (variantImageMap.has(sku.option1)) continue;
-      const designPreview = variantPreviewMap[sku.option1];
-      if (designPreview) {
-        variantImageMap.set(sku.option1, designPreview);
-      } else if (sku.skuImage) {
-        variantImageMap.set(sku.option1, toPublicUrl(sku.skuImage));
-      }
-    }
-
-    console.log(`[Shopify Sync] Creating product with ${selectedSkus.length} variants via GraphQL, ${variantImageMap.size} variant images`);
-    const createdProduct = await createProductViaGraphQL(
-      shopDomain!,
-      accessToken,
-      shopifyProduct,
-      selectedSkus,
-      optionSets,
-      product.retail_price,
-      skuPriceMap,
-      variantImageMap,
-    );
-
-    const shopifyVariants: { id: number | string; sku: string; option1?: string; option2?: string; option3?: string }[] =
-      createdProduct.variants || [];
-
-    // ── Step 3: Record channel listing ──
-    const externalUrl = `https://${shopDomain}/products/${createdProduct.handle}`;
-    const { data: listing, error: listingError } = await supabase
-      .from('channel_listings')
-      .insert({
-        sellable_product_instance_id: product_instance_id,
-        channel_type: 'creator_store',
-        creator_store_connection_id: store_connection_id,
-        external_product_id: String(createdProduct.id),
-        external_listing_url: externalUrl,
-        price: product.retail_price,
-        currency: 'USD',
-        status: 'active',
-        published_at: new Date().toISOString(),
-        metadata: {
-          shopify_product_id: createdProduct.id,
-          shopify_handle: createdProduct.handle,
-          variant_count: shopifyVariants.length,
-        },
-      })
-      .select('*')
-      .single();
-
-    if (listingError) {
-      console.error('[Shopify Sync] Failed to save listing:', listingError);
-    }
-
-    // ── Step 4: Create channel_listing_variants & map Shopify variant IDs ──
-    if (listing && customSkus && customSkus.length > 0) {
-      const listingVariantRows = customSkus.map(csku => {
-        // Match Shopify variant by option values
-        const shopifyVariant = shopifyVariants.find(sv =>
-          (sv.option1 || null) === (csku.option1 || null) &&
-          (sv.option2 || null) === (csku.option2 || null) &&
-          (sv.option3 || null) === (csku.option3 || null)
-        ) || shopifyVariants.find(sv => sv.sku === csku.sku_code);
-
-        return {
-          channel_listing_id: listing.id,
-          custom_product_sku_id: csku.id,
-          sale_price: csku.sale_price,
-          base_cost_snapshot: csku.base_cost_snapshot,
-          external_variant_id: shopifyVariant ? String(shopifyVariant.id) : null,
-          is_active: true,
-        };
-      });
-
-      const { error: lvError } = await supabase
-        .from('channel_listing_variants')
-        .insert(listingVariantRows);
-
-      if (lvError) {
-        console.error('[Shopify Sync] Failed to save listing variants:', lvError);
-      }
-
-      // Update custom_product_skus with Shopify variant IDs
-      for (const csku of customSkus) {
-        const shopifyVariant = shopifyVariants.find(sv =>
-          (sv.option1 || null) === (csku.option1 || null) &&
-          (sv.option2 || null) === (csku.option2 || null) &&
-          (sv.option3 || null) === (csku.option3 || null)
-        );
-        if (shopifyVariant) {
-          await supabase
-            .from('custom_product_skus')
-            .update({
-              external_variant_ids: {
-                ...(csku.external_variant_ids as Record<string, string> || {}),
-                shopify: String(shopifyVariant.id),
-              },
-            })
-            .eq('id', csku.id);
-        }
-      }
-    }
-
-    // ── Step 5: Update product status ──
-    await supabase
-      .from('sellable_product_instances')
-      .update({ status: 'listed' })
-      .eq('id', product_instance_id);
-
-    await supabase
-      .from('creator_store_connections')
-      .update({ last_sync_at: new Date().toISOString() })
-      .eq('id', store_connection_id);
-
     return NextResponse.json({
       success: true,
-      shopify_product_id: createdProduct.id,
-      shopify_url: externalUrl,
-      listing_id: listing?.id,
-      custom_skus_created: customSkus?.length || 0,
-      variants_mapped: shopifyVariants.length,
+      shopify_product_id: result.shopifyProductId,
+      shopify_url: result.shopifyUrl,
+      listing_id: result.listingId,
+      custom_skus_created: result.customSkusCreated,
+      variants_mapped: result.variantsMapped,
     });
   } catch (err) {
+    if (err instanceof ProductSyncError) {
+      const details = (err.details && typeof err.details === 'object') ? err.details : {};
+      return NextResponse.json({ error: err.message, ...details }, { status: err.status });
+    }
     console.error('[Shopify Sync] Unexpected error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to sync product' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to sync product' }, { status: 500 });
   }
 }

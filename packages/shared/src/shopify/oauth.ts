@@ -158,3 +158,31 @@ export function buildStoreConnection(creatorId: string, shop: string, storeName:
     connected_at: new Date().toISOString(),
   };
 }
+
+export interface ShopifyRefreshedToken {
+  accessToken: string;
+  refreshToken: string | null;
+  expiresIn?: number;
+}
+
+/** 用 refresh token 换新的 access token（expiring token 约 1 小时过期）。失败时抛错。 */
+export async function refreshAccessToken(cfg: ShopifyAppConfig, shop: string, refreshToken: string): Promise<ShopifyRefreshedToken> {
+  const res = await fetch(`https://${shop}/admin/oauth/access_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: cfg.clientId,
+      client_secret: cfg.clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
+  });
+  if (!res.ok) throw new Error(`Shopify token refresh failed (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
+  return { accessToken: data.access_token, refreshToken: data.refresh_token ?? null, expiresIn: data.expires_in };
+}
+
+/** 从 store_url（https://xxx.myshopify.com/）取出店铺域名 */
+export function shopDomainFromStoreUrl(storeUrl: string | null | undefined): string {
+  return (storeUrl ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+}

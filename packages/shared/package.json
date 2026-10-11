@@ -12,7 +12,11 @@
     "./erp/options": "./src/erp/options.ts",
     "./erp/business-lines": "./src/erp/business-lines.ts",
     "./shopify": "./src/shopify/index.ts",
-    "./shopify/domain": "./src/shopify/domain.ts"
+    "./shopify/domain": "./src/shopify/domain.ts",
+    "./shopify/listing-prices": "./src/shopify/listing-prices.ts"
   },
-  "scripts": {}
+  "scripts": {},
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4"
+  }
 }

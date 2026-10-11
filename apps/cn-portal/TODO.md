@@ -39,9 +39,13 @@
       `creator_store_connections`。订单 webhook 指向 Creator Portal（`SHOPIFY_WEBHOOK_BASE_URL`，缺省 `APP_URL`）。
       **上线前**：Shopify App 的 Allowed redirection URL(s) 加 `https://cn-portal.onrender.com/api/shopify/callback`。
       产品同步、订单回流逻辑仍在 Creator Portal 的路由里，第 3 步再抽。
-- [ ] **第 3 步 · 仅同步白板**：详情页选 SKU、填售价（成本 = 等级价）、选图 → 建产品记录 → 复用同步推到 Shopify；
-      cn-portal 加「我的产品」「订单」页。
+- [x] **第 3 步 · 仅同步白板**：产品页「同步店铺 → 仅同步白板」→ `/products/[id]/sync` 选 variant、填售价、选图 →
+      建 `sellable_product_instances` 记录（`product_template_id = erp-<id>`）→ 共享的 `syncProductToStore`
+      推到 Shopify；新增「我的产品」`/my-products`。Creator Portal 的 sync-product 路由也改调共享逻辑。
+      成本 = 该等级的空白件售价（色档价优先；多组定价取第一组有价的档）；空白件价为 0 或缺失的 variant
+      不能按白板同步（`pod_only` 产品整体不可）。订单页待下一步。
 - [ ] **第 3 步 · 开始设计**：嵌入 Design Engine，复用 Creator Portal 的编辑 session 与建品逻辑。
+- [ ] **第 3 步 · 订单页**：cn-portal 展示 `creator_orders`（店铺订单经 Creator Portal 的 webhook 回流）。
 - [ ] **第 4 步 · 下单**（等支付方案：Plaid 或 Stripe）：白板 bulk order；上传设计的定制单；推 ERP「创建订单」。
 
 ## 二、待接入（工程）

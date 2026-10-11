@@ -11,6 +11,7 @@ export default function SiteHeader({ seller }: { seller: Seller }) {
           <Link href="/products" className="text-sm font-bold text-gray-900">{t('app.title')}</Link>
           <nav className="flex items-center gap-4 text-sm text-gray-600">
             <Link href="/products" className="hover:text-gray-900">{t('nav.products')}</Link>
+            <Link href="/my-products" className="hover:text-gray-900">{t('nav.myProducts')}</Link>
             <Link href="/stores" className="hover:text-gray-900">{t('nav.stores')}</Link>
           </nav>
         </div>
