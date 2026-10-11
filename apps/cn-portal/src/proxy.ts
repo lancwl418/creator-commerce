@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+const SELLER_PATH_PREFIXES = ['/products', '/stores'];
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -24,9 +26,9 @@ export async function proxy(request: NextRequest) {
   // 刷新过期的会话
   const { data: { user } } = await supabase.auth.getUser();
 
-  // 选品页需要登录：价格按卖家账户的等级展示。未登录跳到登录页，登录后回到原页面。
+  // 选品、店铺等卖家页面需要登录。未登录跳到登录页，登录后回到原页面。
   const path = request.nextUrl.pathname;
-  if (!user && path.startsWith('/products')) {
+  if (!user && SELLER_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('next', path + request.nextUrl.search);
     return NextResponse.redirect(loginUrl);

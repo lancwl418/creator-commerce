@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  SHOPIFY_OAUTH_COOKIES,
+  buildStoreConnection,
+  exchangeAccessToken,
+  fetchShopName,
+  registerOrderWebhooks,
+  shopifyAppConfigFromEnv,
+  verifyOAuthHmac,
+} from '@creator-commerce/shared/shopify';
 import { createClient } from '@/lib/supabase/server';
-import crypto from 'crypto';
-import { SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, SHOPIFY_API_VERSION } from '@/lib/constants';
 
 function getBaseUrl(req: NextRequest): string {
   return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
@@ -23,8 +30,8 @@ export async function GET(req: NextRequest) {
   const hmac = searchParams.get('hmac');
 
   // Verify state matches cookie
-  const savedState = req.cookies.get('shopify_oauth_state')?.value;
-  const creatorId = req.cookies.get('shopify_oauth_creator')?.value;
+  const savedState = req.cookies.get(SHOPIFY_OAUTH_COOKIES.state)?.value;
+  const creatorId = req.cookies.get(SHOPIFY_OAUTH_COOKIES.creator)?.value;
 
   if (!code || !shop || !state || !hmac) {
     return redirectTo('/dashboard/stores?error=missing_params', req);
@@ -38,84 +45,26 @@ export async function GET(req: NextRequest) {
     return redirectTo('/dashboard/stores?error=session_expired', req);
   }
 
-  // Verify HMAC
-  const params = new URLSearchParams(searchParams.toString());
-  params.delete('hmac');
-  const sortedParams = Array.from(params.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}=${v}`)
-    .join('&');
-  const expectedHmac = crypto
-    .createHmac('sha256', SHOPIFY_CLIENT_SECRET)
-    .update(sortedParams)
-    .digest('hex');
-
-  if (hmac !== expectedHmac) {
+  const config = shopifyAppConfigFromEnv();
+  if (!verifyOAuthHmac(config, searchParams)) {
     return redirectTo('/dashboard/stores?error=invalid_hmac', req);
   }
 
-  // Exchange code for expiring offline access token
-  const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: SHOPIFY_CLIENT_ID,
-      client_secret: SHOPIFY_CLIENT_SECRET,
-      code,
-      expiring: 1, // Request expiring token (required since 2025)
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    console.error('[Shopify OAuth] Token exchange failed:', await tokenRes.text());
+  let grant;
+  try {
+    grant = await exchangeAccessToken(config, shop, code);
+  } catch (error) {
+    console.error('[Shopify OAuth] Token exchange failed:', error);
     return redirectTo('/dashboard/stores?error=token_exchange', req);
   }
 
-  const tokenData = await tokenRes.json();
-  const { access_token, scope, refresh_token } = tokenData;
-  // Expiring tokens: access_token ~1h, refresh_token ~90 days
-  const expiresIn = tokenData.expires_in as number | undefined;
-  const refreshTokenExpiresIn = tokenData.refresh_token_expires_in as number | undefined;
-  const tokenExpiresAt = expiresIn
-    ? new Date(Date.now() + expiresIn * 1000).toISOString()
-    : null;
-
-  // Fetch shop info for display name
-  let storeName = shop;
-  try {
-    const shopRes = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/shop.json`, {
-      headers: { 'X-Shopify-Access-Token': access_token },
-    });
-    if (shopRes.ok) {
-      const { shop: shopData } = await shopRes.json();
-      storeName = shopData.name || shop;
-    }
-  } catch { /* use shop domain as fallback name */ }
+  const storeName = await fetchShopName(config, shop, grant.accessToken);
 
   // Upsert store connection
   const supabase = await createClient();
   const { error: upsertError } = await supabase
     .from('creator_store_connections')
-    .upsert(
-      {
-        creator_id: creatorId,
-        platform: 'shopify',
-        store_name: storeName,
-        store_url: `https://${shop}`,
-        access_token,
-        refresh_token: refresh_token || null,
-        scopes: scope?.split(',') || [],
-        status: 'connected',
-        token_expires_at: tokenExpiresAt,
-        metadata: {
-          expires_in: expiresIn,
-          refresh_token_expires_in: refreshTokenExpiresIn,
-          token_type: 'expiring',
-        },
-        connected_at: new Date().toISOString(),
-      },
-      { onConflict: 'creator_id,platform' }
-    );
+    .upsert(buildStoreConnection(creatorId, shop, storeName, grant), { onConflict: 'creator_id,platform' });
 
   if (upsertError) {
     console.error('[Shopify OAuth] Upsert error:', upsertError);
@@ -123,40 +72,17 @@ export async function GET(req: NextRequest) {
   }
 
   // Register order webhooks (best-effort, don't fail OAuth on error)
-  try {
-    const webhookAddress = `${getBaseUrl(req)}/api/webhooks/shopify/orders`;
-    const topics = ['orders/create', 'orders/paid', 'orders/updated', 'orders/cancelled'];
-
-    for (const topic of topics) {
-      const whRes = await fetch(
-        `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Shopify-Access-Token': access_token,
-          },
-          body: JSON.stringify({
-            webhook: { topic, address: webhookAddress, format: 'json' },
-          }),
-        },
-      );
-      if (!whRes.ok) {
-        const errText = await whRes.text();
-        console.warn(`[Shopify OAuth] Webhook ${topic} registration failed:`, whRes.status, errText);
-      } else {
-        console.log(`[Shopify OAuth] Registered webhook: ${topic}`);
-      }
-    }
-  } catch (e) {
-    console.error('[Shopify OAuth] Webhook registration error:', e);
+  const webhookAddress = `${getBaseUrl(req)}/api/webhooks/shopify/orders`;
+  for (const result of await registerOrderWebhooks(config, shop, grant.accessToken, webhookAddress)) {
+    if (result.ok) console.log(`[Shopify OAuth] Registered webhook: ${result.topic}`);
+    else console.warn(`[Shopify OAuth] Webhook ${result.topic} registration failed:`, result.status, result.error);
   }
 
   // Clear OAuth cookies
   const response = redirectTo('/dashboard/stores?connected=shopify', req);
-  response.cookies.delete('shopify_oauth_state');
-  response.cookies.delete('shopify_oauth_creator');
-  response.cookies.delete('shopify_oauth_shop');
+  response.cookies.delete(SHOPIFY_OAUTH_COOKIES.state);
+  response.cookies.delete(SHOPIFY_OAUTH_COOKIES.creator);
+  response.cookies.delete(SHOPIFY_OAUTH_COOKIES.shop);
 
   return response;
 }

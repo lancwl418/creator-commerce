@@ -32,11 +32,13 @@
 
 产品页两个入口：「同步店铺」→ 开始设计（Creator Portal 同款流程）/ 仅同步白板；「下单」→ 上传设计 / 白板 bulk order。
 
-- [ ] **第 1 步 · 数据模型合并**：中国卖家并入 `creators`（`user_type = cn_seller`，migration 029），
-      cn-portal 与 Admin 改读写 `creators`；`cn_sellers` 废弃。代码已改，**migration 029 待执行**。
-- [ ] **第 2 步 · 连接自己的 Shopify**：把 Creator Portal 的 Shopify 授权 / 同步 / webhook 核心逻辑抽到共享包，
-      cn-portal 加「我的店铺」。需在 Shopify App 的 Allowed redirection URL(s) 加
-      `https://cn-portal.onrender.com/api/shopify/callback`；订单 webhook 统一指向 Creator Portal。
+- [x] **第 1 步 · 数据模型合并**：中国卖家并入 `creators`（`user_type = cn_seller`，migration 029，2026-10-11 已执行），
+      cn-portal 与 Admin 改读写 `creators`；`cn_sellers` 已废弃。
+- [x] **第 2 步 · 连接自己的 Shopify**：Shopify 授权逻辑抽到 `packages/shared/src/shopify`（两个 app 的
+      `/api/shopify/auth`、`/callback` 都用它），cn-portal 加「我的店铺」`/stores`，店铺记录共用
+      `creator_store_connections`。订单 webhook 指向 Creator Portal（`SHOPIFY_WEBHOOK_BASE_URL`，缺省 `APP_URL`）。
+      **上线前**：Shopify App 的 Allowed redirection URL(s) 加 `https://cn-portal.onrender.com/api/shopify/callback`。
+      产品同步、订单回流逻辑仍在 Creator Portal 的路由里，第 3 步再抽。
 - [ ] **第 3 步 · 仅同步白板**：详情页选 SKU、填售价（成本 = 等级价）、选图 → 建产品记录 → 复用同步推到 Shopify；
       cn-portal 加「我的产品」「订单」页。
 - [ ] **第 3 步 · 开始设计**：嵌入 Design Engine，复用 Creator Portal 的编辑 session 与建品逻辑。

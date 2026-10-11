@@ -10,7 +10,9 @@
     "./erp/types": "./src/erp/types.ts",
     "./erp/pricing": "./src/erp/pricing.ts",
     "./erp/options": "./src/erp/options.ts",
-    "./erp/business-lines": "./src/erp/business-lines.ts"
+    "./erp/business-lines": "./src/erp/business-lines.ts",
+    "./shopify": "./src/shopify/index.ts",
+    "./shopify/domain": "./src/shopify/domain.ts"
   },
   "scripts": {}
 }

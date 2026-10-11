@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  SHOPIFY_OAUTH_COOKIES,
+  SHOPIFY_OAUTH_COOKIE_MAX_AGE,
+  buildAuthorizeUrl,
+  createOAuthState,
+  isValidShopDomain,
+  shopifyAppConfigFromEnv,
+} from '@creator-commerce/shared/shopify';
 import { createClient } from '@/lib/supabase/server';
-import crypto from 'crypto';
-import { SHOPIFY_CLIENT_ID, SHOPIFY_SCOPES } from '@/lib/constants';
 
 function getAppUrl(req: NextRequest): string {
   // APP_URL (runtime) takes priority, then NEXT_PUBLIC_APP_URL (build-time inline)
   return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 }
+
+const OAUTH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'lax' as const,
+  maxAge: SHOPIFY_OAUTH_COOKIE_MAX_AGE,
+  path: '/',
+};
 
 /**
  * GET /api/shopify/auth?shop=mystore.myshopify.com
@@ -15,11 +29,14 @@ function getAppUrl(req: NextRequest): string {
 export async function GET(req: NextRequest) {
   const shop = req.nextUrl.searchParams.get('shop')?.trim();
 
-  if (!shop || !/^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/.test(shop)) {
+  if (!shop || !isValidShopDomain(shop)) {
     return NextResponse.json({ error: 'Invalid shop domain. Use format: mystore.myshopify.com' }, { status: 400 });
   }
 
-  if (!SHOPIFY_CLIENT_ID) {
+  let config;
+  try {
+    config = shopifyAppConfigFromEnv();
+  } catch {
     return NextResponse.json({ error: 'Shopify app not configured' }, { status: 500 });
   }
 
@@ -40,45 +57,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
   }
 
-  // Generate state nonce
-  const state = crypto.randomBytes(16).toString('hex');
-  const appUrl = getAppUrl(req);
-  const redirectUri = `${appUrl}/api/shopify/callback`;
-
-  const authUrl = `https://${shop}/admin/oauth/authorize?` +
-    `client_id=${SHOPIFY_CLIENT_ID}&` +
-    `scope=${encodeURIComponent(SHOPIFY_SCOPES)}&` +
-    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-    `state=${state}`;
+  const state = createOAuthState();
+  const redirectUri = `${getAppUrl(req)}/api/shopify/callback`;
+  const authUrl = buildAuthorizeUrl(config, shop, redirectUri, state);
 
   console.log('[Shopify OAuth] Auth URL:', authUrl);
-  console.log('[Shopify OAuth] Scopes:', SHOPIFY_SCOPES);
+  console.log('[Shopify OAuth] Scopes:', config.scopes);
   console.log('[Shopify OAuth] Redirect URI:', redirectUri);
 
-  const response = NextResponse.redirect(authUrl);
-
   // Store state and creator_id in cookies for callback verification
-  response.cookies.set('shopify_oauth_state', state, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    maxAge: 600, // 10 minutes
-    path: '/',
-  });
-  response.cookies.set('shopify_oauth_creator', creator.id, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    maxAge: 600,
-    path: '/',
-  });
-  response.cookies.set('shopify_oauth_shop', shop, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    maxAge: 600,
-    path: '/',
-  });
-
+  const response = NextResponse.redirect(authUrl);
+  response.cookies.set(SHOPIFY_OAUTH_COOKIES.state, state, OAUTH_COOKIE_OPTIONS);
+  response.cookies.set(SHOPIFY_OAUTH_COOKIES.creator, creator.id, OAUTH_COOKIE_OPTIONS);
+  response.cookies.set(SHOPIFY_OAUTH_COOKIES.shop, shop, OAUTH_COOKIE_OPTIONS);
   return response;
 }

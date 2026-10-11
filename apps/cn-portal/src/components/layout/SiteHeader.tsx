@@ -7,7 +7,13 @@ export default function SiteHeader({ seller }: { seller: Seller }) {
   return (
     <header className="border-b border-border bg-white">
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link href="/products" className="text-sm font-bold text-gray-900">{t('app.title')}</Link>
+        <div className="flex items-center gap-6">
+          <Link href="/products" className="text-sm font-bold text-gray-900">{t('app.title')}</Link>
+          <nav className="flex items-center gap-4 text-sm text-gray-600">
+            <Link href="/products" className="hover:text-gray-900">{t('nav.products')}</Link>
+            <Link href="/stores" className="hover:text-gray-900">{t('nav.stores')}</Link>
+          </nav>
+        </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">{seller.companyName || seller.email}</span>
           <form action={signOutSeller}>
