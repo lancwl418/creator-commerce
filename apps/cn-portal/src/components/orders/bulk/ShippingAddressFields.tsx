@@ -4,7 +4,7 @@ import { t, type MessageKey } from '@/lib/i18n';
 
 const REQUIRED: (keyof ShippingAddress)[] = ['name', 'phone', 'country', 'city', 'address1', 'zip'];
 
-export default function ShippingAddressFields({ address }: { address: Partial<ShippingAddress> }) {
+export default function ShippingAddressFields({ address, required = true }: { address: Partial<ShippingAddress>; required?: boolean }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {ADDRESS_FIELDS.map((key) => (
@@ -12,7 +12,7 @@ export default function ShippingAddressFields({ address }: { address: Partial<Sh
           <label htmlFor={`address.${key}`} className="block text-sm font-medium text-gray-700 mb-1.5">
             {t(`order.address.${key}` as MessageKey)}
           </label>
-          <input id={`address.${key}`} name={`address.${key}`} defaultValue={address[key] ?? ''} required={REQUIRED.includes(key)}
+          <input id={`address.${key}`} name={`address.${key}`} defaultValue={address[key] ?? ''} required={required && REQUIRED.includes(key)}
             autoComplete={key === 'name' ? 'name' : key === 'phone' ? 'tel' : key === 'zip' ? 'postal-code' : 'off'}
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/60 focus:border-brand-500" />
         </div>

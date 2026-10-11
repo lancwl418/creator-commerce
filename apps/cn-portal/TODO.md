@@ -56,6 +56,9 @@
       `/products/[id]/order/designed`（按 ERP `printPositions` 的每个面上传设计图 + 预览图，设计了 N 面按 face_N
       计价，文件存 R2）；采购单表 `cn_bulk_orders`（migration 030），提交后「待确认」；卖家在「订单」页看采购单，
       Admin `/dashboard/cn-orders` 确认 / 取消。
+- [x] **批量下单 / 表格下单**：产品页「加入批量单」→ `/cart`（多产品合成一张采购单，migration 031）；
+      `/orders/import` 上传 CSV（单号 / SKU / 数量 + 可选每单收货地址，模板可下载），解析预览无误后一次建多张采购单；
+      SKU 按全目录索引（`getSkuIndex`）匹配，只收开放、可上架、有白板价的 SKU。migration 030 / 031 已于 2026-10-11 执行。
 - [ ] **第 4 步 · 支付与 ERP 推单**：支付（Plaid 或 Stripe）待定；确认后推 ERP「创建订单」`HyHUQiWD`，
       `erp_order_id / erp_sync_status` 已预留，需对 ERP 订单字段和 appKey 授权。
 - [ ] **设计器下单**：目前从「我的产品」对设计器建的产品也能下单（按单面计价），产品页「上传设计」走上传文件，不走设计器。

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { BulkOrderRow } from '@/lib/types/bulk-order';
-import { orderQuantity } from '@/lib/orders/bulk-order';
+import { orderQuantity, orderTitle } from '@/lib/orders/bulk-order';
 import { t } from '@/lib/i18n';
 import { BULK_STATUS_STYLES, bulkStatusLabel } from './BulkOrderDetail';
 
@@ -19,7 +19,7 @@ export default function BulkOrdersList({ orders }: { orders: BulkOrderRow[] }) {
           <li key={order.id}>
             <Link href={`/orders/bulk/${order.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-surface-secondary transition-colors">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{order.product_title}</p>
+                <p className="text-sm font-semibold text-gray-900 truncate">{orderTitle(order)}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {t(order.order_type === 'blank' ? 'order.type.blank' : 'order.type.designed')} · {new Date(order.created_at).toLocaleString('zh-CN')} · {t('order.quantityTotal', 'zh', { n: orderQuantity(order.items) })}
                 </p>

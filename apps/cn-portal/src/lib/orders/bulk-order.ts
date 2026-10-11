@@ -14,6 +14,10 @@ function field(form: FormData, name: string): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+export function isCompleteAddress(address: Partial<ShippingAddress>): address is ShippingAddress {
+  return REQUIRED_ADDRESS_FIELDS.every((key) => !!address[key]);
+}
+
 export function readAddress(form: FormData): ShippingAddress {
   return Object.fromEntries(ADDRESS_FIELDS.map((key) => [key, field(form, `address.${key}`)])) as unknown as ShippingAddress;
 }
@@ -38,7 +42,7 @@ export function parseBulkOrderForm(form: FormData, variants: BlankVariant[]): Pa
     });
   }
   if (items.length === 0) return { ok: false, error: 'order.error.noItems', address };
-  if (REQUIRED_ADDRESS_FIELDS.some((key) => !address[key])) return { ok: false, error: 'order.error.address', address };
+  if (!isCompleteAddress(address)) return { ok: false, error: 'order.error.address', address };
   return { ok: true, input: { items, shippingAddress: address, note: field(form, 'note') } };
 }
 
@@ -48,4 +52,11 @@ export function orderSubtotal(items: BulkOrderItem[]): number {
 
 export function orderQuantity(items: BulkOrderItem[]): number {
   return items.reduce((sum, item) => sum + item.quantity, 0);
+}
+
+/** 采购单标题：单产品用产品名，多产品列出产品数 */
+export function orderTitle(order: { product_title: string | null; items: BulkOrderItem[] }): string {
+  if (order.product_title) return order.product_title;
+  const titles = [...new Set(order.items.map((item) => item.product_title).filter(Boolean))];
+  return titles.length === 1 ? titles[0]! : `${titles[0] ?? ''} 等 ${titles.length} 个产品`;
 }

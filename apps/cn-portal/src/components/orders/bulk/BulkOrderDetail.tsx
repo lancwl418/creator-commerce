@@ -1,5 +1,5 @@
 import type { BulkOrderRow } from '@/lib/types/bulk-order';
-import { orderQuantity } from '@/lib/orders/bulk-order';
+import { orderQuantity, orderTitle } from '@/lib/orders/bulk-order';
 import { t, type MessageKey } from '@/lib/i18n';
 import { faceLabel } from './DesignUploadFields';
 
@@ -21,7 +21,7 @@ export default function BulkOrderDetail({ order }: { order: BulkOrderRow }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs text-gray-400">{t(order.order_type === 'blank' ? 'order.type.blank' : 'order.type.designed')} · {new Date(order.created_at).toLocaleString('zh-CN')}</p>
-            <h2 className="text-lg font-semibold text-gray-900 mt-1">{order.product_title}</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mt-1">{orderTitle(order)}</h2>
           </div>
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${BULK_STATUS_STYLES[order.status]}`}>{bulkStatusLabel(order.status)}</span>
         </div>
@@ -37,7 +37,7 @@ export default function BulkOrderDetail({ order }: { order: BulkOrderRow }) {
           <tbody>
             {order.items.map((item) => (
               <tr key={item.sku_id} className="border-b border-border last:border-0">
-                <td className="px-2 py-2 text-gray-800">{item.sku}</td>
+                <td className="px-2 py-2 text-gray-800">{item.sku}{!order.product_title && item.product_title && <span className="block text-xs text-gray-400">{item.product_title}</span>}</td>
                 <td className="px-2 py-2 text-gray-800">{[item.option1, item.option2, item.option3].filter(Boolean).join(' / ')}</td>
                 <td className="px-2 py-2 text-gray-800">${Number(item.unit_cost).toFixed(2)}</td>
                 <td className="px-2 py-2 text-gray-800">{item.quantity}</td>

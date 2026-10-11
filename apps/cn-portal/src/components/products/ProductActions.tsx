@@ -35,6 +35,12 @@ export default function ProductActions({ productId, canSyncBlank }: { productId:
             className="rounded-xl border border-gray-900 px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition-all">
             {t('actions.order.design')}
           </Link>
+          {canSyncBlank && (
+            <Link href={`/products/${productId}/add-to-cart`}
+              className="rounded-xl border border-gray-900 px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition-all">
+              {t('cart.add')}
+            </Link>
+          )}
           {canSyncBlank ? (
             <Link href={`/products/${productId}/order`}
               className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-brand-600 transition-all shadow-sm">

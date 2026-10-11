@@ -12,6 +12,7 @@ export default function SiteHeader({ seller }: { seller: Seller }) {
           <nav className="flex items-center gap-4 text-sm text-gray-600">
             <Link href="/products" className="hover:text-gray-900">{t('nav.products')}</Link>
             <Link href="/my-products" className="hover:text-gray-900">{t('nav.myProducts')}</Link>
+            <Link href="/cart" className="hover:text-gray-900">{t('nav.cart')}</Link>
             <Link href="/orders" className="hover:text-gray-900">{t('nav.orders')}</Link>
             <Link href="/stores" className="hover:text-gray-900">{t('nav.stores')}</Link>
           </nav>

@@ -13,6 +13,12 @@ const STATUS_LABELS: Record<CnOrderRow['status'], string> = {
   cancelled: 'Cancelled',
 };
 
+function orderTitle(order: CnOrderRow): string {
+  if (order.product_title) return order.product_title;
+  const titles = [...new Set(order.items.map((item) => item.product_title).filter(Boolean))];
+  return titles.length <= 1 ? titles[0] ?? 'Order' : `${titles[0]} + ${titles.length - 1} more`;
+}
+
 function formatDate(value: string): string {
   return new Date(value).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
@@ -35,7 +41,7 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-gray-900">{order.product_title}</h3>
+                  <h3 className="font-semibold text-gray-900">{orderTitle(order)}</h3>
                   <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status]}`}>{STATUS_LABELS[order.status]}</span>
                   <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{order.order_type === 'blank' ? 'Blank' : 'Designed'}</span>
                 </div>
@@ -59,7 +65,7 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
               <tbody>
                 {order.items.map((item) => (
                   <tr key={item.sku_id} className="border-b border-border-light last:border-0">
-                    <td className="px-2 py-1.5 text-gray-800">{item.sku}</td>
+                    <td className="px-2 py-1.5 text-gray-800">{item.sku}{!order.product_title && item.product_title && <span className="block text-xs text-gray-400">{item.product_title}</span>}</td>
                     <td className="px-2 py-1.5 text-gray-800">{[item.option1, item.option2, item.option3].filter(Boolean).join(' / ')}</td>
                     <td className="px-2 py-1.5 text-gray-800">${Number(item.unit_cost).toFixed(2)}</td>
                     <td className="px-2 py-1.5 text-gray-800">{item.quantity}</td>

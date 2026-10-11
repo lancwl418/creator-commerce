@@ -14,6 +14,9 @@ import { getUploadableFaces } from '../products/print-faces';
 import type { BulkOrderFormState, DesignFile } from '../types/bulk-order';
 import { orderSubtotal, parseBulkOrderForm, readAddress } from './bulk-order';
 import { fileExtension, parseFaceUploads } from './design-upload';
+import { parseImportCsv, resolveImportGroups } from './import';
+import { getSkuIndex, loadPlatformData } from '../catalog.server';
+import type { ImportFormState } from '../types/bulk-order';
 
 /** 白板下单：按该等级的空白件价生成采购单，状态待确认（不接支付）。 */
 export async function createBlankOrder(_state: BulkOrderFormState, form: FormData): Promise<BulkOrderFormState> {
@@ -137,4 +140,34 @@ export async function createUploadedDesignOrder(_state: BulkOrderFormState, form
   if (error || !created) return { error: error?.message ?? t('order.error.generic'), address: parsed.input.shippingAddress };
 
   redirect(`/orders/bulk/${created.id}?created=1`);
+}
+
+/** 表格下单：解析 CSV → 预览（有错不提交）；confirm=1 时按解析结果建多张采购单。 */
+export async function importOrders(_state: ImportFormState, form: FormData): Promise<ImportFormState> {
+  const seller = await requireSeller();
+  const file = form.get('file');
+  const csv = typeof form.get('csv') === 'string' && form.get('csv') ? String(form.get('csv')) : file instanceof File && file.size > 0 ? await file.text() : '';
+  const defaultAddress = readAddress(form);
+  if (!csv.trim()) return { error: t('import.error.noFile'), address: defaultAddress };
+
+  const parsed = parseImportCsv(csv);
+  if (!parsed.ok) {
+    return { error: parsed.error === 'empty' ? t('import.error.empty') : t('import.error.missingColumns', 'zh', { columns: (parsed.missing ?? []).join(', ') }), address: defaultAddress };
+  }
+  const [skuIndex, platformData] = await Promise.all([getSkuIndex(seller.tier), loadPlatformData(seller.tier)]);
+  const groups = resolveImportGroups(parsed.lines, { tier: seller.tier, skuIndex, platformData, defaultAddress });
+  const hasErrors = groups.some((g) => g.errors.length > 0);
+  if (form.get('confirm') !== '1' || hasErrors) return { groups, csv, address: defaultAddress, error: hasErrors ? t('import.error.fixRows') : undefined };
+
+  const supabase = await createClient();
+  const { data: created, error } = await supabase
+    .from('cn_bulk_orders')
+    .insert(groups.map((group) => ({
+      creator_id: seller.id, order_type: 'blank', erp_product_id: null, product_title: null,
+      items: group.items, subtotal: orderSubtotal(group.items), currency: 'USD',
+      shipping_address: group.address, note: [group.ref !== '1' ? `#${group.ref}` : '', group.note].filter(Boolean).join(' ') || null,
+    })))
+    .select('id');
+  if (error || !created) return { error: error?.message ?? t('order.error.generic'), groups, csv, address: defaultAddress };
+  redirect(`/orders?imported=${created.length}`);
 }

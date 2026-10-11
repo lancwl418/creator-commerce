@@ -1,6 +1,8 @@
 export type CnOrderStatus = 'pending_confirmation' | 'confirmed' | 'cancelled';
 
 export interface CnOrderItem {
+  erp_product_id?: string;
+  product_title?: string;
   sku_id: string;
   sku: string;
   option1: string | null;
@@ -26,8 +28,8 @@ export interface CnOrderRow {
   id: string;
   order_type: 'blank' | 'designed';
   status: CnOrderStatus;
-  erp_product_id: string;
-  product_title: string;
+  erp_product_id: string | null;
+  product_title: string | null;
   items: CnOrderItem[];
   subtotal: number;
   currency: string;
