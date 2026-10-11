@@ -8,7 +8,7 @@ import {
 import { getErpConfig } from './erp';
 import { createClient } from './supabase/server';
 import { buildCatalog } from './catalog';
-import type { CatalogPage, PlatformData, ProductDetailData } from './types/catalog';
+import type { CatalogResult, PlatformData, ProductDetailData } from './types/catalog';
 import { loadAllRows } from './platform-data';
 import { createTtlCache } from './ttl-cache';
 
@@ -80,18 +80,27 @@ export async function loadPlatformData(tier: SellerTier): Promise<PlatformData> 
   return { hiddenSkusForTier, stock, moq };
 }
 
-/** 选品列表页数据 */
-export async function getCatalogPage(
-  tier: SellerTier,
-  pageNo = 1,
-  pageSize = 40
-): Promise<CatalogPage> {
-  const [page, data] = await Promise.all([
-    loadErpPage(pageNo, pageSize),
+// ERP 产品列表接口只有分页参数，不能按业务线筛选；目录要先取回全部产品再在本地筛选、
+// 排序和分页。各页走上面的 5 分钟缓存。
+const ERP_SCAN_PAGE_SIZE = 100;
+
+async function loadAllErpProducts(): Promise<ErpProduct[]> {
+  const first = await loadErpPage(1, ERP_SCAN_PAGE_SIZE);
+  const rest = await Promise.all(
+    Array.from({ length: Math.max(0, first.pages - 1) }, (_, index) =>
+      loadErpPage(index + 2, ERP_SCAN_PAGE_SIZE)
+    )
+  );
+  return [first, ...rest].flatMap((page) => page.records);
+}
+
+/** 该等级卖家可选的全部产品（未筛选、未分页） */
+export async function getCatalog(tier: SellerTier): Promise<CatalogResult> {
+  const [products, data] = await Promise.all([
+    loadAllErpProducts(),
     loadPlatformData(tier),
   ]);
-  const result = buildCatalog(page.records, tier, data);
-  return { ...result, total: page.total, pages: page.pages, page: pageNo };
+  return buildCatalog(products, tier, data);
 }
 
 /** 详情页原始产品 + 平台数据（价格/库存/MOQ 由页面按等级计算） */

@@ -97,6 +97,28 @@ describe('尺码档 × 色档价格明细', () => {
     expect(resolveTierPriceTables(sweatshirt(), 'WHOLESALE')).toEqual([]);
   });
 
+  it('产品没有「中国商家」定价组时，中国商家等级按 VIP 取价', () => {
+    expect(resolveTierPriceTables(sweatshirt(), 'CN_MERCHANT')).toEqual(resolveTierPriceTables(sweatshirt(), 'VIP'));
+    expect(resolveProductTierPrice(sweatshirt(), 'CN_MERCHANT')).toEqual({ min: 6, max: 11 });
+  });
+
+  it('产品配了「中国商家」定价组时用该组，不再用 VIP', () => {
+    const vip = sweatshirt().pricingGroups![0];
+    const cnMerchant = {
+      ...vip,
+      name: '中国商家',
+      pricingTiers: [{ tierCode: '4XL', memberSizes: ['4XL'], blankPrice: 7, colorPrices: null }],
+      rules: [{ craftId: 'c1', craftName: 'DTF', printPriceJson: JSON.stringify({ '4XL': { face_1: 2 } }) }],
+    };
+    const product = sweatshirt({ pricingGroups: [vip, cnMerchant] });
+    expect(resolveProductTierPrice(product, 'CN_MERCHANT')).toEqual({ min: 9, max: 9 });
+    expect(resolveProductTierPrice(product, 'VIP')).toEqual({ min: 6, max: 11 });
+  });
+
+  it('只有中国商家等级有兜底：批发等级缺价时不借用 VIP', () => {
+    expect(resolveProductTierPrice(sweatshirt(), 'WHOLESALE')).toBeNull();
+  });
+
   it('起价与明细一致：空白衣售价 + 单面印花价，取各档的最低和最高', () => {
     // Light 5+1、Dark 6+2、4XL 8+3
     expect(resolveProductTierPrice(sweatshirt(), 'VIP')).toEqual({ min: 6, max: 11 });

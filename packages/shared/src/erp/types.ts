@@ -32,7 +32,7 @@ export interface ErpPricingTier {
 }
 
 export interface ErpPricingGroup {
-  name: string; // '零售' | '批发' | 'VIP'（等级名）
+  name: string; // '零售' | '批发' | 'VIP' | '中国商家'（等级名）
   mode: string; // 'multiplier' 等
   multiplier: number;
   printMode: string;
@@ -113,6 +113,8 @@ export interface ErpProduct {
   weight?: number | null;
   /** 定价模式，如 'pod_only' */
   pricingMode?: string | null;
+  /** 支持的业务线 code 列表，ERP 以 JSON 字符串返回，如 '["ideamax","chinamerchant"]' */
+  prodSupport?: string | string[] | null;
   /** 分级定价组（按客户等级），POD 产品的价格来源 */
   pricingGroups?: ErpPricingGroup[] | null;
   options?: ErpProductOption[] | null;

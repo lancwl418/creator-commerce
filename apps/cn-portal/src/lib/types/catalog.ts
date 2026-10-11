@@ -52,7 +52,10 @@ export interface CatalogSearchParams {
   page?: string | string[];
 }
 
-export interface CatalogPage extends CatalogResult {
+/** 筛选后的列表中的一页 */
+export interface CatalogPage {
+  items: CatalogItem[];
+  /** 筛选后的产品总数 */
   total: number;
   pages: number;
   page: number;

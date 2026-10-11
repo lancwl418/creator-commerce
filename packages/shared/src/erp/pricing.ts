@@ -2,13 +2,28 @@ import { resolveOptionDimensions } from './options';
 import type { ErpProduct, ErpPricingGroup, ErpSku } from './types';
 
 // ── 卖家等级 ↔ ERP 客户等级（文档 4.1） ──
-// 平台等级 1 → VIP，平台等级 2 → 批发商。ERP 侧等级组名为「VIP」「批发」「零售」。
-export type SellerTier = 'VIP' | 'WHOLESALE';
+// 平台等级 1 → VIP，平台等级 2 → 批发商；中国卖家归 ERP 客户等级「中国商家」。
+// ERP 侧等级名为「VIP」「批发」「零售」「中国商家」。
+export const SELLER_TIERS = ['VIP', 'WHOLESALE', 'CN_MERCHANT'] as const;
+export type SellerTier = (typeof SELLER_TIERS)[number];
+
+export function isSellerTier(value: unknown): value is SellerTier {
+  return (SELLER_TIERS as readonly unknown[]).includes(value);
+}
 
 /** 平台卖家等级 → ERP pricingGroup.name（客户等级名） */
 export const TIER_TO_ERP_LEVEL_NAME: Record<SellerTier, string> = {
   VIP: 'VIP',
   WHOLESALE: '批发',
+  CN_MERCHANT: '中国商家',
+};
+
+/**
+ * 产品没有该等级的定价组时改用的等级。
+ * ERP 还没有给产品配「中国商家」定价组，这期间中国卖家按 VIP 价；ERP 配上后自动改用本等级的价格。
+ */
+const TIER_PRICE_FALLBACK: Partial<Record<SellerTier, SellerTier>> = {
+  CN_MERCHANT: 'VIP',
 };
 
 export interface PriceRange {
@@ -102,12 +117,22 @@ function buildGroupPriceRows(product: ErpProduct, group: ErpPricingGroup): TierP
   return rows;
 }
 
-/** 该等级下带印花报价的定价组，各自展开成价格明细。 */
-function resolveGroupPriceRows(product: ErpProduct, tier: SellerTier): TierPriceRow[][] {
+function findTierGroups(product: ErpProduct, tier: SellerTier): ErpPricingGroup[] {
   const levelName = TIER_TO_ERP_LEVEL_NAME[tier];
-  return (product.pricingGroups ?? [])
-    .filter((g) => g.name === levelName && (g.rules?.length ?? 0) > 0)
-    .map((g) => buildGroupPriceRows(product, g));
+  return (product.pricingGroups ?? []).filter(
+    (g) => g.name === levelName && (g.rules?.length ?? 0) > 0
+  );
+}
+
+/**
+ * 该等级下带印花报价的定价组，各自展开成价格明细。
+ * 产品没有该等级的定价组时，按 TIER_PRICE_FALLBACK 改用兜底等级的定价组。
+ */
+function resolveGroupPriceRows(product: ErpProduct, tier: SellerTier): TierPriceRow[][] {
+  let groups = findTierGroups(product, tier);
+  const fallbackTier = TIER_PRICE_FALLBACK[tier];
+  if (groups.length === 0 && fallbackTier) groups = findTierGroups(product, fallbackTier);
+  return groups.map((g) => buildGroupPriceRows(product, g));
 }
 
 function parseRecord(json: string | null | undefined): Record<string, unknown> | null {
@@ -151,6 +176,7 @@ function pickBaseFace(faces: PrintFacePrice[]): PrintFacePrice {
  *
  * 数据来源：product.pricingGroups 中 name 匹配该等级、且带 printPriceJson 的组
  * （POD 供应商组）。分级倍率已由 ERP 算入 printPriceJson，无需再乘。
+ * 「中国商家」等级在产品上没有定价组时按 VIP 取价（TIER_PRICE_FALLBACK）。
  */
 export function resolveProductTierPrice(
   product: ErpProduct,

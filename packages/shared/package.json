@@ -9,7 +9,8 @@
     "./erp": "./src/erp/index.ts",
     "./erp/types": "./src/erp/types.ts",
     "./erp/pricing": "./src/erp/pricing.ts",
-    "./erp/options": "./src/erp/options.ts"
+    "./erp/options": "./src/erp/options.ts",
+    "./erp/business-lines": "./src/erp/business-lines.ts"
   },
   "scripts": {}
 }

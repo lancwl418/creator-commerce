@@ -1,37 +1,39 @@
-import { getCatalogPage } from '@/lib/catalog.server';
-import { getCurrentSellerTier } from '@/lib/seller';
-import { applyFilters, uniqueCategories } from '@/lib/catalog';
+import { getCatalog } from '@/lib/catalog.server';
+import { requireSeller } from '@/lib/sellers/session';
+import { applyFilters, paginate, uniqueCategories } from '@/lib/catalog';
 import { parseCatalogQuery } from '@/lib/catalog-query';
-import type { CatalogPage, CatalogPageProps } from '@/lib/types/catalog';
+import type { CatalogItem, CatalogPageProps } from '@/lib/types/catalog';
 import CatalogProducts from '@/components/products/CatalogProducts';
 
 export const dynamic = 'force-dynamic';
 
+const CATALOG_PAGE_SIZE = 40;
+
 export default async function ProductsPage({ searchParams }: CatalogPageProps) {
   const params = await searchParams;
-  const tier = await getCurrentSellerTier();
+  const { tier } = await requireSeller();
   const filters = parseCatalogQuery(params);
-  let catalog: CatalogPage | undefined;
+  let items: CatalogItem[] = [];
   let errored = false;
 
   try {
-    catalog = await getCatalogPage(tier, filters.page);
+    items = (await getCatalog(tier)).items;
   } catch (error) {
     console.error('Failed to load CN catalog', error);
     errored = true;
   }
 
-  const items = catalog?.items ?? [];
+  const page = paginate(applyFilters(items, filters), filters.page, CATALOG_PAGE_SIZE);
   return (
     <CatalogProducts
       tier={tier}
-      items={applyFilters(items, filters)}
+      items={page.items}
       categories={uniqueCategories(items)}
-      count={items.length}
+      count={page.total}
       errored={errored}
       searchParams={params}
-      page={filters.page}
-      pages={catalog?.pages ?? 1}
+      page={page.page}
+      pages={page.pages}
     />
   );
 }

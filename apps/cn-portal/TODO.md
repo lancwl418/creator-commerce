@@ -13,10 +13,14 @@
 
 - [ ] **哪些 ERP 产品状态可以给卖家看**：目录目前不按状态过滤，ERP 里的草稿（status=0）、
       审批中（1）、通过（2）都会显示。需确认只展示哪些状态 / 是否按 shelfStatus 过滤。
-- [ ] **是否用 ERP 的「中国商家」客户等级和 `chinamerchant` 业务线**：ERP 已有客户等级
-      「中国商家」和业务线 `chinamerchant`（商品字段 prodSupport），但定价分组目前只有
-      零售 / 批发 / VIP。需确认卖家等级沿用 VIP / 批发，还是改用「中国商家」，以及目录是否
-      只展示 prodSupport 含 `chinamerchant` 的产品。
+- [x] **卖家等级用 ERP 的「中国商家」**（2026-10-06 决定）：卖家默认归 `CN_MERCHANT`；产品没有
+      「中国商家」定价组时按 VIP 取价（`TIER_PRICE_FALLBACK`）。2026-10-06 的 ERP 数据里没有任何产品
+      配了该等级的定价组，所以现在全部产品显示的是 VIP 价。
+- [ ] **ERP 给产品配「中国商家」定价组**：配上后 cn-portal 自动改用该组。目前按定价组名称
+      「中国商家」匹配，这个名称还没有真实数据验证过；ERP 配好第一个产品后核对一次。
+- [x] **目录只展示 `chinamerchant` 业务线的产品**（2026-10-06 决定）：按商品字段 prodSupport 过滤
+      （`isOfferedToCnSellers`），列表和详情共用。2026-10-06 时 ERP 205 个产品里只有 1 个
+      （OLA26090001）开了这条业务线，其余产品要在 ERP 里勾选后才会出现在目录。
 
 - [ ] **印花价为 0 的含义**：ERP 里有的工艺单面或双面售价是 0（例如单面 0、双面 0.48）。
       页面目前照原值显示 $0.00，起价也按 0 计入。需确认 0 是「免费」还是「未报价」。
@@ -29,18 +33,32 @@
 - [x] **应用 migration 023 / 024**：2026-10-06 已在生产库执行。024 为三张表开启 RLS、只开放读取，
       写入需走服务端密钥。注意 `_migrations` 里没有 020–022 的记录（它们已手动应用），
       直接跑 `pnpm db:migrate` 会重跑这三个，执行前先看 `pnpm db:status`。
-- [ ] **上线前访问控制**：当前 cookie 可由访问者修改，默认 VIP 也不是认证结果，不能作为
-      生产价格权限来源。接入真实身份后，删除 cookie/default 占位。三张表的 RLS 已由 migration 024 开启
-      （任何人可读、仅服务端密钥可写）；可见性表目前所有等级的行都可读，接入身份后按等级收紧。
-- [ ] **卖家 auth + ERP 真实 tier 解析**：把 `src/lib/seller.ts` 里的 cookie 占位（`cn_seller_tier`）
-      换成「登录 → 调 ERP customer 接口读价格等级 → 映射 SellerTier」。
+- [ ] **应用 migration 025 / 026**（先 025 后 026，执行完再部署）：
+      025 给 `cn_seller_tier` 枚举增加 `CN_MERCHANT`，未执行时按该等级查询 `seller_product_visibility`
+      会报错（22P02），选品页打不开。026 新建卖家账户表 `cn_sellers`，并修改 auth.users 的注册触发器
+      `handle_new_user`：从 cn-portal 注册的用户只建卖家账户，不再建 Creator 记录。
+      026 未执行时注册页会提示「注册暂未开放」，不会创建用户。
+- [x] **卖家注册 / 登录**：`/register`、`/login`，与 Creator Portal 共用 Supabase Auth。选品页需要登录
+      （`src/proxy.ts`），价格等级取自 `cn_sellers.seller_tier`（`requireSeller`），cookie 占位已删除。
+      新账户一律是 `CN_MERCHANT`；卖家不能自己改等级（表对登录用户只读）。
+- [ ] **调整卖家等级的入口**：目前只能由运营直接改 `cn_sellers.seller_tier`，没有后台界面。
+- [ ] **已有 Creator Portal 账号的邮箱不能再注册卖家**：两边共用登录体系，同一邮箱只有一个用户；
+      这类用户登录 cn-portal 会提示「该账户未开通卖家平台」。需要时再做「为已有账号开通卖家」。
+- [ ] **找回密码**：还没有做。
+- [ ] **卖家账户对接 ERP 客户档案**：对接口是 `src/lib/sellers/erp-sync.ts` 的 `syncSellerToErp`，
+      注册成功后调用，目前直接返回 skipped；`cn_sellers.erp_customer_id / erp_synced_at` 已预留。
+      接入时调「新增客户」接口（`RIv0P9vK`）写入等级，并用服务端密钥回写 ERP 客户 id。
       ERP 已提供客户档案分页接口（`UmrAedIA`，含 custStageId / vipStage）和客户等级分页接口（`wfi8Vrp4`）；
       等级匹配建议同时改为按 `pricingGroups[].customerLevelId`，不再按分组名称。
+      2026-10-06 时 ERP 现有 2328 个客户的 custStageId / vipStage 全为空。接口文档里等级 id 的字段名
+      不一致（数据字典 `custStageId`，示例代码 `vipStageId`），写入前需与 ERP 确认。
+- [ ] **可见性表按等级收紧 RLS**：三张表的 RLS 已由 migration 024 开启（任何人可读、仅服务端密钥可写）；
+      `seller_product_visibility` 目前所有等级的行都可读，可改为只读自己等级的行。
 - [x] **详情页 variant 精确价**：详情页新增「价格明细」表，按「尺码档 × 色档」列出该等级的空白件售价
       和各工艺单面 / 双面印花售价（`resolveTierPriceTables`）。只列可上架 SKU 覆盖到的尺码和颜色。
       起价与明细同源：空白件售价改为优先取色档价（`colorPrices`），此前只取尺码档的 `blankPrice`。
 - [ ] **下单 / 购物车模块**：详情页「加入购物车」现为占位（`AddToCart.tsx`）。
-- [ ] **后台缺价清单页**：`buildCatalog` 已产出 `missingPriceProducts`，需一个运营可见的清单页
+- [ ] **后台缺价清单页**（暂缓，2026-10-06 决定先不做）：`buildCatalog` 已产出 `missingPriceProducts`，需一个运营可见的清单页
       （文档 4.1：让运营知道哪些产品因缺价没上架）。
 - [ ] **库存人工导入界面**：每周运营导出供应商库存表上传，按 SKU 更新 `product_stock_snapshot`
       （文档 6.4 / 4.4）。API 确认可用后可换定时任务。
@@ -60,8 +78,8 @@
       详情可跨 ERP 页查找；URL 参数校验、筛选输入重置已修复。
 - [ ] **剩余 ERP 展示类型归并**：Creator Portal 的设计器向导仍有历史 ERP 展示模型，后续
       按实际字段逐步适配共享类型，避免直接把展示模型当成完整 ERP 数据契约。
-- [ ] **列表跨页筛选**：当前 category/价格筛选在已取回的 ERP 单页内进行（沿用 portal 做法）。
-      当前总页数是 ERP 原始页数，品类、价格排序、计数都是单页结果，并不代表完整目录。
-      如需全量筛选，待 ERP 提供带筛选参数的产品接口。
+- [x] **列表跨页筛选**：目录改为取回 ERP 全部产品后在本地筛选、排序、分页（每页 40），品类、
+      价格排序和计数都是完整目录的结果。ERP 列表接口只有分页参数，不能按业务线筛选；
+      全量数据走 5 分钟缓存，缓存失效后的第一次打开要重新拉全量。
 - [ ] **价格币种确认**：ERP 当前类型不含币种，页面沿用美元符号展示。需确认 ERP 价格币种，
       再统一列表/详情的金额格式化；不能因界面中文就推断为人民币。

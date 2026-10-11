@@ -1,8 +1,16 @@
 import type { ErpProduct, ErpSku } from '@creator-commerce/shared/erp/types';
 import { type SellerTier, resolveProductTierPrice } from '@creator-commerce/shared/erp/pricing';
-import type { CatalogItem, CatalogResult, CatalogFilters, MissingPriceProduct, PlatformData } from './types/catalog';
+import { CHINA_MERCHANT_BUSINESS_LINE, productSupportsBusinessLine } from '@creator-commerce/shared/erp/business-lines';
+import type {
+  CatalogItem, CatalogResult, CatalogFilters, CatalogPage, MissingPriceProduct, PlatformData,
+} from './types/catalog';
 
 export type { CatalogItem, CatalogResult, CatalogFilters, MissingPriceProduct, PlatformData, SortKey } from './types/catalog';
+
+/** 平台只卖 ERP 里开放给「中国商家」业务线的产品。 */
+export function isOfferedToCnSellers(product: ErpProduct): boolean {
+  return productSupportsBusinessLine(product, CHINA_MERCHANT_BUSINESS_LINE);
+}
 
 function getCategory(p: ErpProduct): string {
   return p.category || p.categoryName || p.productType || '';
@@ -34,6 +42,7 @@ export function getCatalogItem(
   tier: SellerTier,
   data: PlatformData
 ): CatalogItem | null {
+  if (!isOfferedToCnSellers(product)) return null;
   const price = resolveProductTierPrice(product, tier);
   const listableSkus = getListableSkus(product, data);
   if (!price || listableSkus.length === 0) return null;
@@ -55,6 +64,7 @@ export function getCatalogItem(
  * 把 ERP 产品 + 平台数据组装成选品列表。
  *
  * 规则（文档 4.1 / 4.2 / 4.4）：
+ *  - 业务线：只收 ERP 里开放给「中国商家」业务线的产品，其余不显示也不进缺价清单；
  *  - 分层取价：产品在该等级缺价 → 不显示，且记入缺价清单；
  *  - 可见性：该等级下被隐藏的 SKU 不计入（缺行=可见）；
  *  - 库存：无货 SKU 不计入（无货产品不出现在列表）；
@@ -70,6 +80,7 @@ export function buildCatalog(
   const missingPriceProducts: MissingPriceProduct[] = [];
 
   for (const p of products) {
+    if (!isOfferedToCnSellers(p)) continue;
     const item = getCatalogItem(p, tier, data);
     if (item) {
       items.push(item);
@@ -117,6 +128,18 @@ export function applyFilters(
   // 'newest' 保持 ERP 返回顺序
 
   return out;
+}
+
+/** 把筛选后的列表切成一页；页码超出范围时落到最后一页。 */
+export function paginate(items: CatalogItem[], page: number, pageSize: number): CatalogPage {
+  const pages = Math.max(1, Math.ceil(items.length / pageSize));
+  const current = Math.min(Math.max(1, page), pages);
+  return {
+    items: items.slice((current - 1) * pageSize, current * pageSize),
+    total: items.length,
+    pages,
+    page: current,
+  };
 }
 
 export function uniqueCategories(items: CatalogItem[]): string[] {

@@ -5,7 +5,7 @@ import {
   type ErpSku,
   type ErpPricingGroup,
 } from '@creator-commerce/shared/erp';
-import { buildCatalog, getCatalogItem, applyFilters, type PlatformData } from './catalog';
+import { buildCatalog, getCatalogItem, applyFilters, paginate, type CatalogItem, type PlatformData } from './catalog';
 
 function sku(overrides: Partial<ErpSku> & { sku: string }): ErpSku {
   return {
@@ -63,6 +63,7 @@ function product(overrides: Partial<ErpProduct> & { id: string }): ErpProduct {
     tags: '',
     itemNo: 'ITEM-1',
     mainPic: '',
+    prodSupport: '["ideamax","chinamerchant"]',
     prodSkuList: [sku({ sku: 's1', option1: 'White', option2: 'M' })],
     prodImageList: [],
     ...overrides,
@@ -215,5 +216,43 @@ describe('选品规则回归', () => {
     const outOfStock = emptyData();
     outOfStock.stock.set('s1', false);
     expect(getCatalogItem(p, 'VIP', outOfStock)).toBeNull();
+  });
+});
+
+describe('业务线：只卖开放给中国商家的产品', () => {
+  it('没有 chinamerchant 业务线的产品不显示，也不进缺价清单', () => {
+    const offered = product({ id: 'p1', pricingGroups: [group('VIP', 5)] });
+    const other = product({ id: 'p2', prodSupport: '["ideamax","ghostly","promo"]', pricingGroups: [group('VIP', 5)] });
+    const otherNoPrice = product({ id: 'p3', prodSupport: '["ideamax"]', pricingGroups: [group('批发', 5)] });
+
+    const res = buildCatalog([offered, other, otherNoPrice], 'VIP', emptyData());
+    expect(res.items.map((i) => i.id)).toEqual(['p1']);
+    expect(res.missingPriceProducts).toEqual([]);
+    expect(getCatalogItem(other, 'VIP', emptyData())).toBeNull();
+  });
+
+  it('prodSupport 缺失或无法解析时按不开放处理', () => {
+    for (const prodSupport of [null, undefined, '', 'chinamerchant', '{"chinamerchant":true}']) {
+      const p = product({ id: 'p1', prodSupport, pricingGroups: [group('VIP', 5)] });
+      expect(getCatalogItem(p, 'VIP', emptyData())).toBeNull();
+    }
+  });
+
+  it('prodSupport 已经是数组时同样识别', () => {
+    const p = product({ id: 'p1', prodSupport: ['chinamerchant'], pricingGroups: [group('VIP', 5)] });
+    expect(getCatalogItem(p, 'VIP', emptyData())).not.toBeNull();
+  });
+});
+
+describe('分页', () => {
+  const items = Array.from({ length: 5 }, (_, i) => ({ id: `p${i + 1}` }) as CatalogItem);
+
+  it('按页大小切分，并给出总数和总页数', () => {
+    expect(paginate(items, 2, 2)).toEqual({ items: [items[2], items[3]], total: 5, pages: 3, page: 2 });
+  });
+
+  it('页码超出范围时落到最后一页；空列表是 1 页', () => {
+    expect(paginate(items, 9, 2)).toMatchObject({ items: [items[4]], page: 3 });
+    expect(paginate([], 3, 2)).toEqual({ items: [], total: 0, pages: 1, page: 1 });
   });
 });

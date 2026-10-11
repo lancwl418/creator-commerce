@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { getCatalogItem } from '@/lib/catalog';
 import { getProductDetail } from '@/lib/catalog.server';
 import { buildProductDetailView } from '@/lib/catalog-detail';
-import { getCurrentSellerTier } from '@/lib/seller';
+import { requireSeller } from '@/lib/sellers/session';
 import type { ProductDetailPageProps } from '@/lib/types/catalog';
 import { t } from '@/lib/i18n';
 import ProductGallery from '@/components/products/ProductGallery';
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { id } = await params;
-  const tier = await getCurrentSellerTier();
+  const { tier } = await requireSeller();
   const { product, data } = await getProductDetail(id, tier);
   if (!product) notFound();
   const item = getCatalogItem(product, tier, data);
