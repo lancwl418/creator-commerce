@@ -11,10 +11,12 @@ interface DesignEditorSession {
   creatorId: string;
   editorUrl: string;
   engineOrigin: string;
+  /** 保存后去同步店铺还是直接下单 */
+  intent: 'sync' | 'order';
 }
 
 /** 监听编辑器的保存消息 → 建产品草稿 → 进入该产品的同步页。 */
-export function useDesignEditor({ creatorId, editorUrl, engineOrigin }: DesignEditorSession) {
+export function useDesignEditor({ creatorId, editorUrl, engineOrigin, intent }: DesignEditorSession) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const handled = useRef(false);
@@ -32,7 +34,7 @@ export function useDesignEditor({ creatorId, editorUrl, engineOrigin }: DesignEd
       setError('');
       try {
         const created = await createDesignedProducts(creatorId, parseDesignPayload(event.data.payload));
-        if (active) router.push(`/my-products/${created[0].id}/sync`);
+        if (active) router.push(`/my-products/${created[0].id}/${intent === 'order' ? 'order' : 'sync'}`);
       } catch (err) {
         if (active) {
           setError(err instanceof Error ? err.message : t('design.error.save'));
@@ -43,7 +45,7 @@ export function useDesignEditor({ creatorId, editorUrl, engineOrigin }: DesignEd
     }
     window.addEventListener('message', onMessage);
     return () => { active = false; window.removeEventListener('message', onMessage); };
-  }, [creatorId, editorUrl, engineOrigin, router]);
+  }, [creatorId, editorUrl, engineOrigin, intent, router]);
 
   return { iframeRef, busy, error };
 }

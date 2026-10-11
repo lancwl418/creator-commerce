@@ -113,6 +113,8 @@ export interface ErpProduct {
   weight?: number | null;
   /** 定价模式，如 'pod_only' */
   pricingMode?: string | null;
+  /** 印刷位置，ERP 以 JSON 字符串返回，如 '["front","back"]' */
+  printPositions?: string | string[] | null;
   /** 支持的业务线 code 列表，ERP 以 JSON 字符串返回，如 '["ideamax","chinamerchant"]' */
   prodSupport?: string | string[] | null;
   /** 分级定价组（按客户等级），POD 产品的价格来源 */

@@ -52,7 +52,13 @@
       `NEXT_PUBLIC_ALLOWED_ORIGINS` 只管它自己的 API 的 CORS，cn-portal 不调那些接口，不用改。
 - [x] **第 3 步 · 订单页**：`/orders` 列出 `creator_orders`（店铺订单经 Creator Portal 的 webhook 回流）。
       仅列表，无详情和发货操作。
-- [ ] **第 4 步 · 下单**（等支付方案：Plaid 或 Stripe）：白板 bulk order；上传设计的定制单；推 ERP「创建订单」。
+- [x] **第 4 步 · 下单（不接支付的人工流程）**：产品页「白板下单」`/products/[id]/order`、「上传设计」
+      `/products/[id]/order/designed`（按 ERP `printPositions` 的每个面上传设计图 + 预览图，设计了 N 面按 face_N
+      计价，文件存 R2）；采购单表 `cn_bulk_orders`（migration 030），提交后「待确认」；卖家在「订单」页看采购单，
+      Admin `/dashboard/cn-orders` 确认 / 取消。
+- [ ] **第 4 步 · 支付与 ERP 推单**：支付（Plaid 或 Stripe）待定；确认后推 ERP「创建订单」`HyHUQiWD`，
+      `erp_order_id / erp_sync_status` 已预留，需对 ERP 订单字段和 appKey 授权。
+- [ ] **设计器下单**：目前从「我的产品」对设计器建的产品也能下单（按单面计价），产品页「上传设计」走上传文件，不走设计器。
 
 ## 二、待接入（工程）
 

@@ -12,23 +12,29 @@ function rowCovers(row: TierPriceRow, sku: ErpSku, sizeKey?: keyof ErpSku, color
     && (!colorKey || row.colors.length === 0 || row.colors.includes(color ?? ''));
 }
 
-/** 一档的单价：空白件 + （带设计时）第一种工艺的单面印花价；缺印花价时返回 null */
-function rowCost(row: TierPriceRow, includePrint: boolean): number | null {
-  const blank = row.blankPrice ?? 0;
-  if (!includePrint) return row.blankPrice != null && row.blankPrice > 0 ? row.blankPrice : null;
-  const face = row.prints[0]?.faces.find((f) => f.faces === 1) ?? row.prints[0]?.faces[0];
+/**
+ * 一档的单价：
+ * - print = false：空白件售价，必须大于 0；
+ * - print = N：空白件售价 + 第一种工艺 N 面的印花价（face_N）；没有 N 面价时不可用。
+ */
+function rowCost(row: TierPriceRow, print: PrintFaces): number | null {
+  if (print === false) return row.blankPrice != null && row.blankPrice > 0 ? row.blankPrice : null;
+  const face = row.prints[0]?.faces.find((f) => f.faces === print);
   if (!face) return null;
-  const cost = blank + face.price;
+  const cost = (row.blankPrice ?? 0) + face.price;
   return cost > 0 ? cost : null;
 }
 
+/** false = 只要白板；N = 设计了 N 面 */
+export type PrintFaces = false | number;
+
 /**
- * 可以同步到店铺的 variant 及其成本。
- * - 白板（includePrint = false）：成本 = 该等级的空白件售价，为 0 或缺失的 variant 不能同步；
- * - 带设计（includePrint = true）：成本 = 空白件售价 + 第一种工艺的单面印花价（与目录起价口径一致），
+ * 可以同步 / 下单的 variant 及其成本。
+ * - 白板：成本 = 该等级的空白件售价，为 0 或缺失的 variant 不能用；
+ * - 带设计（N 面）：成本 = 空白件售价 + 第一种工艺 N 面的印花价（1 面即目录起价口径），
  *   一个产品有多组定价时取第一组有价的档位。
  */
-export function buildSyncVariants(product: ErpProduct, tier: SellerTier, listableSkus: ErpSku[], includePrint: boolean): BlankVariant[] {
+export function buildSyncVariants(product: ErpProduct, tier: SellerTier, listableSkus: ErpSku[], print: PrintFaces): BlankVariant[] {
   const dimensions = resolveOptionDimensions(product);
   const sizeKey = dimensions.find((d) => d.isSize)?.key;
   const colorKey = dimensions.find((d) => d.isColor)?.key;
@@ -40,7 +46,7 @@ export function buildSyncVariants(product: ErpProduct, tier: SellerTier, listabl
     for (const rows of tables) {
       for (const row of rows) {
         if (!rowCovers(row, sku, sizeKey, colorKey)) continue;
-        cost = rowCost(row, includePrint);
+        cost = rowCost(row, print);
         if (cost != null) break;
       }
       if (cost != null) break;

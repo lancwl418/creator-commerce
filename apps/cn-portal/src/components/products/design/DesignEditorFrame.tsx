@@ -9,15 +9,16 @@ interface DesignEditorFrameProps {
   editorUrl: string;
   engineOrigin: string;
   backHref: string;
+  intent: 'sync' | 'order';
 }
 
-export default function DesignEditorFrame({ creatorId, editorUrl, engineOrigin, backHref }: DesignEditorFrameProps) {
-  const { iframeRef, busy, error } = useDesignEditor({ creatorId, editorUrl, engineOrigin });
+export default function DesignEditorFrame({ creatorId, editorUrl, engineOrigin, backHref, intent }: DesignEditorFrameProps) {
+  const { iframeRef, busy, error } = useDesignEditor({ creatorId, editorUrl, engineOrigin, intent });
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-4">
         <Link href={backHref} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">← {t('design.back')}</Link>
-        <p className="text-xs text-gray-400">{t('design.hint')}</p>
+        <p className="text-xs text-gray-400">{t(intent === 'order' ? 'design.hintOrder' : 'design.hint')}</p>
       </div>
       {error && <p role="alert" className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-600">{error}</p>}
       {busy && (

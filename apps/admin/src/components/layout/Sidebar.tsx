@@ -31,6 +31,7 @@ const navSections = [
     items: [
       { href: '/dashboard/channels', label: 'Channels', icon: GlobeIcon },
       { href: '/dashboard/orders', label: 'Orders', icon: ShoppingCartIcon },
+      { href: '/dashboard/cn-orders', label: 'CN Orders', icon: ShoppingCartIcon },
       { href: '/dashboard/settlements', label: 'Settlements', icon: BankIcon },
     ],
   },

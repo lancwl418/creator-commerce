@@ -94,7 +94,7 @@ export async function syncExistingProduct(_state: BlankSyncFormState, form: Form
   if (!product) return { error: t('detail.notFound') };
 
   const designed = (row.design_artwork_urls?.length ?? 0) > 0 || (row.preview_urls?.length ?? 0) > 0;
-  const variants = buildSyncVariants(product, seller.tier, getListableSkus(product, data), designed);
+  const variants = buildSyncVariants(product, seller.tier, getListableSkus(product, data), designed ? 1 : false);
   const images = buildBlankProductImages(product);
   const parsed = parseBlankProductForm(form, variants, images);
   if (!parsed.ok) return { error: t(parsed.error) };

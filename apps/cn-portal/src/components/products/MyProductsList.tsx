@@ -54,6 +54,9 @@ export default function MyProductsList({ products, highlightId }: { products: My
                   {t('myProducts.syncNow')}
                 </Link>
               )}
+              <Link href={`/my-products/${product.id}/order`} className="text-sm text-gray-700 underline underline-offset-2 whitespace-nowrap">
+                {t('myProducts.orderNow')}
+              </Link>
               {listing?.external_listing_url && (
                 <a href={listing.external_listing_url} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-700 underline underline-offset-2 whitespace-nowrap">
                   {t('myProducts.viewInStore')}

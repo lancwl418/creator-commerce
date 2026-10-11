@@ -29,11 +29,12 @@ describe('同步 variant 的成本', () => {
     expect(buildSyncVariants(product, 'VIP', product.prodSkuList, false).map((v) => [v.sku, v.cost])).toEqual([['B-S', 5]]);
   });
 
-  it('带设计：空白件价 + 单面印花价；没有单面价时取最小面数价', () => {
-    expect(buildSyncVariants(product, 'VIP', product.prodSkuList, true).map((v) => [v.sku, v.cost])).toEqual([['W-S', 8], ['B-S', 8]]);
+  it('带设计：空白件价 + 对应面数的印花价；没有该面数的价就不可用', () => {
+    expect(buildSyncVariants(product, 'VIP', product.prodSkuList, 1).map((v) => [v.sku, v.cost])).toEqual([['W-S', 8]]);
+    expect(buildSyncVariants(product, 'VIP', product.prodSkuList, 2).map((v) => [v.sku, v.cost])).toEqual([['B-S', 8]]);
   });
 
   it('中国商家等级没有定价组时按 VIP 兜底', () => {
-    expect(buildSyncVariants(product, 'CN_MERCHANT', product.prodSkuList, true)).toHaveLength(2);
+    expect(buildSyncVariants(product, 'CN_MERCHANT', product.prodSkuList, 1)).toHaveLength(1);
   });
 });

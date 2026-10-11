@@ -13,8 +13,8 @@ import DesignEditorFrame from '@/components/products/design/DesignEditorFrame';
 export const dynamic = 'force-dynamic';
 
 /** 「开始设计」：把 ERP 产品交给 Design Engine，保存后建产品草稿并进入同步页。 */
-export default async function DesignPage({ params }: SyncPageProps) {
-  const { id } = await params;
+export default async function DesignPage({ params, searchParams }: SyncPageProps & { searchParams: Promise<{ intent?: string }> }) {
+  const [{ id }, { intent }] = await Promise.all([params, searchParams]);
   const seller = await requireSeller();
   const { product, data } = await getProductDetail(id, seller.tier);
   if (!product || !getCatalogItem(product, seller.tier, data)) notFound();
@@ -30,6 +30,7 @@ export default async function DesignPage({ params }: SyncPageProps) {
         editorUrl={editorUrl}
         engineOrigin={new URL(getDesignEngineUrl()).origin}
         backHref={`/products/${id}`}
+        intent={intent === 'order' ? 'order' : 'sync'}
       />
     </div>
   );
