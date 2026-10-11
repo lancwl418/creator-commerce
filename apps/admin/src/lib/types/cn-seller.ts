@@ -1,6 +1,6 @@
 import type { SellerTier } from '@creator-commerce/shared/erp/pricing';
 
-/** cn_sellers 表的一行（后台视角） */
+/** 中国卖家：creators 表里 user_type = cn_seller 的记录（后台视角） */
 export interface CnSellerRow {
   id: string;
   email: string;
@@ -13,6 +13,9 @@ export interface CnSellerRow {
   erp_sync_error: string | null;
   created_at: string;
 }
+
+/** 查询返回的原始行；未同步过的账户 erp_sync_status 可能为空 */
+export type CnSellerQueryRow = Omit<CnSellerRow, 'erp_sync_status'> & { erp_sync_status: CnSellerRow['erp_sync_status'] | null };
 
 export interface CnSellersPageProps {
   searchParams: Promise<{ q?: string }>;

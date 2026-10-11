@@ -28,6 +28,20 @@
       最多 4 组），详情页目前全部列出并标为「报价方案 1、2…」，不显示供应商名称。
       需确认是否固定一家（对应《待确认清单》6.5）。
 
+## 做法 1 分步计划（2026-10-11 决定：复用 Creator Portal 的店铺 / 产品 / 订单链路）
+
+产品页两个入口：「同步店铺」→ 开始设计（Creator Portal 同款流程）/ 仅同步白板；「下单」→ 上传设计 / 白板 bulk order。
+
+- [ ] **第 1 步 · 数据模型合并**：中国卖家并入 `creators`（`user_type = cn_seller`，migration 029），
+      cn-portal 与 Admin 改读写 `creators`；`cn_sellers` 废弃。代码已改，**migration 029 待执行**。
+- [ ] **第 2 步 · 连接自己的 Shopify**：把 Creator Portal 的 Shopify 授权 / 同步 / webhook 核心逻辑抽到共享包，
+      cn-portal 加「我的店铺」。需在 Shopify App 的 Allowed redirection URL(s) 加
+      `https://cn-portal.onrender.com/api/shopify/callback`；订单 webhook 统一指向 Creator Portal。
+- [ ] **第 3 步 · 仅同步白板**：详情页选 SKU、填售价（成本 = 等级价）、选图 → 建产品记录 → 复用同步推到 Shopify；
+      cn-portal 加「我的产品」「订单」页。
+- [ ] **第 3 步 · 开始设计**：嵌入 Design Engine，复用 Creator Portal 的编辑 session 与建品逻辑。
+- [ ] **第 4 步 · 下单**（等支付方案：Plaid 或 Stripe）：白板 bulk order；上传设计的定制单；推 ERP「创建订单」。
+
 ## 二、待接入（工程）
 
 - [x] **应用 migration 023 / 024**：2026-10-06 已在生产库执行。024 为三张表开启 RLS、只开放读取，

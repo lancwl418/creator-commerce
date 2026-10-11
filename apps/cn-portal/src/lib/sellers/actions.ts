@@ -17,14 +17,6 @@ export async function signUpSeller(_state: AuthFormState, form: FormData): Promi
   const { registration } = parsed;
   const supabase = await createClient();
 
-  // 卖家账户表还没建好（migration 026 未执行）时不能注册：否则数据库的注册触发器
-  // 会把这个用户建成 Creator，而不是卖家。
-  const { error: tableError } = await supabase.from('cn_sellers').select('id').limit(1);
-  if (tableError) {
-    console.error('Seller accounts are unavailable', tableError);
-    return { error: t('auth.error.unavailable'), values };
-  }
-
   const next = safeReturnPath(form.get('next') as string | null);
   const { data, error } = await supabase.auth.signUp({
     email: registration.email,

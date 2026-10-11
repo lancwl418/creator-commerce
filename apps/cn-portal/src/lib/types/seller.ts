@@ -1,6 +1,6 @@
 import type { SellerTier } from '@creator-commerce/shared/erp/pricing';
 
-/** 中国卖家账户（cn_sellers 表） */
+/** 中国卖家账户：creators 表里 user_type = cn_seller 的记录 */
 export interface Seller {
   id: string;
   email: string;
@@ -22,7 +22,7 @@ export interface SellerRow {
   phone: string;
   seller_tier: string;
   erp_customer_id: string | null;
-  erp_sync_status: string;
+  erp_sync_status: string | null;
 }
 
 export interface SellerRegistration {

@@ -18,19 +18,21 @@ ERP Core 是整个业务的数据底座，向上支撑三个面向不同用户�
 |---|---|---|---|
 | **目标用户** | C端消费者、无店铺 Distributor、Print Shop | Designer、有店铺 Distributor | 中国跨境卖家 |
 | **核心需求** | 购物/定制下单、B2B采购 | 上传设计稿/设计器、同步到自己店铺/看收益 | 多店铺管理、供应链外包 |
-| **设计器** | 需要（嵌入主站） | 需要 | 不需要 |
-| **渠道同步** | 不需要 | Shopify / Etsy / TikTok Shop | 自建独立站 |
+| **设计器** | 需要（嵌入主站） | 需要 | 需要（嵌入 cn-portal，同一个 Design Engine） |
+| **渠道同步** | 不需要 | Shopify / Etsy / TikTok Shop | Shopify（复用 Creator Portal 的店铺 / 同步 / 订单链路） |
 | **收益结算** | 无（直接采购） | 差价 / Royalty | 净收入（扣5%平台费） |
-| **现阶段方案** | 已有 Shopify 店铺 | **完整开发（本项目）** | **作为 monorepo 独立 app 开发（本 repo `apps/cn-portal`），共享领域层** |
+| **现阶段方案** | 已有 Shopify 店铺 | **完整开发（本项目）** | **独立 app `apps/cn-portal`（中文 UI + 分级取价目录），数据模型与建品 / 同步 / 订单链路复用 Creator Portal** |
 
 **本 repo 承载 Creator Commerce + 中国卖家 Portal 两个前端系统。** Shopify 主站已有，不在本 repo。
 
 **中国卖家 Portal 的归属原则（2026-09 决策）：** 它在**业务定位上是独立系统**（面向中国跨境卖家，业务模型、收益、UI、语言均与 Creator Commerce 不同），但在**工程上归属于本 monorepo**，作为独立 app `apps/cn-portal` 存在。判断依据是两系统**领域层高度重叠、表现层完全分离**：
 
 - **领域层共享**：ERP 对接、产品/SKU 数据、取价、类型等下沉到 `packages/shared`（现已有 `packages/shared/src/erp`），两个前端共用一份，避免跨 repo 复制或版本同步。
-- **表现层分离**：各自独立的 app（独立域名/部署/CI）、UI、i18n、路由，以及各自专属的业务规则（cn-portal 无设计器、无渠道同步，走分级取价 + 5% 平台费）。
+- **表现层分离**：各自独立的 app（独立域名/部署/CI）、UI、i18n、路由，以及各自专属的业务规则（cn-portal 走 ERP 客户等级「中国商家」的分级取价，目录只收 `chinamerchant` 业务线的产品）。
 - **原则一句话**：同一 monorepo 下的两个"窗口"，共享领域层、分离表现层。
 - 详见 `apps/cn-portal`（依据《中国卖家上架选品系统·产品模块 需求与技术方案 v1》）。
+
+**2026-10-11 更新：中国卖家与 Creator 共用数据模型和后链路。** 中国卖家是 `creators` 的一种 `user_type = cn_seller`（等级、公司、ERP 客户 id 等字段加在 `creators` 上，migration 029），店铺连接、已建产品、渠道 listing、订单全部按 `creator_id` 复用 Creator Portal 的表和服务端逻辑，不在 cn-portal 另搭一套。cn-portal 产品页两个入口：「同步店铺」（开始设计 → 走 Creator Portal 同款流程；或仅同步白板）和「下单」（上传设计 / 白板 bulk order，待支付方案确定后做）。Shopify 用同一个 App，仅需把 cn-portal 域名加入回调白名单；订单 webhook 统一指向 Creator Portal。
 
 ### 项目结构：Monorepo
 
@@ -77,7 +79,7 @@ creator-commerce/                  ← 本 repo
 |--------|------|
 | **代码结构** | Monorepo (pnpm workspaces + turborepo)，源码在一起方便联调，部署各自独立 |
 | **数据库策略** | 两个独立数据库：ERP 自己的 DB（已有，不动）+ Creator Commerce DB（**Supabase**，PostgreSQL 全兼容，Portal + Admin + Design Engine + cn-portal 共享） |
-| **cn-portal 归属** | 业务定位独立、工程上归属本 monorepo；领域层共享（`packages/shared`），表现层分离（独立 app/域名/UI/i18n）。详见「全局系统定位」 |
+| **cn-portal 归属** | 独立 app（中文 UI、分级取价目录），数据模型并入 `creators`（`user_type = cn_seller`），建品 / 店铺同步 / 订单复用 Creator Portal 的表与服务端逻辑；领域层共享 `packages/shared`。详见「全局系统定位」 |
 | **共享领域层** | ERP 请求、签名、环境配置和图片代理由 `packages/shared/src/erp` 统一提供，CN Portal / Creator Portal / Design Engine 复用；服务端使用 `@creator-commerce/shared/erp`，纯取价与类型使用 `/erp/pricing`、`/erp/types`，避免 node crypto 进入客户端。所有 ERP 地址和凭据由环境变量提供 |
 | **Supabase 使用范围** | Auth（Creator 注册/登录）、Storage（artwork/preview/print file 存储）、Database（全部业务表）、RLS（按 creator 隔离数据） |
 | **技术栈** | Creator Commerce 全栈 Node.js/TypeScript，ERP 是 Java，不强制统一，通过 REST API 通信 |

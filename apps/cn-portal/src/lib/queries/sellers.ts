@@ -10,9 +10,10 @@ export const getCurrentSeller = cache(async (): Promise<Seller | null> => {
   if (!user) return null;
 
   const { data, error } = await supabase
-    .from('cn_sellers')
+    .from('creators')
     .select(SELLER_COLUMNS)
     .eq('auth_user_id', user.id)
+    .eq('user_type', 'cn_seller')
     .maybeSingle<SellerRow>();
   if (error) throw new Error(`Failed to load seller account: ${error.message}`);
   return data ? toSeller(data) : null;

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import type { CnSellerRow } from '@/lib/types/cn-seller';
+import type { CnSellerQueryRow, CnSellerRow } from '@/lib/types/cn-seller';
 
 export const CN_SELLER_COLUMNS =
   'id, email, company_name, contact_name, phone, seller_tier, erp_customer_id, erp_sync_status, erp_sync_error, created_at';
@@ -10,8 +10,9 @@ const PAGE_SIZE = 100;
 export async function getCnSellers(q = ''): Promise<CnSellerRow[]> {
   const supabase = await createClient();
   let query = supabase
-    .from('cn_sellers')
+    .from('creators')
     .select(CN_SELLER_COLUMNS)
+    .eq('user_type', 'cn_seller')
     .order('created_at', { ascending: false })
     .limit(PAGE_SIZE);
 
@@ -20,7 +21,7 @@ export async function getCnSellers(q = ''): Promise<CnSellerRow[]> {
     query = query.or(`company_name.ilike.%${keyword}%,email.ilike.%${keyword}%,contact_name.ilike.%${keyword}%`);
   }
 
-  const { data, error } = await query.returns<CnSellerRow[]>();
+  const { data, error } = await query.returns<CnSellerQueryRow[]>();
   if (error) throw new Error(`Failed to load CN sellers: ${error.message}`);
-  return data ?? [];
+  return (data ?? []).map((row) => ({ ...row, erp_sync_status: row.erp_sync_status ?? 'pending' }));
 }
