@@ -3,6 +3,6 @@ import type { AuthPageProps } from '@/lib/types/seller';
 import LoginForm from '@/components/auth/LoginForm';
 
 export default async function LoginPage({ searchParams }: AuthPageProps) {
-  const { next } = await searchParams;
-  return <LoginForm next={safeReturnPath(next)} />;
+  const { next, error } = await searchParams;
+  return <LoginForm next={safeReturnPath(next)} linkError={error === 'link'} />;
 }

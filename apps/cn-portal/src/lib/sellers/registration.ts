@@ -67,6 +67,9 @@ const AUTH_ERROR_MESSAGES: Record<string, MessageKey> = {
   email_address_invalid: 'auth.error.email',
   over_email_send_rate_limit: 'auth.error.rateLimited',
   over_request_rate_limit: 'auth.error.rateLimited',
+  same_password: 'auth.error.samePassword',
+  session_expired: 'auth.error.linkExpired',
+  otp_expired: 'auth.error.linkExpired',
 };
 
 /** Supabase Auth 错误码 → 界面文案；不认识的错误码用兜底文案。 */

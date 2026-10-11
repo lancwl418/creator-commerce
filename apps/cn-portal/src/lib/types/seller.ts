@@ -40,5 +40,5 @@ export interface AuthFormState {
 }
 
 export interface AuthPageProps {
-  searchParams: Promise<{ next?: string | string[] }>;
+  searchParams: Promise<{ next?: string | string[]; error?: string | string[] }>;
 }

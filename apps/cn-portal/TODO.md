@@ -44,7 +44,12 @@
 - [ ] **调整卖家等级的入口**：目前只能由运营直接改 `cn_sellers.seller_tier`，没有后台界面。
 - [ ] **已有 Creator Portal 账号的邮箱不能再注册卖家**：两边共用登录体系，同一邮箱只有一个用户；
       这类用户登录 cn-portal 会提示「该账户未开通卖家平台」。需要时再做「为已有账号开通卖家」。
-- [ ] **找回密码**：还没有做。
+- [x] **找回密码**：`/forgot-password` 发重设邮件，`/reset-password` 设新密码；邮件链接落到 `/auth/confirm`
+      换取会话（兼容 `?code=` 和 `?token_hash=`），注册验证邮件也改为回到本站。
+      上线前要在 Supabase → Authentication → URL Configuration 的 Redirect URLs 里加上
+      `https://<cn-portal 域名>/auth/confirm`（本地开发加 `http://localhost:3002/auth/confirm`），
+      否则链接会跳回项目默认站点（Creator Portal）。可用 `CN_PORTAL_PUBLIC_URL` 固定回跳域名。
+      邮件链接需在发起申请的同一浏览器里打开（PKCE）。
 - [ ] **卖家账户对接 ERP 客户档案**：对接口是 `src/lib/sellers/erp-sync.ts` 的 `syncSellerToErp`，
       注册成功后调用，目前直接返回 skipped；`cn_sellers.erp_customer_id / erp_synced_at` 已预留。
       接入时调「新增客户」接口（`RIv0P9vK`）写入等级，并用服务端密钥回写 ERP 客户 id。

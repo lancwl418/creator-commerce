@@ -2,9 +2,11 @@
 
 import { redirect } from 'next/navigation';
 import { t } from '../i18n';
+import { getRequestOrigin } from '../request-origin';
 import { createClient } from '../supabase/server';
 import type { AuthFormState } from '../types/seller';
 import { syncSellerToErp } from './erp-sync';
+import { RESET_PASSWORD_PATH, emailRedirectUrl, parseNewPassword } from './password-reset';
 import { authErrorMessage, parseRegistration, refillValues, safeReturnPath, signupMetadata } from './registration';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -34,10 +36,15 @@ export async function signUpSeller(_state: AuthFormState, form: FormData): Promi
     return { error: t('auth.error.unavailable'), values };
   }
 
+  const next = safeReturnPath(form.get('next') as string | null);
   const { data, error } = await supabase.auth.signUp({
     email: registration.email,
     password: registration.password,
-    options: { data: signupMetadata(registration) },
+    options: {
+      data: signupMetadata(registration),
+      // 开启邮箱验证时，验证链接回到本站而不是 Supabase 项目的默认站点
+      emailRedirectTo: emailRedirectUrl(await getRequestOrigin(), next),
+    },
   });
   if (error) {
     console.error('Seller sign-up failed', error);
@@ -62,7 +69,7 @@ export async function signUpSeller(_state: AuthFormState, form: FormData): Promi
 
   // 项目开启了邮箱验证时注册后没有会话，需要先验证邮箱再登录。
   if (!data.session) return { notice: t('auth.notice.confirmEmail') };
-  redirect(safeReturnPath(form.get('next') as string | null));
+  redirect(next);
 }
 
 export async function signInSeller(_state: AuthFormState, form: FormData): Promise<AuthFormState> {
@@ -83,6 +90,36 @@ export async function signInSeller(_state: AuthFormState, form: FormData): Promi
     return { error: t('auth.error.notSeller'), values };
   }
   redirect(safeReturnPath(form.get('next') as string | null));
+}
+
+export async function requestPasswordReset(_state: AuthFormState, form: FormData): Promise<AuthFormState> {
+  const email = String(form.get('email') ?? '').trim().toLowerCase();
+  const values = { email };
+  if (!email) return { error: t('auth.error.required'), values };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: emailRedirectUrl(await getRequestOrigin(), RESET_PASSWORD_PATH),
+  });
+  // 邮箱不存在时 Supabase 同样返回成功；只有发信频率等真实错误才提示，避免暴露邮箱是否已注册。
+  if (error) {
+    console.error('Password reset request failed', error);
+    return { error: t(authErrorMessage(error.code, 'auth.error.resetFailed')), values };
+  }
+  return { notice: t('auth.notice.resetEmailSent') };
+}
+
+export async function updatePassword(_state: AuthFormState, form: FormData): Promise<AuthFormState> {
+  const parsed = parseNewPassword(form);
+  if (!parsed.ok) return { error: t(parsed.error) };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password: parsed.password });
+  if (error) {
+    console.error('Password update failed', error);
+    return { error: t(authErrorMessage(error.code, 'auth.error.resetFailed')) };
+  }
+  redirect('/products');
 }
 
 export async function signOutSeller(): Promise<void> {

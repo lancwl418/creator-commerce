@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import Link from 'next/link';
 import { signInSeller } from '@/lib/sellers/actions';
 import type { AuthFormState } from '@/lib/types/seller';
 import { t } from '@/lib/i18n';
@@ -11,7 +12,7 @@ import AuthSubmitButton from './AuthSubmitButton';
 
 const INITIAL_STATE: AuthFormState = {};
 
-export default function LoginForm({ next }: { next: string }) {
+export default function LoginForm({ next, linkError }: { next: string; linkError: boolean }) {
   const [state, action, pending] = useActionState(signInSeller, INITIAL_STATE);
   return (
     <AuthCard
@@ -25,7 +26,12 @@ export default function LoginForm({ next }: { next: string }) {
         <input type="hidden" name="next" value={next} />
         <AuthField name="email" defaultValue={state.values?.email} type="email" label={t('auth.field.email')} autoComplete="email" />
         <AuthField name="password" type="password" label={t('auth.field.password')} autoComplete="current-password" />
-        <AuthFormStatus state={state} />
+        <div className="text-right -mt-2">
+          <Link href="/forgot-password" className="text-xs text-gray-500 hover:text-gray-900 underline-offset-2 hover:underline">
+            {t('auth.login.forgot')}
+          </Link>
+        </div>
+        <AuthFormStatus state={linkError && !state.error && !state.notice ? { error: t('auth.error.linkExpired') } : state} />
         <AuthSubmitButton pending={pending} label={t('auth.login.submit')} pendingLabel={t('auth.login.pending')} />
       </form>
     </AuthCard>
