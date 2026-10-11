@@ -1,15 +1,8 @@
 import type { DesignEditorPayload } from '@creator-commerce/shared';
 import type { ImportedProductEdit } from '@/lib/types/product-import';
 
-export function parseDesignPayload(value: unknown): DesignEditorPayload {
-  const payload: unknown = typeof value === 'string' ? JSON.parse(value) : value;
-  if (!payload || typeof payload !== 'object' || !('products' in payload)
-    || !Array.isArray(payload.products) || !payload.products.length
-    || !payload.products.every(product => product && typeof product === 'object' && typeof product.template_id === 'string')) {
-    throw new Error('No valid products received from the editor');
-  }
-  return payload as DesignEditorPayload;
-}
+export { parseDesignPayload } from '@creator-commerce/shared/products';
+import { parseDesignPayload } from '@creator-commerce/shared/products';
 
 export function consumeDesignPayload(key: string, allowHash = false): DesignEditorPayload {
   let raw: string | null = null;

@@ -7,7 +7,8 @@ import { getConnectedShopifyStore } from '@/lib/queries/my-products';
 import { requireSeller } from '@/lib/sellers/session';
 import type { SyncPageProps } from '@/lib/types/product';
 import { t } from '@/lib/i18n';
-import BlankSyncForm from '@/components/products/sync/BlankSyncForm';
+import ProductSyncForm from '@/components/products/sync/ProductSyncForm';
+import { syncBlankProduct } from '@/lib/products/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,8 +39,9 @@ export default async function BlankSyncPage({ params }: SyncPageProps) {
           {t('actions.sync.blankUnavailable')}
         </div>
       ) : (
-        <BlankSyncForm
-          erpProductId={product.id}
+        <ProductSyncForm
+          action={syncBlankProduct}
+          hiddenFields={{ erpProductId: product.id }}
           defaultTitle={item.name}
           defaultDescription={product.description ?? ''}
           variants={variants}

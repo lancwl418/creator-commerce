@@ -3,7 +3,7 @@ import { t } from '@/lib/i18n';
 
 /**
  * 产品页两个入口（2026-10-11 方案）：同步店铺（开始设计 / 仅同步白板）、下单（上传设计 / 白板下单）。
- * 目前只有「仅同步白板」可用，其余待后续步骤接入。
+ * 「下单」待支付方案确定后接入。
  */
 export default function ProductActions({ productId, canSyncBlank }: { productId: string; canSyncBlank: boolean }) {
   return (
@@ -21,7 +21,10 @@ export default function ProductActions({ productId, canSyncBlank }: { productId:
               {t('actions.sync.blank')}
             </span>
           )}
-          <span className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-gray-400">{t('actions.sync.design')} · {t('actions.comingSoon')}</span>
+          <Link href={`/products/${productId}/design`}
+            className="rounded-xl border border-gray-900 px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition-all">
+            {t('actions.sync.design')}
+          </Link>
         </div>
         {!canSyncBlank && <p className="mt-1 text-xs text-gray-400">{t('actions.sync.blankUnavailable')}</p>}
       </div>

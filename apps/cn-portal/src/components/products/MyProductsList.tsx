@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { MyProductRow } from '@/lib/types/product';
 import { erpImage } from '@/lib/image';
 import { t } from '@/lib/i18n';
@@ -48,6 +49,11 @@ export default function MyProductsList({ products, highlightId }: { products: My
               <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[product.status] ?? STATUS_STYLES.draft}`}>
                 {t(`myProducts.status.${product.status === 'listed' ? 'listed' : 'notListed'}`)}
               </span>
+              {product.status !== 'listed' && (
+                <Link href={`/my-products/${product.id}/sync`} className="text-sm font-semibold text-gray-900 underline underline-offset-2 whitespace-nowrap">
+                  {t('myProducts.syncNow')}
+                </Link>
+              )}
               {listing?.external_listing_url && (
                 <a href={listing.external_listing_url} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-700 underline underline-offset-2 whitespace-nowrap">
                   {t('myProducts.viewInStore')}

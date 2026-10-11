@@ -11,6 +11,35 @@ const dict = {
   'nav.products': { zh: '选品', en: 'Products' },
   'nav.stores': { zh: '我的店铺', en: 'My store' },
   'nav.myProducts': { zh: '我的产品', en: 'My products' },
+  'nav.orders': { zh: '订单', en: 'Orders' },
+
+  // 订单
+  'orders.title': { zh: '订单', en: 'Orders' },
+  'orders.subtitle': { zh: '你店铺里售出的本平台产品订单', en: 'Orders for platform products sold in your store' },
+  'orders.empty': { zh: '还没有订单。店铺里售出同步的产品后会显示在这里。', en: 'No orders yet. Orders for synced products will show up here.' },
+  'orders.col.order': { zh: '订单', en: 'Order' },
+  'orders.col.items': { zh: '商品', en: 'Items' },
+  'orders.col.customer': { zh: '客户', en: 'Customer' },
+  'orders.col.total': { zh: '金额', en: 'Total' },
+  'orders.col.status': { zh: '状态', en: 'Status' },
+  'orders.moreItems': { zh: '另有 {n} 件商品', en: '+{n} more' },
+  'orders.quantity': { zh: '共 {n} 件', en: '{n} pcs' },
+  'orders.financial.paid': { zh: '已付款', en: 'Paid' },
+  'orders.financial.pending': { zh: '待付款', en: 'Pending' },
+  'orders.financial.partiallyPaid': { zh: '部分付款', en: 'Partially paid' },
+  'orders.financial.refunded': { zh: '已退款', en: 'Refunded' },
+  'orders.financial.voided': { zh: '已作废', en: 'Voided' },
+  'orders.financial.unknown': { zh: '付款状态未知', en: 'Payment unknown' },
+  'orders.fulfillment.fulfilled': { zh: '已发货', en: 'Fulfilled' },
+  'orders.fulfillment.partial': { zh: '部分发货', en: 'Partially fulfilled' },
+  'orders.fulfillment.unfulfilled': { zh: '未发货', en: 'Unfulfilled' },
+
+  // 开始设计
+  'design.title': { zh: '设计产品', en: 'Design product' },
+  'design.back': { zh: '返回产品', en: 'Back to product' },
+  'design.hint': { zh: '在设计器里保存后，会进入售价与同步页面', en: 'After saving in the editor you will set prices and sync' },
+  'design.saving': { zh: '正在保存设计并创建产品…', en: 'Saving design and creating product…' },
+  'design.error.save': { zh: '保存设计失败，请重试', en: 'Failed to save the design, please try again' },
 
   // 产品页入口
   'actions.sync.title': { zh: '同步店铺', en: 'Sync to store' },
@@ -24,6 +53,9 @@ const dict = {
 
   // 仅同步白板
   'sync.title': { zh: '仅同步白板到店铺', en: 'Sync blank product to store' },
+  'sync.designedTitle': { zh: '设置售价并同步到店铺', en: 'Set prices and sync to store' },
+  'sync.section.previews': { zh: '设计预览（自动同步）', en: 'Design previews (synced automatically)' },
+  'sync.noPricedVariants': { zh: '该产品在当前等级没有可用的报价，暂不能同步', en: 'No usable price for your level, cannot sync yet' },
   'sync.back': { zh: '返回产品', en: 'Back to product' },
   'sync.noStore': { zh: '还没有连接 Shopify 店铺，请先连接店铺', en: 'Connect your Shopify store first' },
   'sync.field.title': { zh: '商品标题', en: 'Product title' },
@@ -56,6 +88,7 @@ const dict = {
   'myProducts.status.listed': { zh: '已上架', en: 'Listed' },
   'myProducts.status.notListed': { zh: '未上架', en: 'Not listed' },
   'myProducts.viewInStore': { zh: '在店铺查看', en: 'View in store' },
+  'myProducts.syncNow': { zh: '去同步', en: 'Sync' },
 
   // 店铺连接
   'stores.title': { zh: '我的店铺', en: 'My store' },

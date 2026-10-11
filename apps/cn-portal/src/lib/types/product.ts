@@ -67,6 +67,18 @@ export interface MyProductRow {
   channel_listings: { id: string; status: string; external_listing_url: string | null; creator_store_connections: { store_name: string | null } | null }[] | null;
 }
 
+export interface MyProductDetailRow {
+  id: string;
+  title: string | null;
+  description: string | null;
+  status: string;
+  retail_price: number | null;
+  base_price_suggestion: number | null;
+  product_template_id: string | null;
+  preview_urls: string[] | null;
+  design_artwork_urls: string[] | null;
+}
+
 export interface MyProductsPageProps {
   searchParams: Promise<{ synced?: string | string[] }>;
 }

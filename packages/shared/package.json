@@ -13,10 +13,13 @@
     "./erp/business-lines": "./src/erp/business-lines.ts",
     "./shopify": "./src/shopify/index.ts",
     "./shopify/domain": "./src/shopify/domain.ts",
-    "./shopify/listing-prices": "./src/shopify/listing-prices.ts"
+    "./shopify/listing-prices": "./src/shopify/listing-prices.ts",
+    "./products": "./src/products/index.ts",
+    "./storage/r2": "./src/storage/r2.ts"
   },
   "scripts": {},
   "dependencies": {
+    "@aws-sdk/client-s3": "^3",
     "@supabase/supabase-js": "^2.49.4"
   }
 }

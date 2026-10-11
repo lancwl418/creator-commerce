@@ -1,45 +1,18 @@
 import type { ErpProduct, ErpSku } from '@creator-commerce/shared/erp/types';
 import { resolveOptionDimensions } from '@creator-commerce/shared/erp/options';
-import { resolveTierPriceTables, type SellerTier, type TierPriceRow } from '@creator-commerce/shared/erp/pricing';
+import type { SellerTier } from '@creator-commerce/shared/erp/pricing';
 import type { SkuSelection } from '@creator-commerce/shared/shopify/listing-prices';
 import type { MessageKey } from '../i18n';
 import { erpImage } from '../image';
+import { buildSyncVariants } from './product-sync';
 import type { BlankProductImage, BlankProductInput, BlankProductRow, BlankVariant } from '../types/product';
 
 /** 同步白板时 ERP 产品 id 的模板标识，与 Creator Portal 一致（同步时去掉前缀） */
 export const ERP_TEMPLATE_PREFIX = 'erp-';
 
-function rowCovers(row: TierPriceRow, sku: ErpSku, sizeKey?: keyof ErpSku, colorKey?: keyof ErpSku): boolean {
-  const size = sizeKey ? (sku[sizeKey] as string | null) : null;
-  const color = colorKey ? (sku[colorKey] as string | null) : null;
-  return (!sizeKey || row.sizes.length === 0 || row.sizes.includes(size ?? ''))
-    && (!colorKey || row.colors.length === 0 || row.colors.includes(color ?? ''));
-}
-
-/**
- * 可以作为白板同步的 variant：该等级下有大于 0 的空白件售价（作为成本）。
- * 一个产品有多组定价时，取第一组里有价的那一档；空白件价为 0 或缺失的 variant 不能同步。
- */
+/** 白板可同步的 variant：成本 = 该等级的空白件售价（见 product-sync.ts） */
 export function buildBlankVariants(product: ErpProduct, tier: SellerTier, listableSkus: ErpSku[]): BlankVariant[] {
-  const dimensions = resolveOptionDimensions(product);
-  const sizeKey = dimensions.find((d) => d.isSize)?.key;
-  const colorKey = dimensions.find((d) => d.isColor)?.key;
-  const tables = resolveTierPriceTables(product, tier, listableSkus);
-
-  const variants: BlankVariant[] = [];
-  for (const sku of listableSkus) {
-    let cost: number | null = null;
-    for (const rows of tables) {
-      const row = rows.find((r) => r.blankPrice != null && r.blankPrice > 0 && rowCovers(r, sku, sizeKey, colorKey));
-      if (row) { cost = row.blankPrice; break; }
-    }
-    if (cost == null) continue;
-    variants.push({
-      skuId: sku.id, sku: sku.sku, option1: sku.option1, option2: sku.option2, option3: sku.option3,
-      skuImage: sku.skuImage, cost,
-    });
-  }
-  return variants;
+  return buildSyncVariants(product, tier, listableSkus, false);
 }
 
 export function buildBlankProductImages(product: ErpProduct): BlankProductImage[] {
