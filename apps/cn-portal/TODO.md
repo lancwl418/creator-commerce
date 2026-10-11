@@ -33,8 +33,7 @@
 - [x] **应用 migration 023 / 024**：2026-10-06 已在生产库执行。024 为三张表开启 RLS、只开放读取，
       写入需走服务端密钥。注意 `_migrations` 里没有 020–022 的记录（它们已手动应用），
       直接跑 `pnpm db:migrate` 会重跑这三个，执行前先看 `pnpm db:status`。
-- [ ] **应用 migration 027**（部署本次改动前执行）：给 `cn_sellers` 加 `erp_customer_level_id`、
-      `erp_sync_status`、`erp_sync_error`。未执行时登录会因为读不到 `erp_sync_status` 列而失败。
+- [x] **应用 migration 027 / 028**（2026-10-11 已执行）。
 - [x] **应用 migration 025 / 026**（2026-10-06 已执行）：
       025 给 `cn_seller_tier` 枚举增加 `CN_MERCHANT`，未执行时按该等级查询 `seller_product_visibility`
       会报错（22P02），选品页打不开。026 新建卖家账户表 `cn_sellers`，并修改 auth.users 的注册触发器
@@ -43,7 +42,8 @@
 - [x] **卖家注册 / 登录**：`/register`、`/login`，与 Creator Portal 共用 Supabase Auth。选品页需要登录
       （`src/proxy.ts`），价格等级取自 `cn_sellers.seller_tier`（`requireSeller`），cookie 占位已删除。
       新账户一律是 `CN_MERCHANT`；卖家不能自己改等级（表对登录用户只读）。
-- [ ] **调整卖家等级的入口**：目前只能由运营直接改 `cn_sellers.seller_tier`，没有后台界面。
+- [x] **调整卖家等级的入口**：Admin 后台 `/dashboard/cn-sellers` 列出卖家、可改等级、显示 ERP 同步状态
+      （migration 028 给 admin 加读写策略）。等级改动暂不回写 ERP，等「编辑客户」接口授权后再做。
 - [ ] **已有 Creator Portal 账号的邮箱不能再注册卖家**：两边共用登录体系，同一邮箱只有一个用户；
       这类用户登录 cn-portal 会提示「该账户未开通卖家平台」。需要时再做「为已有账号开通卖家」。
 - [x] **找回密码**：`/forgot-password` 发重设邮件，`/reset-password` 设新密码；邮件链接落到 `/auth/confirm`
@@ -60,8 +60,7 @@
       需要 ERP 侧：① 给 appKey 授权 `RIv0P9vK`（后续编辑客户 `9EqmqMxD` 也要）；② 确认必填字段——示例说 11 个，
       注册只收集公司名、联系人、手机号、邮箱，请求体不编造地址等；③ 确认 `sysOrgCode`（文档 A02A04，
       现有客户记录都是 A02A01）和客户分类 `custSortId`。字段名以现有客户记录为准：等级是 `custStageId / vipStage`。
-- [ ] **可见性表按等级收紧 RLS**：三张表的 RLS 已由 migration 024 开启（任何人可读、仅服务端密钥可写）；
-      `seller_product_visibility` 目前所有等级的行都可读，可改为只读自己等级的行。
+- [x] **可见性表按等级收紧 RLS**：migration 028 后 `seller_product_visibility` 只读本人等级的行（admin 可读全部）。
 - [x] **详情页 variant 精确价**：详情页新增「价格明细」表，按「尺码档 × 色档」列出该等级的空白件售价
       和各工艺单面 / 双面印花售价（`resolveTierPriceTables`）。只列可上架 SKU 覆盖到的尺码和颜色。
       起价与明细同源：空白件售价改为优先取色档价（`colorPrices`），此前只取尺码档的 `blankPrice`。

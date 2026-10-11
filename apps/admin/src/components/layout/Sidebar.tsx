@@ -16,6 +16,7 @@ const navSections = [
     items: [
       { href: '/dashboard/creators', label: 'Creator Management', icon: UsersIcon },
       { href: '/dashboard/recruitment', label: 'Recruitment', icon: MegaphoneIcon },
+      { href: '/dashboard/cn-sellers', label: 'CN Sellers', icon: UsersIcon },
     ],
   },
   {
