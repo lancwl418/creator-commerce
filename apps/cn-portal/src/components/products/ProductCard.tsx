@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import type { CatalogItem } from '@/lib/types/catalog';
 import { erpImage } from '@/lib/image';
@@ -7,7 +6,8 @@ import ProductPrice from './ProductPrice';
 import MoqHint from './MoqHint';
 
 export default function ProductCard({ item }: { item: CatalogItem }) {
-  const img = erpImage(item.imagePath);
+  // ERP 主图动辄 500KB 的 PNG，一页 40 张；代理层缩成卡片尺寸的小 webp 并缓存到 R2（见 api/erp/image）
+  const img = erpImage(item.imagePath, 480);
   return (
     <Link
       href={`/products/${item.id}`}
@@ -15,13 +15,13 @@ export default function ProductCard({ item }: { item: CatalogItem }) {
     >
       <div className="aspect-square bg-surface-secondary flex items-center justify-center">
         {img ? (
-          // ERP 主图动辄 500KB 的 PNG，一页 40 张；经 next/image 缩成卡片尺寸的 webp 并在服务端缓存
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element -- 走 R2 缓存的缩略图，不用 Next 优化器（免费实例缓存会丢）
+          <img
             src={img}
             alt={item.name}
             width={320}
             height={320}
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
+            loading="lazy"
             className="w-full h-full object-contain p-4"
           />
         ) : (
