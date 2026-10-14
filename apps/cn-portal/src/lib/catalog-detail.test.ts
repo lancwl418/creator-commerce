@@ -25,21 +25,21 @@ const options = [
 ];
 
 describe('详情页属性表', () => {
-  it('每个变体维度一行，值只取可上架 SKU 且去重', () => {
-    const view = buildProductDetailView(product({ options }), item, data, 'VIP');
+  it('每个变体维度一行，值取全部 SKU 并去重（不再过滤隐藏/无货）', () => {
+    const view = buildProductDetailView(product({ options }), item, data);
     expect(view.attributes).toEqual([
-      { label: 'Color', value: 'Black' },
-      { label: 'Size', value: 'M, L' },
+      { label: 'Color', value: 'Black, Pink' },
+      { label: 'Size', value: 'M, L, XL' },
     ]);
   });
 
   it('主档 option 名称为空或顺序相反时，仍按 options[] 标注', () => {
-    const view = buildProductDetailView(product({ options, option1: 'Size', option2: 'Color' }), item, data, 'VIP');
+    const view = buildProductDetailView(product({ options, option1: 'Size', option2: 'Color' }), item, data);
     expect(view.attributes.map((a) => a.label)).toEqual(['Color', 'Size']);
   });
 
   it('没有值的维度不显示', () => {
-    expect(buildProductDetailView(product({ option3: 'Material' }), item, data, 'VIP').attributes).toEqual([]);
+    expect(buildProductDetailView(product({ option3: 'Material' }), item, data).attributes).toEqual([]);
   });
 });
 

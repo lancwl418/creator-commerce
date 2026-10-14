@@ -23,7 +23,7 @@ export default async function MyProductSyncPage({ params }: SyncPageProps) {
   if (!product) notFound();
 
   const designed = (row.design_artwork_urls?.length ?? 0) > 0 || (row.preview_urls?.length ?? 0) > 0;
-  const variants = buildSyncVariants(product, seller.tier, getListableSkus(product, data), designed ? 1 : false);
+  const variants = buildSyncVariants(product, getListableSkus(product, data), designed ? 1 : false);
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">

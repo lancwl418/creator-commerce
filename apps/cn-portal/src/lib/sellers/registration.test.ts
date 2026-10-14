@@ -84,6 +84,6 @@ describe('卖家账户', () => {
   });
 
   it('账户上是代码不认识的等级时报错，不默认成某个等级', () => {
-    expect(() => toSeller({ ...row, seller_tier: 'RETAIL' })).toThrow('Unknown seller tier: RETAIL');
+    expect(() => toSeller({ ...row, seller_tier: 'GOLD' })).toThrow('Unknown seller tier: GOLD');
   });
 });

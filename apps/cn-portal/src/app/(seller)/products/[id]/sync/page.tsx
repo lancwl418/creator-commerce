@@ -17,9 +17,9 @@ export default async function BlankSyncPage({ params }: SyncPageProps) {
   const seller = await requireSeller();
   const [{ product, data }, store] = await Promise.all([getProductDetail(id, seller.tier), getConnectedShopifyStore(seller.id)]);
   if (!product) notFound();
-  const item = getCatalogItem(product, seller.tier, data);
+  const item = getCatalogItem(product, data);
   if (!item) notFound();
-  const variants = buildBlankVariants(product, seller.tier, getListableSkus(product, data));
+  const variants = buildBlankVariants(product, getListableSkus(product, data));
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">

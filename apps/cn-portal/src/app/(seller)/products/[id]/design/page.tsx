@@ -17,7 +17,7 @@ export default async function DesignPage({ params, searchParams }: SyncPageProps
   const [{ id }, { intent }] = await Promise.all([params, searchParams]);
   const seller = await requireSeller();
   const { product, data } = await getProductDetail(id, seller.tier);
-  if (!product || !getCatalogItem(product, seller.tier, data)) notFound();
+  if (!product || !getCatalogItem(product, data)) notFound();
 
   const origin = await getRequestOrigin();
   const editorUrl = buildEmbeddedEditorUrl(`${ERP_TEMPLATE_PREFIX}${product.id}`, cacheProductsForEditor([product]), origin);

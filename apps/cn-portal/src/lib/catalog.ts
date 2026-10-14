@@ -1,32 +1,24 @@
 import type { ErpProduct, ErpSku } from '@creator-commerce/shared/erp/types';
 import { type SellerTier, resolveProductTierPrice } from '@creator-commerce/shared/erp/pricing';
-import { CHINA_MERCHANT_BUSINESS_LINE, productSupportsBusinessLine } from '@creator-commerce/shared/erp/business-lines';
 import type {
-  CatalogItem, CatalogResult, CatalogFilters, CatalogPage, MissingPriceProduct, PlatformData,
+  CatalogItem, CatalogResult, CatalogFilters, CatalogPage, PlatformData,
 } from './types/catalog';
 
-export type { CatalogItem, CatalogResult, CatalogFilters, MissingPriceProduct, PlatformData, SortKey } from './types/catalog';
+export type { CatalogItem, CatalogResult, CatalogFilters, PlatformData, SortKey } from './types/catalog';
 
-/** 平台只卖 ERP 里开放给「中国商家」业务线的产品。 */
-export function isOfferedToCnSellers(product: ErpProduct): boolean {
-  return productSupportsBusinessLine(product, CHINA_MERCHANT_BUSINESS_LINE);
-}
+/**
+ * cn-portal 目录统一按 VIP 价展示 / 计价（VIP 缺价回落「零售」，见 pricing.ts 的 TIER_PRICE_FALLBACK）。
+ * 卖家 seller_tier 不参与计价，仅用于 ERP 客户同步。
+ */
+export const CN_PRICE_TIER: SellerTier = 'VIP';
 
 function getCategory(p: ErpProduct): string {
   return p.category || p.categoryName || p.productType || '';
 }
 
-function isStockKnownInStock(sku: string, data: PlatformData): boolean {
-  // 引导态：还没有任何库存快照 → 不做库存过滤，全部按有货处理
-  if (data.stock.size === 0) return true;
-  return data.stock.get(sku) === true;
-}
-
-/** 列表和详情共用同一套 SKU 可见性/库存规则。 */
-export function getListableSkus(product: ErpProduct, data: PlatformData): ErpSku[] {
-  return (product.prodSkuList ?? []).filter(
-    (sku) => !data.hiddenSkusForTier.has(sku.sku) && isStockKnownInStock(sku.sku, data)
-  );
+/** 产品可选的 SKU。不再按可见性 / 库存过滤——ERP 返回什么就是什么。 */
+export function getListableSkus(product: ErpProduct, _data?: PlatformData): ErpSku[] {
+  return product.prodSkuList ?? [];
 }
 
 export function getMoqQty(skus: ErpSku[], data: PlatformData): number | null {
@@ -37,15 +29,10 @@ export function getMoqQty(skus: ErpSku[], data: PlatformData): number | null {
   return null;
 }
 
-export function getCatalogItem(
-  product: ErpProduct,
-  tier: SellerTier,
-  data: PlatformData
-): CatalogItem | null {
-  if (!isOfferedToCnSellers(product)) return null;
-  const price = resolveProductTierPrice(product, tier);
+/** 组装单个产品的列表项。价格按 VIP 取（缺价回落零售），取不到为 null（照常显示，不隐藏）。 */
+export function getCatalogItem(product: ErpProduct, data: PlatformData): CatalogItem {
+  const price = resolveProductTierPrice(product, CN_PRICE_TIER);
   const listableSkus = getListableSkus(product, data);
-  if (!price || listableSkus.length === 0) return null;
 
   return {
     id: product.id,
@@ -53,8 +40,8 @@ export function getCatalogItem(
     name: product.itemEnName || product.title || product.itemCnName,
     imagePath: product.mainPic || product.prodImageList?.find((i) => i.isMain === 1)?.picSrc || null,
     category: getCategory(product),
-    fromPrice: price.min,
-    maxPrice: price.max,
+    fromPrice: price?.min ?? null,
+    maxPrice: price?.max ?? null,
     inStock: true,
     moqQty: getMoqQty(listableSkus, data),
   };
@@ -63,42 +50,11 @@ export function getCatalogItem(
 /**
  * 把 ERP 产品 + 平台数据组装成选品列表。
  *
- * 规则（文档 4.1 / 4.2 / 4.4）：
- *  - 业务线：只收 ERP 里开放给「中国商家」业务线的产品，其余不显示也不进缺价清单；
- *  - 分层取价：产品在该等级缺价 → 不显示，且记入缺价清单；
- *  - 可见性：该等级下被隐藏的 SKU 不计入（缺行=可见）；
- *  - 库存：无货 SKU 不计入（无货产品不出现在列表）；
- *  - 产品在「有 ≥1 个 可见 + 有货 的 SKU」且「该等级有价」时才上架，
- *    from 价取该等级价格区间的最低值。
+ * 不做任何显示限制：ERP 列表接口只返回审核完成的产品，这里原样全显示
+ * （不按业务线 / 缺价 / 库存 / SKU 可见性过滤）。价格统一按 VIP（缺价回落零售）。
  */
-export function buildCatalog(
-  products: ErpProduct[],
-  tier: SellerTier,
-  data: PlatformData
-): CatalogResult {
-  const items: CatalogItem[] = [];
-  const missingPriceProducts: MissingPriceProduct[] = [];
-
-  for (const p of products) {
-    if (!isOfferedToCnSellers(p)) continue;
-    const item = getCatalogItem(p, tier, data);
-    if (item) {
-      items.push(item);
-      continue;
-    }
-    // 该等级下的价格（POD 为产品+等级级）
-    const price = resolveProductTierPrice(p, tier);
-    if (price == null) {
-      missingPriceProducts.push({
-        productId: p.id,
-        itemNo: p.itemNo,
-        productName: p.itemEnName || p.title,
-      });
-      continue; // 缺价 → 不显示
-    }
-  }
-
-  return { items, missingPriceProducts };
+export function buildCatalog(products: ErpProduct[], data: PlatformData): CatalogResult {
+  return { items: products.map((p) => getCatalogItem(p, data)) };
 }
 
 // ── 列表筛选 / 排序（文档 5.1，在已组装的 items 上做） ──

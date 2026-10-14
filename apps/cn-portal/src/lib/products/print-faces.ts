@@ -1,5 +1,6 @@
 import type { ErpProduct } from '@creator-commerce/shared/erp/types';
-import { resolveTierPriceTables, type SellerTier } from '@creator-commerce/shared/erp/pricing';
+import { resolveTierPriceTables } from '@creator-commerce/shared/erp/pricing';
+import { CN_PRICE_TIER } from '../catalog';
 
 /** 印刷面：ERP printPositions 里的位置名（front / back / left / right / full …） */
 export interface PrintFace {
@@ -24,10 +25,10 @@ export function getPrintPositions(product: Pick<ErpProduct, 'printPositions'>): 
   return faces.length > 0 ? [...new Set(faces)] : DEFAULT_FACES;
 }
 
-/** 该等级下报了几面的印花价（face_1 … face_N 的最大 N） */
-export function getPricedFaceCount(product: ErpProduct, tier: SellerTier): number {
+/** VIP 下报了几面的印花价（face_1 … face_N 的最大 N） */
+export function getPricedFaceCount(product: ErpProduct): number {
   let max = 0;
-  for (const rows of resolveTierPriceTables(product, tier)) {
+  for (const rows of resolveTierPriceTables(product, CN_PRICE_TIER)) {
     for (const row of rows) {
       for (const craft of row.prints) for (const face of craft.faces) max = Math.max(max, face.faces);
     }
@@ -36,8 +37,8 @@ export function getPricedFaceCount(product: ErpProduct, tier: SellerTier): numbe
 }
 
 /** 可以上传设计的面：印刷位置列表，裁到有报价的面数以内 */
-export function getUploadableFaces(product: ErpProduct, tier: SellerTier): PrintFace[] {
+export function getUploadableFaces(product: ErpProduct): PrintFace[] {
   const positions = getPrintPositions(product);
-  const priced = getPricedFaceCount(product, tier);
+  const priced = getPricedFaceCount(product);
   return positions.slice(0, Math.max(0, priced)).map((face) => ({ face }));
 }

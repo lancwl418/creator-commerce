@@ -1,7 +1,8 @@
 import type { ErpProduct, ErpSku } from '@creator-commerce/shared/erp/types';
 import { resolveOptionDimensions } from '@creator-commerce/shared/erp/options';
-import { resolveTierPriceTables, type SellerTier, type TierPriceRow } from '@creator-commerce/shared/erp/pricing';
+import { resolveTierPriceTables, type TierPriceRow } from '@creator-commerce/shared/erp/pricing';
 import type { SkuSelection } from '@creator-commerce/shared/shopify/listing-prices';
+import { CN_PRICE_TIER } from '../catalog';
 import { erpImage } from '../image';
 import type { BlankProductImage, BlankProductInput, BlankVariant } from '../types/product';
 
@@ -34,11 +35,11 @@ export type PrintFaces = false | number;
  * - 带设计（N 面）：成本 = 空白件售价 + 第一种工艺 N 面的印花价（1 面即目录起价口径），
  *   一个产品有多组定价时取第一组有价的档位。
  */
-export function buildSyncVariants(product: ErpProduct, tier: SellerTier, listableSkus: ErpSku[], print: PrintFaces): BlankVariant[] {
+export function buildSyncVariants(product: ErpProduct, listableSkus: ErpSku[], print: PrintFaces): BlankVariant[] {
   const dimensions = resolveOptionDimensions(product);
   const sizeKey = dimensions.find((d) => d.isSize)?.key;
   const colorKey = dimensions.find((d) => d.isColor)?.key;
-  const tables = resolveTierPriceTables(product, tier, listableSkus);
+  const tables = resolveTierPriceTables(product, CN_PRICE_TIER, listableSkus);
 
   const variants: BlankVariant[] = [];
   for (const sku of listableSkus) {

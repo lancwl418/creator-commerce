@@ -19,7 +19,7 @@ export async function addToCart(_state: BulkOrderFormState, form: FormData): Pro
   const { product, data } = await getProductDetail(erpProductId, seller.tier);
   if (!product) return { error: t('detail.notFound') };
 
-  const variants = buildBlankVariants(product, seller.tier, getListableSkus(product, data));
+  const variants = buildBlankVariants(product, getListableSkus(product, data));
   const items: { sku_id: string; quantity: number }[] = [];
   for (const variant of variants) {
     const raw = String(form.get(`qty:${variant.skuId}`) ?? '').trim();

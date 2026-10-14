@@ -1,6 +1,5 @@
 import type { ErpProduct, ErpSku } from '@creator-commerce/shared/erp/types';
 import { resolveOptionDimensions } from '@creator-commerce/shared/erp/options';
-import type { SellerTier } from '@creator-commerce/shared/erp/pricing';
 import type { SkuSelection } from '@creator-commerce/shared/shopify/listing-prices';
 import type { MessageKey } from '../i18n';
 import { erpImage } from '../image';
@@ -10,9 +9,9 @@ import type { BlankProductImage, BlankProductInput, BlankProductRow, BlankVarian
 /** 同步白板时 ERP 产品 id 的模板标识，与 Creator Portal 一致（同步时去掉前缀） */
 export const ERP_TEMPLATE_PREFIX = 'erp-';
 
-/** 白板可同步的 variant：成本 = 该等级的空白件售价（见 product-sync.ts） */
-export function buildBlankVariants(product: ErpProduct, tier: SellerTier, listableSkus: ErpSku[]): BlankVariant[] {
-  return buildSyncVariants(product, tier, listableSkus, false);
+/** 白板可同步的 variant：成本 = VIP 的空白件售价（见 product-sync.ts） */
+export function buildBlankVariants(product: ErpProduct, listableSkus: ErpSku[]): BlankVariant[] {
+  return buildSyncVariants(product, listableSkus, false);
 }
 
 export function buildBlankProductImages(product: ErpProduct): BlankProductImage[] {

@@ -102,6 +102,12 @@ describe('尺码档 × 色档价格明细', () => {
     expect(resolveProductTierPrice(sweatshirt(), 'CN_MERCHANT')).toEqual({ min: 6, max: 11 });
   });
 
+  it('产品没有 VIP 定价组时，VIP 按「零售」取价；VIP 和零售都没有才缺价', () => {
+    const retail = { ...sweatshirt().pricingGroups![0], name: '零售' };
+    expect(resolveProductTierPrice(sweatshirt({ pricingGroups: [retail] }), 'VIP')).toEqual({ min: 6, max: 11 });
+    expect(resolveProductTierPrice(sweatshirt({ pricingGroups: [{ ...retail, name: '批发' }] }), 'VIP')).toBeNull();
+  });
+
   it('产品配了「中国商家」定价组时用该组，不再用 VIP', () => {
     const vip = sweatshirt().pricingGroups![0];
     const cnMerchant = {

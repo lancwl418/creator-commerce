@@ -11,7 +11,7 @@ export async function priceCartItems(items: CartItemRow[], tier: SellerTier): Pr
   await Promise.all(productIds.map(async (erpProductId) => {
     const { product, data } = await getProductDetail(erpProductId, tier);
     if (!product) return;
-    for (const variant of buildSyncVariants(product, tier, getListableSkus(product, data), false)) {
+    for (const variant of buildSyncVariants(product, getListableSkus(product, data), false)) {
       costBySku.set(variant.skuId, variant.cost);
     }
   }));

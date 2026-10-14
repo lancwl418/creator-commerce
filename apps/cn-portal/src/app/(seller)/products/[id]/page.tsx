@@ -18,10 +18,10 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   const { tier } = await requireSeller();
   const { product, data } = await getProductDetail(id, tier);
   if (!product) notFound();
-  const item = getCatalogItem(product, tier, data);
+  const item = getCatalogItem(product, data);
   if (!item) notFound();
-  const details = buildProductDetailView(product, item, data, tier);
-  const canSyncBlank = buildBlankVariants(product, tier, getListableSkus(product, data)).length > 0;
+  const details = buildProductDetailView(product, item, data);
+  const canSyncBlank = buildBlankVariants(product, getListableSkus(product, data)).length > 0;
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">

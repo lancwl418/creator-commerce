@@ -22,17 +22,8 @@ export interface CatalogItem {
   moqQty: number | null;
 }
 
-// POD 定价是「产品 + 等级」级（SKU 无独立价），缺价清单按产品记
-export interface MissingPriceProduct {
-  productId: string;
-  itemNo: string;
-  productName: string;
-}
-
 export interface CatalogResult {
   items: CatalogItem[];
-  /** 该等级下缺价的产品（进后台缺价清单，文档 4.1） */
-  missingPriceProducts: MissingPriceProduct[];
 }
 
 export type SortKey = 'newest' | 'price_asc' | 'price_desc';

@@ -26,15 +26,11 @@ const product = {
 
 describe('同步 variant 的成本', () => {
   it('白板：只认大于 0 的空白件价', () => {
-    expect(buildSyncVariants(product, 'VIP', product.prodSkuList, false).map((v) => [v.sku, v.cost])).toEqual([['B-S', 5]]);
+    expect(buildSyncVariants(product, product.prodSkuList, false).map((v) => [v.sku, v.cost])).toEqual([['B-S', 5]]);
   });
 
   it('带设计：空白件价 + 对应面数的印花价；没有该面数的价就不可用', () => {
-    expect(buildSyncVariants(product, 'VIP', product.prodSkuList, 1).map((v) => [v.sku, v.cost])).toEqual([['W-S', 8]]);
-    expect(buildSyncVariants(product, 'VIP', product.prodSkuList, 2).map((v) => [v.sku, v.cost])).toEqual([['B-S', 8]]);
-  });
-
-  it('中国商家等级没有定价组时按 VIP 兜底', () => {
-    expect(buildSyncVariants(product, 'CN_MERCHANT', product.prodSkuList, 1)).toHaveLength(1);
+    expect(buildSyncVariants(product, product.prodSkuList, 1).map((v) => [v.sku, v.cost])).toEqual([['W-S', 8]]);
+    expect(buildSyncVariants(product, product.prodSkuList, 2).map((v) => [v.sku, v.cost])).toEqual([['B-S', 8]]);
   });
 });

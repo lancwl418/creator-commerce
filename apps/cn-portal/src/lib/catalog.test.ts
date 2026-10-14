@@ -108,43 +108,30 @@ describe('resolveProductTierPrice · 分级取价（验收 #1）', () => {
   });
 });
 
-describe('buildCatalog · 缺价过滤（验收 #5）', () => {
-  it('缺价产品不显示，且进缺价清单', () => {
+describe('buildCatalog · 不做任何显示限制', () => {
+  it('缺价产品照常显示，fromPrice 为 null', () => {
     const p = product({ id: 'p1', pricingGroups: [group('批发', 9.62)] });
-    const res = buildCatalog([p], 'VIP', emptyData());
-    expect(res.items).toHaveLength(0);
-    expect(res.missingPriceProducts).toEqual([
-      { productId: 'p1', itemNo: 'ITEM-1', productName: 'Gildan Tee' },
-    ]);
-  });
-});
-
-describe('buildCatalog · 库存过滤（验收 #3）', () => {
-  const p = product({ id: 'p1', pricingGroups: [group('VIP', 5)] });
-
-  it('库存空表 = 引导态，不过滤', () => {
-    expect(buildCatalog([p], 'VIP', emptyData()).items).toHaveLength(1);
+    const res = buildCatalog([p], emptyData());
+    expect(res.items).toHaveLength(1);
+    expect(res.items[0]).toMatchObject({ id: 'p1', fromPrice: null, maxPrice: null });
   });
 
-  it('有快照且标记无货 → 不出现', () => {
-    const data = emptyData();
-    data.stock.set('s1', false);
-    expect(buildCatalog([p], 'VIP', data).items).toHaveLength(0);
-  });
-
-  it('有快照且有货 → 出现', () => {
-    const data = emptyData();
-    data.stock.set('s1', true);
-    expect(buildCatalog([p], 'VIP', data).items).toHaveLength(1);
-  });
-});
-
-describe('buildCatalog · 可见性', () => {
-  it('该等级隐藏所有 SKU → 产品不出现', () => {
+  it('无货 / 被隐藏的 SKU 不再过滤，产品照常出现', () => {
     const p = product({ id: 'p1', pricingGroups: [group('VIP', 5)] });
     const data = emptyData();
+    data.stock.set('s1', false);
     data.hiddenSkusForTier.add('s1');
-    expect(buildCatalog([p], 'VIP', data).items).toHaveLength(0);
+    expect(buildCatalog([p], data).items).toHaveLength(1);
+  });
+
+  it('价格按 VIP 取（缺价回落零售）', () => {
+    const p = product({ id: 'p1', pricingGroups: [group('VIP', 8), group('零售', 12)] });
+    expect(buildCatalog([p], emptyData()).items[0]).toMatchObject({ fromPrice: 8, maxPrice: 8 });
+  });
+
+  it('产品没有 VIP 组时回落零售价', () => {
+    const p = product({ id: 'p1', pricingGroups: [group('零售', 12)] });
+    expect(buildCatalog([p], emptyData()).items[0]).toMatchObject({ fromPrice: 12, maxPrice: 12 });
   });
 });
 
@@ -171,11 +158,11 @@ describe('applyFilters', () => {
 
 
 describe('选品规则回归', () => {
-  it('有等级组但 VIP 缺价时不回退到通用 SKU 价', () => {
+  it('有等级组但 VIP 缺价时不回退到通用 SKU 价（价格为 null，但产品仍显示）', () => {
     const p = product({ id: 'p1', pricingGroups: [group('批发', 9)], prodSkuList: [sku({ sku: 's1', price: 1 })] });
     expect(resolveProductTierPrice(p, 'VIP')).toBeNull();
-    expect(buildCatalog([p], 'VIP', emptyData()).items).toHaveLength(0);
-    expect(getCatalogItem(p, 'VIP', emptyData())).toBeNull();
+    expect(buildCatalog([p], emptyData()).items).toHaveLength(1);
+    expect(getCatalogItem(p, emptyData())).toMatchObject({ id: 'p1', fromPrice: null });
   });
 
   it('POD 缺少等级组时不回退到通用价', () => {
@@ -197,50 +184,43 @@ describe('选品规则回归', () => {
     expect(resolveProductTierPrice(p, 'VIP')).toEqual({ min: 0, max: 0 });
   });
 
-  it('列表与详情 MOQ 只取可见且有货的 SKU', () => {
+  it('MOQ 取第一个有起订量的 SKU（不再排除隐藏/无货）', () => {
     const p = product({ id: 'p1', pricingGroups: [group('VIP', 5)], prodSkuList: [sku({ sku: 'hidden' }), sku({ sku: 'available' })] });
     const data = emptyData();
-    data.hiddenSkusForTier.add('hidden');
     data.moq.set('hidden', { minQty: 100, minAmount: null });
     data.moq.set('available', { minQty: 10, minAmount: null });
-    const item = getCatalogItem(p, 'VIP', data);
-    expect(item?.moqQty).toBe(10);
-    expect(buildCatalog([p], 'VIP', data).items).toEqual([item]);
+    const item = getCatalogItem(p, data);
+    expect(item.moqQty).toBe(100);
+    expect(buildCatalog([p], data).items).toEqual([item]);
   });
 
-  it('全隐藏或无货产品详情不再泄露价格与属性', () => {
+  it('无货 / 被隐藏的产品详情照常返回', () => {
     const p = product({ id: 'p1', pricingGroups: [group('VIP', 5)] });
     const hidden = emptyData();
     hidden.hiddenSkusForTier.add('s1');
-    expect(getCatalogItem(p, 'VIP', hidden)).toBeNull();
+    expect(getCatalogItem(p, hidden)).toMatchObject({ id: 'p1', fromPrice: 5 });
     const outOfStock = emptyData();
     outOfStock.stock.set('s1', false);
-    expect(getCatalogItem(p, 'VIP', outOfStock)).toBeNull();
+    expect(getCatalogItem(p, outOfStock)).toMatchObject({ id: 'p1', fromPrice: 5 });
   });
 });
 
-describe('业务线：只卖开放给中国商家的产品', () => {
-  it('没有 chinamerchant 业务线的产品不显示，也不进缺价清单', () => {
+describe('不按业务线过滤：所有产品都显示', () => {
+  it('没有 chinamerchant 业务线的产品同样显示', () => {
     const offered = product({ id: 'p1', pricingGroups: [group('VIP', 5)] });
     const other = product({ id: 'p2', prodSupport: '["ideamax","ghostly","promo"]', pricingGroups: [group('VIP', 5)] });
-    const otherNoPrice = product({ id: 'p3', prodSupport: '["ideamax"]', pricingGroups: [group('批发', 5)] });
+    const noPrice = product({ id: 'p3', prodSupport: '["ideamax"]', pricingGroups: [group('批发', 5)] });
 
-    const res = buildCatalog([offered, other, otherNoPrice], 'VIP', emptyData());
-    expect(res.items.map((i) => i.id)).toEqual(['p1']);
-    expect(res.missingPriceProducts).toEqual([]);
-    expect(getCatalogItem(other, 'VIP', emptyData())).toBeNull();
+    const res = buildCatalog([offered, other, noPrice], emptyData());
+    expect(res.items.map((i) => i.id)).toEqual(['p1', 'p2', 'p3']);
+    expect(getCatalogItem(other, emptyData())).toMatchObject({ id: 'p2', fromPrice: 5 });
   });
 
-  it('prodSupport 缺失或无法解析时按不开放处理', () => {
+  it('prodSupport 缺失 / 无法解析时也照常显示', () => {
     for (const prodSupport of [null, undefined, '', 'chinamerchant', '{"chinamerchant":true}']) {
       const p = product({ id: 'p1', prodSupport, pricingGroups: [group('VIP', 5)] });
-      expect(getCatalogItem(p, 'VIP', emptyData())).toBeNull();
+      expect(getCatalogItem(p, emptyData())).toMatchObject({ id: 'p1' });
     }
-  });
-
-  it('prodSupport 已经是数组时同样识别', () => {
-    const p = product({ id: 'p1', prodSupport: ['chinamerchant'], pricingGroups: [group('VIP', 5)] });
-    expect(getCatalogItem(p, 'VIP', emptyData())).not.toBeNull();
   });
 });
 

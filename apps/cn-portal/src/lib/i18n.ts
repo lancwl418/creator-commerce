@@ -265,6 +265,7 @@ const dict = {
   'tier.VIP': { zh: 'VIP 等级价', en: 'VIP price' },
   'tier.WHOLESALE': { zh: '批发商等级价', en: 'Wholesale price' },
   'tier.CN_MERCHANT': { zh: '中国商家等级价', en: 'China merchant price' },
+  'tier.RETAIL': { zh: '零售价', en: 'Retail price' },
 
   // 注册 / 登录
   'auth.login.title': { zh: '登录选品平台', en: 'Sign in' },

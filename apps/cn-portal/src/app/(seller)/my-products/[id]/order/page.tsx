@@ -22,7 +22,7 @@ export default async function DesignedOrderPage({ params }: SyncPageProps) {
   if (!row) notFound();
   const { product, data } = await getProductDetail((row.product_template_id ?? '').replace(ERP_TEMPLATE_PREFIX, ''), seller.tier);
   if (!product) notFound();
-  const variants = buildSyncVariants(product, seller.tier, getListableSkus(product, data), 1);
+  const variants = buildSyncVariants(product, getListableSkus(product, data), 1);
   const moqBySku = Object.fromEntries(variants.map((v) => [v.sku, data.moq.get(v.sku)?.minQty ?? null]));
 
   return (

@@ -19,7 +19,7 @@ const product = {
     { code: '4XL', memberSizes: ['4XL'], colorTiers: [{ id: 'ct_w', code: 'White', memberColors: ['White'] }] },
   ] }],
   pricingGroups: [{
-    name: '中国商家', mode: 'multiplier', multiplier: 1.2, printMode: 'multiplier', printMultiplier: 1.2,
+    name: 'VIP', mode: 'multiplier', multiplier: 1.2, printMode: 'multiplier', printMultiplier: 1.2,
     customerLevelId: 'lvl', supplierId: 's', supplierName: 'A', supplierQuoteId: 'q1',
     pricingTiers: [
       { tierCode: 'S~M', memberSizes: ['S', 'M'], blankPrice: 4, colorPrices: { ct_w: 4, ct_b: 5 } },
@@ -39,7 +39,7 @@ function form(entries: Record<string, string | string[]>): FormData {
 
 describe('仅同步白板', () => {
   it('成本取该等级的空白件价（色档价优先）；空白件价为 0 的 variant 不能同步', () => {
-    const variants = buildBlankVariants(product, 'CN_MERCHANT', product.prodSkuList);
+    const variants = buildBlankVariants(product, product.prodSkuList);
     expect(variants.map((v) => [v.sku, v.cost])).toEqual([['W-S', 4], ['B-S', 5]]);
   });
 
@@ -51,7 +51,7 @@ describe('仅同步白板', () => {
   });
 
   it('表单：标题、正数售价、至少一个 variant；覆盖价只收合法数字', () => {
-    const variants = buildBlankVariants(product, 'CN_MERCHANT', product.prodSkuList);
+    const variants = buildBlankVariants(product, product.prodSkuList);
     const images = buildBlankProductImages(product);
     expect(parseBlankProductForm(form({ title: '', retailPrice: '10', enabledSku: 'id-W-S' }), variants, images)).toEqual({ ok: false, error: 'sync.error.titleRequired' });
     expect(parseBlankProductForm(form({ title: 'T', retailPrice: '0', enabledSku: 'id-W-S' }), variants, images)).toEqual({ ok: false, error: 'sync.error.priceInvalid' });
@@ -63,7 +63,7 @@ describe('仅同步白板', () => {
   });
 
   it('产品记录：erp- 模板前缀、按 SKU 字段顺序的选项名、成本为启用 variant 的最低价', () => {
-    const variants = buildBlankVariants(product, 'CN_MERCHANT', product.prodSkuList);
+    const variants = buildBlankVariants(product, product.prodSkuList);
     const images = buildBlankProductImages(product);
     const row = buildBlankProductRow('creator-1', product, variants, images, {
       title: 'T', description: 'd', retailPrice: 10, variantPrices: { 'id-B-S': 12 }, enabledSkuIds: ['id-B-S'], selectedImageIds: ['img-0'], publishStatus: 'active',

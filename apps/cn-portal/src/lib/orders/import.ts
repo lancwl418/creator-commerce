@@ -112,7 +112,7 @@ export function resolveImportGroups(lines: ImportLine[], context: ResolveContext
   function costFor(lookup: SkuLookup): number | null {
     let bySku = costCache.get(lookup.product.id);
     if (!bySku) {
-      bySku = new Map(buildSyncVariants(lookup.product, context.tier, getListableSkus(lookup.product, context.platformData), false).map((v) => [v.skuId, v.cost]));
+      bySku = new Map(buildSyncVariants(lookup.product, getListableSkus(lookup.product, context.platformData), false).map((v) => [v.skuId, v.cost]));
       costCache.set(lookup.product.id, bySku);
     }
     return bySku.get(lookup.sku.id) ?? null;

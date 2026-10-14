@@ -18,9 +18,9 @@ export default async function BlankOrderPage({ params }: SyncPageProps) {
   const seller = await requireSeller();
   const [{ product, data }, lastAddress] = await Promise.all([getProductDetail(id, seller.tier), getLastShippingAddress(seller.id)]);
   if (!product) notFound();
-  const item = getCatalogItem(product, seller.tier, data);
+  const item = getCatalogItem(product, data);
   if (!item) notFound();
-  const variants = buildBlankVariants(product, seller.tier, getListableSkus(product, data));
+  const variants = buildBlankVariants(product, getListableSkus(product, data));
   const moqBySku = Object.fromEntries(variants.map((v) => [v.sku, data.moq.get(v.sku)?.minQty ?? null]));
 
   return (

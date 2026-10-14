@@ -1,6 +1,6 @@
 import type { ErpProduct, ErpSku, SellerTier } from '@creator-commerce/shared/erp';
 import { createClient } from './supabase/server';
-import { buildCatalog, getCatalogItem, getListableSkus } from './catalog';
+import { buildCatalog, getListableSkus } from './catalog';
 import type { CatalogResult, PlatformData, ProductDetailData } from './types/catalog';
 import { loadAllRows } from './platform-data';
 import { loadAllErpProducts, loadErpProduct } from './erp-products.server';
@@ -59,7 +59,7 @@ export async function getCatalog(tier: SellerTier): Promise<CatalogResult> {
     loadAllErpProducts(),
     loadPlatformData(tier),
   ]);
-  return buildCatalog(products, tier, data);
+  return buildCatalog(products, data);
 }
 
 /** 详情页原始产品 + 平台数据（价格/库存/MOQ 由页面按等级计算） */
@@ -81,13 +81,12 @@ export interface SkuLookup {
 
 /**
  * 全目录的 SKU 编码索引（批量 / 表格下单按 SKU 找产品用）。
- * 只收开放给中国卖家、且该等级可上架（可见、有货、有价）的 SKU。
+ * 不做任何过滤：ERP 返回的每个产品的每个 SKU 都收。
  */
 export async function getSkuIndex(tier: SellerTier): Promise<Map<string, SkuLookup>> {
   const [products, data] = await Promise.all([loadAllErpProducts(), loadPlatformData(tier)]);
   const index = new Map<string, SkuLookup>();
   for (const product of products) {
-    if (!getCatalogItem(product, tier, data)) continue;
     for (const sku of getListableSkus(product, data)) {
       if (sku.sku) index.set(sku.sku.trim().toUpperCase(), { product, sku });
     }

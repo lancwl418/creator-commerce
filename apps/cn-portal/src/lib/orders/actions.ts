@@ -25,7 +25,7 @@ export async function createBlankOrder(_state: BulkOrderFormState, form: FormDat
   const { product, data } = await getProductDetail(erpProductId, seller.tier);
   if (!product) return { error: t('detail.notFound') };
 
-  const variants = buildBlankVariants(product, seller.tier, getListableSkus(product, data));
+  const variants = buildBlankVariants(product, getListableSkus(product, data));
   const parsed = parseBulkOrderForm(form, variants);
   if (!parsed.ok) return { error: t(parsed.error), address: parsed.address };
 
@@ -59,7 +59,7 @@ export async function createDesignedOrder(_state: BulkOrderFormState, form: Form
   const { product, data } = await getProductDetail((row.product_template_id ?? '').replace(ERP_TEMPLATE_PREFIX, ''), seller.tier);
   if (!product) return { error: t('detail.notFound') };
 
-  const variants = buildSyncVariants(product, seller.tier, getListableSkus(product, data), 1);
+  const variants = buildSyncVariants(product, getListableSkus(product, data), 1);
   const parsed = parseBulkOrderForm(form, variants);
   if (!parsed.ok) return { error: t(parsed.error), address: parsed.address };
 
@@ -95,11 +95,11 @@ export async function createUploadedDesignOrder(_state: BulkOrderFormState, form
   const { product, data } = await getProductDetail(erpProductId, seller.tier);
   if (!product) return { error: t('detail.notFound') };
 
-  const faces = getUploadableFaces(product, seller.tier);
+  const faces = getUploadableFaces(product);
   const uploads = parseFaceUploads(form, faces);
   if (!uploads.ok) return { error: t(uploads.error), address: readAddress(form) };
 
-  const variants = buildSyncVariants(product, seller.tier, getListableSkus(product, data), uploads.uploads.length);
+  const variants = buildSyncVariants(product, getListableSkus(product, data), uploads.uploads.length);
   if (variants.length === 0) return { error: t('order.error.noPriceForFaces'), address: readAddress(form) };
   const parsed = parseBulkOrderForm(form, variants);
   if (!parsed.ok) return { error: t(parsed.error), address: parsed.address };

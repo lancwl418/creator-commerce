@@ -1,10 +1,10 @@
 import type { ErpProduct } from '@creator-commerce/shared/erp/types';
 import { resolveOptionDimensions } from '@creator-commerce/shared/erp/options';
-import { type SellerTier, type TierPriceRow, resolveTierPriceTables } from '@creator-commerce/shared/erp/pricing';
+import { type TierPriceRow, resolveTierPriceTables } from '@creator-commerce/shared/erp/pricing';
 import type {
   CatalogItem, PlatformData, PriceTableColumn, PriceTableView, ProductAttribute, ProductDetailView,
 } from './types/catalog';
-import { getListableSkus } from './catalog';
+import { CN_PRICE_TIER, getListableSkus } from './catalog';
 
 function distinct(values: (string | null | undefined)[]): string[] {
   return Array.from(new Set(values.filter((v): v is string => !!v)));
@@ -50,8 +50,7 @@ export function buildPriceTableView(rows: TierPriceRow[]): PriceTableView {
 export function buildProductDetailView(
   product: ErpProduct,
   item: CatalogItem,
-  data: PlatformData,
-  tier: SellerTier
+  data: PlatformData
 ): ProductDetailView {
   const skus = getListableSkus(product, data);
   // 图集
@@ -73,7 +72,7 @@ export function buildProductDetailView(
     item,
     images,
     attributes: attrs,
-    priceTables: resolveTierPriceTables(product, tier, skus).map(buildPriceTableView),
+    priceTables: resolveTierPriceTables(product, CN_PRICE_TIER, skus).map(buildPriceTableView),
     productionTime: product.productionTime ?? null,
     shipFrom: product.shipFrom ?? null,
   };

@@ -4,7 +4,7 @@ import type { ErpProduct, ErpPricingGroup, ErpSku } from './types';
 // ── 卖家等级 ↔ ERP 客户等级（文档 4.1） ──
 // 平台等级 1 → VIP，平台等级 2 → 批发商；中国卖家归 ERP 客户等级「中国商家」。
 // ERP 侧等级名为「VIP」「批发」「零售」「中国商家」。
-export const SELLER_TIERS = ['VIP', 'WHOLESALE', 'CN_MERCHANT'] as const;
+export const SELLER_TIERS = ['VIP', 'WHOLESALE', 'CN_MERCHANT', 'RETAIL'] as const;
 export type SellerTier = (typeof SELLER_TIERS)[number];
 
 export function isSellerTier(value: unknown): value is SellerTier {
@@ -16,14 +16,17 @@ export const TIER_TO_ERP_LEVEL_NAME: Record<SellerTier, string> = {
   VIP: 'VIP',
   WHOLESALE: '批发',
   CN_MERCHANT: '中国商家',
+  RETAIL: '零售',
 };
 
 /**
- * 产品没有该等级的定价组时改用的等级。
- * ERP 还没有给产品配「中国商家」定价组，这期间中国卖家按 VIP 价；ERP 配上后自动改用本等级的价格。
+ * 产品没有该等级的定价组时改用的等级（单层回落，不链式）。
+ * - ERP 还没给产品配「中国商家」定价组时，中国卖家按 VIP 价；ERP 配上后自动改用本等级。
+ * - VIP 缺价时回落「零售」价（cn-portal 目录统一按 VIP 展示/计价，见 CN_PRICE_TIER）。
  */
 const TIER_PRICE_FALLBACK: Partial<Record<SellerTier, SellerTier>> = {
   CN_MERCHANT: 'VIP',
+  VIP: 'RETAIL',
 };
 
 export interface PriceRange {
