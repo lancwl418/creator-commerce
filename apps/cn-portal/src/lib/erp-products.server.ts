@@ -6,6 +6,8 @@ import {
 } from '@creator-commerce/shared/erp';
 import { getErpConfig } from './erp';
 import { createTtlCache } from './ttl-cache';
+import { isApprovedErpProduct } from './catalog';
+import { ensureErpThumbnailUrl } from './erp-thumb.server';
 
 // ERP 产品数据与卖家等级无关，可以跨请求共用；等级价格、可见性、库存在其后按请求计算。
 //
@@ -50,6 +52,35 @@ export async function loadAllErpProducts(): Promise<ErpProduct[]> {
 const ERP_WARM_INTERVAL_MS = ERP_FRESH_MS + 5 * 1000;
 let warming = false;
 
+/** 列表卡片缩略图宽度（与 ProductCard 的 w=480 一致）。 */
+const CARD_THUMB_WIDTH = 480;
+
+function mainImagePath(p: ErpProduct): string | null {
+  return p.mainPic || p.prodImageList?.find((i) => i.isMain === 1)?.picSrc || null;
+}
+
+/**
+ * 预生成审核通过产品的列表缩略图并存入 R2，使第一个访客打开目录时图已就绪
+ * （不用等「首次回源 ERP 现做」）。ensureErpThumbnailUrl 内部先查 R2，已存在则跳过，
+ * 所以每轮刷新重复调用也很廉价。单个失败不影响其他。
+ */
+async function prewarmCardThumbnails(products: ErpProduct[]): Promise<void> {
+  const paths = products
+    .filter(isApprovedErpProduct)
+    .map(mainImagePath)
+    .filter((p): p is string => !!p);
+  let done = 0;
+  for (const path of paths) {
+    try {
+      await ensureErpThumbnailUrl(path, CARD_THUMB_WIDTH);
+      done++;
+    } catch {
+      // 忽略单张失败，请求时还能按需兜底生成。
+    }
+  }
+  if (paths.length) console.log(`[cn-portal] 缩略图预热：${done}/${paths.length}`);
+}
+
 /** 进程启动时拉一遍目录，之后定时在后台刷新，用户打开页面时数据已经在内存里。 */
 export function keepErpProductsWarm(): void {
   if (warming) return;
@@ -59,6 +90,8 @@ export function keepErpProductsWarm(): void {
     try {
       const products = await loadAllErpProducts();
       console.log(`[cn-portal] ERP 目录已刷新：${products.length} 个产品，${Date.now() - started}ms`);
+      // 不阻塞刷新周期，后台预热缩略图。
+      void prewarmCardThumbnails(products);
     } catch (error) {
       console.warn('[cn-portal] ERP 目录刷新失败，下次再试', error);
     }

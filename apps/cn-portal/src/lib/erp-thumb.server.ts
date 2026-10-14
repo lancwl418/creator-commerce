@@ -22,15 +22,13 @@ function redirectTo(url: string): Response {
 }
 
 /**
- * 产品图缩略图：优先用 R2 里缓存的小 webp，首次生成后对所有用户永久可用，
- * 不依赖 Render 实例本地缓存（免费实例会休眠 / 部署即清空）。
- *
- * 命中缓存 → 直接 302 到 R2；未命中 → 拉 ERP 原图 → sharp 缩成 webp → 存 R2 → 302。
- * 无法解析源或拉取失败时返回 null，交回原始代理兜底。
+ * 确保某张 ERP 图在指定宽度下的缩略图已存在于 R2，返回其公网地址（失败返回 null）。
+ * 命中缓存直接返回；未命中则拉 ERP 原图 → sharp 缩成 webp → 存 R2。
+ * 既供请求时按需生成，也供启动时批量预热（见 erp-products.server.ts）。
  */
-export async function erpThumbnailRedirect(path: string, width: number): Promise<Response | null> {
+export async function ensureErpThumbnailUrl(path: string, width: number): Promise<string | null> {
   const key = thumbKey(path, width);
-  if (await r2ObjectExists(key)) return redirectTo(r2PublicUrl(key));
+  if (await r2ObjectExists(key)) return r2PublicUrl(key);
 
   const source = resolveErpImageSource(path, erpBaseUrlFromEnv(), extraOrigins());
   if (!source) return null;
@@ -46,6 +44,15 @@ export async function erpThumbnailRedirect(path: string, width: number): Promise
     .webp({ quality: 72 })
     .toBuffer();
 
-  const url = await uploadToR2AtKey(new Uint8Array(webp), key, 'image/webp');
-  return redirectTo(url);
+  return uploadToR2AtKey(new Uint8Array(webp), key, 'image/webp');
+}
+
+/**
+ * 产品图缩略图：优先用 R2 里缓存的小 webp，首次生成后对所有用户永久可用，
+ * 不依赖 Render 实例本地缓存（免费实例会休眠 / 部署即清空）。
+ * 命中 / 生成成功 → 302 到 R2；无法解析源或拉取失败时返回 null，交回原始代理兜底。
+ */
+export async function erpThumbnailRedirect(path: string, width: number): Promise<Response | null> {
+  const url = await ensureErpThumbnailUrl(path, width);
+  return url ? redirectTo(url) : null;
 }

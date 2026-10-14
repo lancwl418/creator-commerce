@@ -1,0 +1,25 @@
+# 构建上下文瘦身：这些不该进 Docker build（COPY . . 时跳过），
+# 既加快上传/COPY，又避免 node_modules/.next 变动把缓存层打掉。
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/build
+**/coverage
+**/.vercel
+
+.git
+.gitignore
+
+# 本地环境与密钥（Render 用 build ARG / env group 注入，不从文件读）
+**/.env
+**/.env.*
+!**/.env.example
+
+# 杂项
+**/*.log
+**/.DS_Store
+**/.vscode
+**/.idea
+*.md
+!README.md
