@@ -154,7 +154,7 @@ export async function importOrders(_state: ImportFormState, form: FormData): Pro
   if (!parsed.ok) {
     return { error: parsed.error === 'empty' ? t('import.error.empty') : t('import.error.missingColumns', 'zh', { columns: (parsed.missing ?? []).join(', ') }), address: defaultAddress };
   }
-  const [skuIndex, platformData] = await Promise.all([getSkuIndex(seller.tier), loadPlatformData(seller.tier)]);
+  const [skuIndex, platformData] = await Promise.all([getSkuIndex(seller.tier), loadPlatformData()]);
   const groups = resolveImportGroups(parsed.lines, { tier: seller.tier, skuIndex, platformData, defaultAddress });
   const hasErrors = groups.some((g) => g.errors.length > 0);
   if (form.get('confirm') !== '1' || hasErrors) return { groups, csv, address: defaultAddress, error: hasErrors ? t('import.error.fixRows') : undefined };

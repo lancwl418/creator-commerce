@@ -59,7 +59,7 @@ function product(overrides: Partial<ErpProduct> & { id: string }): ErpProduct {
     description: '',
     vendor: '',
     productType: 'Apparel',
-    status: 1,
+    status: 2, // 2 = 审批通过（目录只收这种）
     tags: '',
     itemNo: 'ITEM-1',
     mainPic: '',
@@ -108,7 +108,16 @@ describe('resolveProductTierPrice · 分级取价（验收 #1）', () => {
   });
 });
 
-describe('buildCatalog · 不做任何显示限制', () => {
+describe('buildCatalog · 只收审批通过的产品', () => {
+  it('草稿(status=0) / 审批中(status=1) 不显示，只显示通过(status=2)', () => {
+    const draft = product({ id: 'd', status: 0, pricingGroups: [group('VIP', 5)] });
+    const pending = product({ id: 'p', status: 1, pricingGroups: [group('VIP', 5)] });
+    const approved = product({ id: 'a', status: 2, pricingGroups: [group('VIP', 5)] });
+    expect(buildCatalog([draft, pending, approved], emptyData()).items.map((i) => i.id)).toEqual(['a']);
+  });
+});
+
+describe('buildCatalog · 不做显示限制（审批通过范围内）', () => {
   it('缺价产品照常显示，fromPrice 为 null', () => {
     const p = product({ id: 'p1', pricingGroups: [group('批发', 9.62)] });
     const res = buildCatalog([p], emptyData());

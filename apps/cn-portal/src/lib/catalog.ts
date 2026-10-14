@@ -12,6 +12,15 @@ export type { CatalogItem, CatalogResult, CatalogFilters, PlatformData, SortKey 
  */
 export const CN_PRICE_TIER: SellerTier = 'VIP';
 
+/**
+ * ERP 产品审批状态：0=草稿、1=审批中、2=通过。
+ * 目录只收「通过」的产品（ERP 列表接口会返回草稿/审批中/通过全部）。
+ */
+const ERP_STATUS_APPROVED = 2;
+export function isApprovedErpProduct(product: Pick<ErpProduct, 'status'>): boolean {
+  return Number(product.status) === ERP_STATUS_APPROVED;
+}
+
 function getCategory(p: ErpProduct): string {
   return p.category || p.categoryName || p.productType || '';
 }
@@ -50,11 +59,11 @@ export function getCatalogItem(product: ErpProduct, data: PlatformData): Catalog
 /**
  * 把 ERP 产品 + 平台数据组装成选品列表。
  *
- * 不做任何显示限制：ERP 列表接口只返回审核完成的产品，这里原样全显示
- * （不按业务线 / 缺价 / 库存 / SKU 可见性过滤）。价格统一按 VIP（缺价回落零售）。
+ * 只按审批状态过滤：ERP 列表返回草稿/审批中/通过全部，这里只收「通过」(status=2)。
+ * 其余不过滤（不按业务线 / 缺价 / 库存 / SKU 可见性）。价格统一按 VIP（缺价回落零售）。
  */
 export function buildCatalog(products: ErpProduct[], data: PlatformData): CatalogResult {
-  return { items: products.map((p) => getCatalogItem(p, data)) };
+  return { items: products.filter(isApprovedErpProduct).map((p) => getCatalogItem(p, data)) };
 }
 
 // ── 列表筛选 / 排序（文档 5.1，在已组装的 items 上做） ──
