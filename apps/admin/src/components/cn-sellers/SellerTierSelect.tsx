@@ -9,6 +9,7 @@ export const TIER_LABELS: Record<SellerTier, string> = {
   CN_MERCHANT: 'China merchant',
   VIP: 'VIP',
   WHOLESALE: 'Wholesale',
+  RETAIL: 'Retail',
 };
 
 export function SellerTierSelect({ sellerId, tier }: { sellerId: string; tier: SellerTier }) {
