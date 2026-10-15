@@ -14,8 +14,8 @@ export default function CatalogFilters({ categories, suppliers }: CatalogFilters
 
   return (
     <div className="space-y-3 mb-6">
-      {/* 默认供应商 pills：只有一家时没有筛选意义，不显示 */}
-      {suppliers.length > 1 && (
+      {/* 默认供应商 pills：显示名可由管理员在设置页自定义 */}
+      {suppliers.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] text-gray-500 mr-1">{t('filter.supplier')}</span>
           {[{ id: 'all', name: t('filter.supplier.all') }, ...suppliers].map((supplier) => (
