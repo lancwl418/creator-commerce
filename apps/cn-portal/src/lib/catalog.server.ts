@@ -4,22 +4,26 @@ import { buildCatalog, getListableSkus, isApprovedErpProduct } from './catalog';
 import type { CatalogResult, PlatformData, ProductDetailData } from './types/catalog';
 import { loadAllRows } from './platform-data';
 import { loadAllErpProducts, loadErpProduct } from './erp-products.server';
+import { loadSupplierNames } from './queries/supplier-settings';
 
 /**
- * 装配 PlatformData。目前只用到起订量（MOQ）——可见性 / 库存过滤已取消，
+ * 装配 PlatformData：起订量（MOQ）+ 供应商显示名。可见性 / 库存过滤已取消，
  * 不再查那两张表，省掉每次列表 / 详情的两次全表扫描。
  */
 export async function loadPlatformData(): Promise<PlatformData> {
   const supabase = await createClient();
 
-  const moqRows = await loadAllRows<{ sku: string; min_qty: number | null; min_amount: number | null }>(
-    'product_moq', (from, to) =>
-      supabase
-        .from('product_moq')
-        .select('sku, min_qty, min_amount')
-        .order('sku')
-        .range(from, to)
-  );
+  const [moqRows, supplierNames] = await Promise.all([
+    loadAllRows<{ sku: string; min_qty: number | null; min_amount: number | null }>(
+      'product_moq', (from, to) =>
+        supabase
+          .from('product_moq')
+          .select('sku, min_qty, min_amount')
+          .order('sku')
+          .range(from, to)
+    ),
+    loadSupplierNames(),
+  ]);
 
   const moq = new Map<string, { minQty: number | null; minAmount: number | null }>();
   for (const r of moqRows) {
@@ -27,7 +31,7 @@ export async function loadPlatformData(): Promise<PlatformData> {
   }
 
   // 保留 PlatformData 形状（可见性 / 库存字段留空，已不参与过滤）。
-  return { hiddenSkusForTier: new Set(), stock: new Map(), moq };
+  return { hiddenSkusForTier: new Set(), stock: new Map(), moq, supplierNames };
 }
 
 /** 可选的全部产品（只含审批通过的，未分页）。tier 仅为签名兼容，计价统一走 VIP。 */

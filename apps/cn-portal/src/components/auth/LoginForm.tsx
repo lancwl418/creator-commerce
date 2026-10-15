@@ -24,7 +24,8 @@ export default function LoginForm({ next, linkError }: { next: string; linkError
     >
       <form action={action} className="space-y-4">
         <input type="hidden" name="next" value={next} />
-        <AuthField name="email" defaultValue={state.values?.email} type="email" label={t('auth.field.email')} autoComplete="email" />
+        {/* 账号可以是邮箱或平台内部用户名，所以不用 type=email */}
+        <AuthField name="email" defaultValue={state.values?.email} type="text" label={t('auth.field.account')} autoComplete="username" />
         <AuthField name="password" type="password" label={t('auth.field.password')} autoComplete="current-password" />
         <div className="text-right -mt-2">
           <Link href="/forgot-password" className="text-xs text-gray-500 hover:text-gray-900 underline-offset-2 hover:underline">

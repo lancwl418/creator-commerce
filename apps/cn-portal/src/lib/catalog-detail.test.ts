@@ -5,7 +5,7 @@ import { buildPriceTableView, buildProductDetailView } from './catalog-detail';
 import type { CatalogItem, PlatformData } from './types/catalog';
 
 const item = { id: 'p1' } as CatalogItem;
-const data: PlatformData = { hiddenSkusForTier: new Set(['hidden']), stock: new Map(), moq: new Map() };
+const data: PlatformData = { hiddenSkusForTier: new Set(['hidden']), stock: new Map(), moq: new Map(), supplierNames: new Map() };
 
 function product(overrides: Partial<ErpProduct>): ErpProduct {
   return {

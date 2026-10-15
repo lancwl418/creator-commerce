@@ -33,7 +33,7 @@ export type PrintFaces = false | number;
  * 可以同步 / 下单的 variant 及其成本。
  * - 白板：成本 = 该等级的空白件售价，为 0 或缺失的 variant 不能用；
  * - 带设计（N 面）：成本 = 空白件售价 + 第一种工艺 N 面的印花价（1 面即目录起价口径），
- *   一个产品有多组定价时取第一组有价的档位。
+ *   价格只取主供应商（mainSupplierId）的定价组；仍有多组时取第一组有价的档位。
  */
 export function buildSyncVariants(product: ErpProduct, listableSkus: ErpSku[], print: PrintFaces): BlankVariant[] {
   const dimensions = resolveOptionDimensions(product);

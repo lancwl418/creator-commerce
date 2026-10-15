@@ -9,12 +9,24 @@ export const getCurrentSeller = cache(async (): Promise<Seller | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
-    .from('creators')
-    .select(SELLER_COLUMNS)
-    .eq('auth_user_id', user.id)
-    .eq('user_type', 'cn_seller')
-    .maybeSingle<SellerRow>();
-  if (error) throw new Error(`Failed to load seller account: ${error.message}`);
-  return data ? toSeller(data) : null;
+  // admin_users 的 RLS 只让管理员读到自己那行，普通卖家查到空结果而不是报错。
+  const [sellerResult, adminResult] = await Promise.all([
+    supabase
+      .from('creators')
+      .select(SELLER_COLUMNS)
+      .eq('auth_user_id', user.id)
+      .eq('user_type', 'cn_seller')
+      .maybeSingle<SellerRow>(),
+    supabase
+      .from('admin_users')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .eq('status', 'active')
+      .maybeSingle<{ id: string }>(),
+  ]);
+  if (sellerResult.error) throw new Error(`Failed to load seller account: ${sellerResult.error.message}`);
+  if (adminResult.error) throw new Error(`Failed to check admin role: ${adminResult.error.message}`);
+  return sellerResult.data
+    ? toSeller(sellerResult.data, { authUserId: user.id, isAdmin: adminResult.data != null })
+    : null;
 });

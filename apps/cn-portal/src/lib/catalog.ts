@@ -1,8 +1,9 @@
 import type { ErpProduct, ErpSku } from '@creator-commerce/shared/erp/types';
 import { type SellerTier, resolveProductTierPrice } from '@creator-commerce/shared/erp/pricing';
 import type {
-  CatalogItem, CatalogResult, CatalogFilters, CatalogPage, PlatformData,
+  CatalogItem, CatalogResult, CatalogFilters, CatalogPage, PlatformData, SupplierOption,
 } from './types/catalog';
+import { displaySupplierName, getMainSupplier } from './suppliers/suppliers';
 
 export type { CatalogItem, CatalogResult, CatalogFilters, PlatformData, SortKey } from './types/catalog';
 
@@ -42,6 +43,7 @@ export function getMoqQty(skus: ErpSku[], data: PlatformData): number | null {
 export function getCatalogItem(product: ErpProduct, data: PlatformData): CatalogItem {
   const price = resolveProductTierPrice(product, CN_PRICE_TIER);
   const listableSkus = getListableSkus(product, data);
+  const supplier = getMainSupplier(product);
 
   return {
     id: product.id,
@@ -53,6 +55,8 @@ export function getCatalogItem(product: ErpProduct, data: PlatformData): Catalog
     maxPrice: price?.max ?? null,
     inStock: true,
     moqQty: getMoqQty(listableSkus, data),
+    supplierId: supplier?.id ?? null,
+    supplierName: supplier ? displaySupplierName(supplier, data.supplierNames) : null,
   };
 }
 
@@ -75,6 +79,9 @@ export function applyFilters(
 
   if (filters.category && filters.category !== 'all') {
     out = out.filter((i) => i.category === filters.category);
+  }
+  if (filters.supplier && filters.supplier !== 'all') {
+    out = out.filter((i) => i.supplierId === filters.supplier);
   }
   const { priceMin, priceMax } = filters;
   if (priceMin != null) {
@@ -109,4 +116,15 @@ export function paginate(items: CatalogItem[], page: number, pageSize: number): 
 
 export function uniqueCategories(items: CatalogItem[]): string[] {
   return Array.from(new Set(items.map((i) => i.category).filter(Boolean)));
+}
+
+/** 目录里出现的默认供应商（去重，保持 ERP 返回顺序），用于筛选。 */
+export function uniqueSuppliers(items: CatalogItem[]): SupplierOption[] {
+  const seen = new Map<string, SupplierOption>();
+  for (const item of items) {
+    if (item.supplierId && !seen.has(item.supplierId)) {
+      seen.set(item.supplierId, { id: item.supplierId, name: item.supplierName ?? item.supplierId });
+    }
+  }
+  return [...seen.values()];
 }

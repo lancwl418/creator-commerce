@@ -20,6 +20,7 @@ export function parseCatalogQuery(params: CatalogSearchParams): CatalogFilters &
   const page = Number(single(params.page));
   return {
     category: single(params.category),
+    supplier: single(params.supplier),
     priceMin: parsePrice(single(params.priceMin)),
     priceMax: parsePrice(single(params.priceMax)),
     sort: parseSort(single(params.sort)),
@@ -31,7 +32,7 @@ export function parseCatalogQuery(params: CatalogSearchParams): CatalogFilters &
 export function catalogUrl(params: URLSearchParams, updates: Record<string, string | null>): string {
   const next = new URLSearchParams(params);
   for (const [key, value] of Object.entries(updates)) {
-    if (value == null || value === '' || (key === 'category' && value === 'all')) next.delete(key);
+    if (value == null || value === '' || ((key === 'category' || key === 'supplier') && value === 'all')) next.delete(key);
     else next.set(key, value);
   }
   const query = next.toString();
@@ -40,7 +41,7 @@ export function catalogUrl(params: URLSearchParams, updates: Record<string, stri
 
 export function catalogSearchParams(params: CatalogSearchParams): URLSearchParams {
   const query = new URLSearchParams();
-  for (const key of ['category', 'priceMin', 'priceMax', 'sort', 'page'] as const) {
+  for (const key of ['category', 'supplier', 'priceMin', 'priceMax', 'sort', 'page'] as const) {
     const value = single(params[key]);
     if (value) query.set(key, value);
   }

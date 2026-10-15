@@ -35,6 +35,7 @@ export default function ProductCard({ item }: { item: CatalogItem }) {
         </p>
         <p className="text-[10px] text-gray-400 mt-0.5 truncate">
           {item.itemNo}
+          {item.supplierName && <span className="text-gray-500"> · {item.supplierName}</span>}
         </p>
         <div className="mt-2">
           <ProductPrice min={item.fromPrice} from className="text-sm font-semibold text-gray-800" />

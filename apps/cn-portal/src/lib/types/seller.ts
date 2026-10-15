@@ -12,6 +12,10 @@ export interface Seller {
   /** ERP 客户档案 id；同步成功前为 null */
   erpCustomerId: string | null;
   erpSyncStatus: 'pending' | 'synced' | 'failed';
+  /** Supabase Auth 用户 id */
+  authUserId: string;
+  /** 平台管理员（admin_users 里 status=active）：可改供应商显示名等设置 */
+  isAdmin: boolean;
 }
 
 export interface SellerRow {

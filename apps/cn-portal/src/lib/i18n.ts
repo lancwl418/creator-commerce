@@ -13,6 +13,21 @@ const dict = {
   'nav.myProducts': { zh: '我的产品', en: 'My products' },
   'nav.orders': { zh: '订单', en: 'Orders' },
   'nav.cart': { zh: '批量单', en: 'Bulk order' },
+  'nav.settings': { zh: '设置', en: 'Settings' },
+
+  // 设置 · 供应商显示名（仅管理员）
+  'settings.suppliers.title': { zh: '供应商显示名', en: 'Supplier display names' },
+  'settings.suppliers.subtitle': { zh: '产品按 ERP 的默认供应商归类。这里可以给供应商起一个对卖家展示的名字；留空则显示 ERP 原名。', en: 'Products are grouped by their default supplier in the ERP. Set the name sellers see here; leave blank to show the ERP name.' },
+  'settings.suppliers.col.original': { zh: 'ERP 原名', en: 'ERP name' },
+  'settings.suppliers.col.products': { zh: '产品数', en: 'Products' },
+  'settings.suppliers.col.display': { zh: '显示名', en: 'Display name' },
+  'settings.suppliers.placeholder': { zh: '留空显示原名', en: 'Blank = ERP name' },
+  'settings.suppliers.empty': { zh: '目录里还没有带默认供应商的产品。', en: 'No products with a default supplier yet.' },
+  'settings.suppliers.save': { zh: '保存', en: 'Save' },
+  'settings.suppliers.saving': { zh: '保存中…', en: 'Saving…' },
+  'settings.suppliers.saved': { zh: '已保存，目录会按新名称显示', en: 'Saved. The catalog now shows the new names.' },
+  'settings.suppliers.error.tooLong': { zh: '显示名不能超过 100 个字', en: 'Display names must be 100 characters or fewer' },
+  'settings.suppliers.loadError': { zh: '加载供应商列表失败，请稍后再试', en: 'Failed to load suppliers, please try again' },
 
   // 批量下单（购物车）
   'cart.title': { zh: '批量单', en: 'Bulk order' },
@@ -224,6 +239,8 @@ const dict = {
   // 筛选 / 排序（文档 5.1）
   'filter.category': { zh: '品类', en: 'Category' },
   'filter.category.all': { zh: '全部', en: 'All' },
+  'filter.supplier': { zh: '供应商', en: 'Supplier' },
+  'filter.supplier.all': { zh: '全部供应商', en: 'All suppliers' },
   'filter.priceRange': { zh: '价格区间', en: 'Price range' },
   'filter.priceMin': { zh: '最低价', en: 'Min' },
   'filter.priceMax': { zh: '最高价', en: 'Max' },
@@ -245,6 +262,7 @@ const dict = {
   'detail.price': { zh: '价格', en: 'Price' },
   'detail.productionTime': { zh: '生产周期', en: 'Production time' },
   'detail.shipFrom': { zh: '发货地', en: 'Ship from' },
+  'detail.supplier': { zh: '供应商', en: 'Supplier' },
   'detail.shipFromNote': {
     zh: '发货地址固定，不可修改。',
     en: 'Ship-from address is fixed and cannot be changed.',
@@ -292,6 +310,7 @@ const dict = {
   'auth.field.contactName': { zh: '联系人', en: 'Contact name' },
   'auth.field.phone': { zh: '手机号', en: 'Phone' },
   'auth.field.email': { zh: '邮箱', en: 'Email' },
+  'auth.field.account': { zh: '账号（邮箱）', en: 'Account (email)' },
   'auth.field.password': { zh: '密码', en: 'Password' },
   'auth.field.passwordHint': { zh: '至少 {n} 位', en: 'At least {n} characters' },
   'auth.field.newPassword': { zh: '新密码', en: 'New password' },

@@ -24,9 +24,23 @@
 
 - [ ] **印花价为 0 的含义**：ERP 里有的工艺单面或双面售价是 0（例如单面 0、双面 0.48）。
       页面目前照原值显示 $0.00，起价也按 0 计入。需确认 0 是「免费」还是「未报价」。
-- [ ] **一个产品有多个供应商报价时卖家看哪个**：同一等级下有的产品有多组定价（不同供应商，
-      最多 4 组），详情页目前全部列出并标为「报价方案 1、2…」，不显示供应商名称。
-      需确认是否固定一家（对应《待确认清单》6.5）。
+- [x] **一个产品有多个供应商报价时卖家看哪个**（2026-10-14 决定：按 ERP 的默认供应商）：ERP 产品上有
+      `mainSupplierId`（2026-10-14 的 205 个产品里 201 个有值，且都能对上 `suppliers[].supplierId` /
+      `pricingGroups[].supplierId`；`vendor` 就是主供应商名）。取价（起价、价格明细、同步/下单成本、
+      可上传面数）只用主供应商在该等级的定价组；主供应商没配该等级的报价时才退回其他供应商的组；
+      没标主供应商的产品沿用旧行为（全部组都算）。见 `packages/shared/src/erp/pricing.ts` `findTierGroups`。
+      详情页「报价方案 1、2…」的多表展示保留，正常只会剩一张表。
+
+- [x] **应用 migration 032**（2026-10-14 已在生产库执行，并用 admin 账号实测登录 / 改名 / 清除）：建 `cn_supplier_settings`
+      （供应商显示名，登录用户可读、仅 is_admin 可写），并建平台管理员账号：用户名 `admin`（实际邮箱
+      `admin@cn-portal.local`）/ 密码 `admin12345`，同时写入 `admin_users`（role=admin）和 `creators`（cn_seller）。
+      登录页账号框不带 @ 时自动补 `@cn-portal.local`（`lib/sellers/login-identifier.ts`）。管理员不在 ERP 建客户。
+      **上线后请改密码**（Supabase → Authentication → Users，待办）。SQL 用的是 `extensions.crypt`，
+      pgcrypto 不在 extensions schema 的项目需改成对应 schema。
+- [x] **目录按默认供应商筛选 + 供应商显示名设置**（2026-10-14）：列表卡片和详情页标出默认供应商；
+      筛选栏多于一家供应商时出现「供应商」pills（URL 参数 `supplier`）。管理员导航多一项「设置」→
+      `/settings/suppliers`，按供应商填显示名，留空回到 ERP 原名（报价上的 name，缺省 vendor）。
+      非管理员访问设置页回到选品页；写入另有 RLS 兜底。
 
 ## 做法 1 分步计划（2026-10-11 决定：复用 Creator Portal 的店铺 / 产品 / 订单链路）
 

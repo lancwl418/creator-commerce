@@ -32,6 +32,14 @@ export default function ProductInformation({ details, tier, canSyncBlank }: Prod
       </div>
       <MoqHint quantity={moqQty} className="mt-2 px-2.5 py-1 text-xs" />
 
+      {/* 默认供应商（显示名可由管理员自定义） */}
+      {item.supplierName && (
+        <div className="mt-4 text-sm">
+          <span className="text-gray-500">{t('detail.supplier')}：</span>
+          <span className="text-gray-800">{item.supplierName}</span>
+        </div>
+      )}
+
       {/* 属性表 */}
       <ProductAttributes attributes={details.attributes} />
 

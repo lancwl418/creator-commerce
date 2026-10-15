@@ -8,6 +8,8 @@ export interface PlatformData {
   stock: Map<string, boolean>;
   /** sku → 起订量 */
   moq: Map<string, { minQty: number | null; minAmount: number | null }>;
+  /** 供应商 id → 管理员自定义的显示名（cn_supplier_settings）；没有的供应商显示 ERP 原名 */
+  supplierNames: Map<string, string>;
 }
 
 export interface CatalogItem {
@@ -20,6 +22,16 @@ export interface CatalogItem {
   maxPrice: number | null; // 该等级最高价
   inStock: boolean;
   moqQty: number | null;
+  /** 默认供应商（ERP mainSupplierId）；ERP 没标时为 null */
+  supplierId: string | null;
+  /** 供应商显示名：管理员自定义优先，否则 ERP 原名 */
+  supplierName: string | null;
+}
+
+/** 目录筛选用的供应商选项 */
+export interface SupplierOption {
+  id: string;
+  name: string;
 }
 
 export interface CatalogResult {
@@ -30,6 +42,7 @@ export type SortKey = 'newest' | 'price_asc' | 'price_desc';
 
 export interface CatalogFilters {
   category?: string; // 'all' 或空 = 不限
+  supplier?: string; // 供应商 id；'all' 或空 = 不限
   priceMin?: number | null;
   priceMax?: number | null;
   sort?: SortKey;
@@ -37,6 +50,7 @@ export interface CatalogFilters {
 
 export interface CatalogSearchParams {
   category?: string | string[];
+  supplier?: string | string[];
   priceMin?: string | string[];
   priceMax?: string | string[];
   sort?: string | string[];

@@ -14,7 +14,7 @@ const product = {
 const context = {
   tier: 'VIP' as const,
   skuIndex: new Map([['W-M', { product, sku: product.prodSkuList[0] }]]),
-  platformData: { hiddenSkusForTier: new Set<string>(), stock: new Map(), moq: new Map() },
+  platformData: { hiddenSkusForTier: new Set<string>(), stock: new Map(), moq: new Map(), supplierNames: new Map() },
   defaultAddress: { name: '默认', phone: '1', country: 'US', province: '', city: 'LA', address1: '1 St', address2: '', zip: '90001' },
 };
 

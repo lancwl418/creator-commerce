@@ -8,3 +8,10 @@ export async function requireSeller(): Promise<Seller> {
   if (!seller) redirect('/login');
   return seller;
 }
+
+/** 只给管理员的页面 / 操作：不是管理员的卖家回到选品页。 */
+export async function requireAdmin(): Promise<Seller> {
+  const seller = await requireSeller();
+  if (!seller.isAdmin) redirect('/products');
+  return seller;
+}

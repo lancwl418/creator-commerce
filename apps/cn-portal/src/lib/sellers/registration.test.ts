@@ -76,14 +76,17 @@ describe('卖家账户', () => {
     seller_tier: 'WHOLESALE', erp_customer_id: null, erp_sync_status: 'pending',
   };
 
-  it('价格等级取自账户', () => {
-    expect(toSeller(row)).toEqual({
+  const auth = { authUserId: 'u1', isAdmin: false };
+
+  it('价格等级取自账户；管理员身份来自 admin_users', () => {
+    expect(toSeller(row, auth)).toEqual({
       id: 's1', email: 'seller@example.com', companyName: 'ACME', contactName: '张三', phone: '13800000000',
-      tier: 'WHOLESALE', erpCustomerId: null, erpSyncStatus: 'pending',
+      tier: 'WHOLESALE', erpCustomerId: null, erpSyncStatus: 'pending', authUserId: 'u1', isAdmin: false,
     });
+    expect(toSeller(row, { authUserId: 'u2', isAdmin: true }).isAdmin).toBe(true);
   });
 
   it('账户上是代码不认识的等级时报错，不默认成某个等级', () => {
-    expect(() => toSeller({ ...row, seller_tier: 'GOLD' })).toThrow('Unknown seller tier: GOLD');
+    expect(() => toSeller({ ...row, seller_tier: 'GOLD' }, auth)).toThrow('Unknown seller tier: GOLD');
   });
 });

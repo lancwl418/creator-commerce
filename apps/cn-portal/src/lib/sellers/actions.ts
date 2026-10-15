@@ -7,6 +7,7 @@ import { getCurrentSeller } from '../queries/sellers';
 import { createClient } from '../supabase/server';
 import type { AuthFormState } from '../types/seller';
 import { syncSellerToErp } from './erp-sync';
+import { resolveLoginEmail } from './login-identifier';
 import { RESET_PASSWORD_PATH, emailRedirectUrl, parseNewPassword } from './password-reset';
 import { authErrorMessage, parseRegistration, refillValues, safeReturnPath, signupMetadata } from './registration';
 
@@ -50,9 +51,11 @@ export async function signUpSeller(_state: AuthFormState, form: FormData): Promi
 }
 
 export async function signInSeller(_state: AuthFormState, form: FormData): Promise<AuthFormState> {
-  const email = String(form.get('email') ?? '').trim().toLowerCase();
+  const identifier = String(form.get('email') ?? '').trim();
+  // 账号可以是邮箱，也可以是平台内部账号的用户名（如 admin）
+  const email = resolveLoginEmail(identifier);
   const password = String(form.get('password') ?? '');
-  const values = { email };
+  const values = { email: identifier };
   if (!email || !password) return { error: t('auth.error.required'), values };
 
   const supabase = await createClient();
@@ -67,8 +70,8 @@ export async function signInSeller(_state: AuthFormState, form: FormData): Promi
     await supabase.auth.signOut();
     return { error: t('auth.error.notSeller'), values };
   }
-  // 注册时没同步成功的账户，登录时补一次。
-  if (seller.erpSyncStatus !== 'synced') {
+  // 注册时没同步成功的账户，登录时补一次。管理员是平台内部账号，不在 ERP 建客户。
+  if (seller.erpSyncStatus !== 'synced' && !seller.isAdmin) {
     await syncSellerToErp({
       authUserId: data.user.id,
       email: seller.email,

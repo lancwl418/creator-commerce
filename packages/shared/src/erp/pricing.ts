@@ -120,11 +120,20 @@ function buildGroupPriceRows(product: ErpProduct, group: ErpPricingGroup): TierP
   return rows;
 }
 
+/**
+ * 该等级下带印花报价的定价组。
+ * 产品有多家供应商报价时，每家供应商在每个等级各有一组；ERP 用 mainSupplierId 指定默认供应商，
+ * 卖家看到的价格只取主供应商那组。主供应商在该等级没有带报价的组时，才退回用其他供应商的组。
+ */
 function findTierGroups(product: ErpProduct, tier: SellerTier): ErpPricingGroup[] {
   const levelName = TIER_TO_ERP_LEVEL_NAME[tier];
-  return (product.pricingGroups ?? []).filter(
+  const groups = (product.pricingGroups ?? []).filter(
     (g) => g.name === levelName && (g.rules?.length ?? 0) > 0
   );
+  const mainSupplierId = product.mainSupplierId?.trim();
+  if (!mainSupplierId) return groups;
+  const mainGroups = groups.filter((g) => g.supplierId === mainSupplierId);
+  return mainGroups.length > 0 ? mainGroups : groups;
 }
 
 /**
@@ -174,7 +183,7 @@ function pickBaseFace(faces: PrintFacePrice[]): PrintFacePrice {
 /**
  * 分层取价 —— 全系统唯一接缝。
  *
- * 返回该产品在指定卖家等级下的价格区间（min–max，覆盖各尺码/色档/供应商组）；
+ * 返回该产品在指定卖家等级下的价格区间（min–max，覆盖各尺码/色档）；多家供应商时只取主供应商；
  * 该等级下取不到价格时返回 null（文档 4.1：缺价不显示 + 进缺价清单）。
  *
  * 数据来源：product.pricingGroups 中 name 匹配该等级、且带 printPriceJson 的组

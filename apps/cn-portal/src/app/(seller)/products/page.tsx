@@ -1,6 +1,6 @@
 import { getCatalog } from '@/lib/catalog.server';
 import { requireSeller } from '@/lib/sellers/session';
-import { applyFilters, paginate, uniqueCategories } from '@/lib/catalog';
+import { applyFilters, paginate, uniqueCategories, uniqueSuppliers } from '@/lib/catalog';
 import { parseCatalogQuery } from '@/lib/catalog-query';
 import type { CatalogItem, CatalogPageProps } from '@/lib/types/catalog';
 import CatalogProducts from '@/components/products/CatalogProducts';
@@ -29,6 +29,7 @@ export default async function ProductsPage({ searchParams }: CatalogPageProps) {
       tier={tier}
       items={page.items}
       categories={uniqueCategories(items)}
+      suppliers={uniqueSuppliers(items)}
       count={page.total}
       errored={errored}
       searchParams={params}

@@ -125,6 +125,33 @@ describe('尺码档 × 色档价格明细', () => {
     expect(resolveProductTierPrice(sweatshirt(), 'WHOLESALE')).toBeNull();
   });
 
+  it('多家供应商报价时只取主供应商（mainSupplierId）的定价组', () => {
+    const main = sweatshirt().pricingGroups![0]; // sup1 / Factory A：6–11
+    const other = {
+      ...main, supplierId: 'sup2', supplierName: 'Factory B', supplierQuoteId: 'quote2',
+      pricingTiers: [{ tierCode: 'S~M', memberSizes: ['S', 'M'], blankPrice: 1, colorPrices: null }],
+      rules: [{ craftId: 'c1', craftName: 'DTF', printPriceJson: JSON.stringify({ 'S~M': { face_1: 1 } }) }],
+    };
+    const product = sweatshirt({ mainSupplierId: 'sup1', pricingGroups: [other, main] });
+    expect(resolveProductTierPrice(product, 'VIP')).toEqual({ min: 6, max: 11 });
+    expect(resolveTierPriceTables(product, 'VIP')).toHaveLength(1);
+    expect(resolveTierPriceTables(product, 'VIP')[0][0]).toEqual(expect.objectContaining({ colorTier: 'Light', blankPrice: 5 }));
+
+    // 没有标主供应商时沿用旧行为：所有供应商的组都算
+    const noMain = sweatshirt({ mainSupplierId: null, pricingGroups: [other, main] });
+    expect(resolveProductTierPrice(noMain, 'VIP')).toEqual({ min: 2, max: 11 });
+    expect(resolveTierPriceTables(noMain, 'VIP')).toHaveLength(2);
+  });
+
+  it('主供应商在该等级没有带报价的组时，退回用其他供应商的组', () => {
+    const main = sweatshirt().pricingGroups![0];
+    const other = { ...main, supplierId: 'sup2', supplierName: 'Factory B' };
+    const mainWithoutRules = { ...main, rules: [] };
+    const product = sweatshirt({ mainSupplierId: 'sup1', pricingGroups: [mainWithoutRules, other] });
+    expect(resolveProductTierPrice(product, 'VIP')).toEqual({ min: 6, max: 11 });
+    expect(resolveTierPriceTables(product, 'VIP')).toHaveLength(1);
+  });
+
   it('起价与明细一致：空白衣售价 + 单面印花价，取各档的最低和最高', () => {
     // Light 5+1、Dark 6+2、4XL 8+3
     expect(resolveProductTierPrice(sweatshirt(), 'VIP')).toEqual({ min: 6, max: 11 });

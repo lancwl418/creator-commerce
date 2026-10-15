@@ -1,13 +1,39 @@
 'use client';
 
 import { useCatalogFilters } from '@/hooks/products/useCatalogFilters';
+import type { SupplierOption } from '@/lib/types/catalog';
 import { t } from '@/lib/i18n';
 
-export default function CatalogFilters({ categories }: { categories: string[] }) {
-  const { activeCategory, sort, priceMin, priceMax, updateFilters, resetFilters } = useCatalogFilters();
+interface CatalogFiltersProps {
+  categories: string[];
+  suppliers: SupplierOption[];
+}
+
+export default function CatalogFilters({ categories, suppliers }: CatalogFiltersProps) {
+  const { activeCategory, activeSupplier, sort, priceMin, priceMax, updateFilters, resetFilters } = useCatalogFilters();
 
   return (
     <div className="space-y-3 mb-6">
+      {/* 默认供应商 pills：只有一家时没有筛选意义，不显示 */}
+      {suppliers.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] text-gray-500 mr-1">{t('filter.supplier')}</span>
+          {[{ id: 'all', name: t('filter.supplier.all') }, ...suppliers].map((supplier) => (
+            <button
+              key={supplier.id}
+              onClick={() => updateFilters({ supplier: supplier.id })}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeSupplier === supplier.id
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'bg-white border border-border text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {supplier.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* 品类 pills */}
       {categories.length > 0 && (
         <div className="flex flex-wrap gap-2">

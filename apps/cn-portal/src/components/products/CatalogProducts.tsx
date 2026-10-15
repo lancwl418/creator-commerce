@@ -1,5 +1,5 @@
 import type { SellerTier } from '@creator-commerce/shared/erp/pricing';
-import type { CatalogItem, CatalogSearchParams } from '@/lib/types/catalog';
+import type { CatalogItem, CatalogSearchParams, SupplierOption } from '@/lib/types/catalog';
 import { t } from '@/lib/i18n';
 import CatalogFilters from './CatalogFilters';
 import ProductCard from './ProductCard';
@@ -9,6 +9,7 @@ interface CatalogProductsProps {
   tier: SellerTier;
   items: CatalogItem[];
   categories: string[];
+  suppliers: SupplierOption[];
   count: number;
   errored: boolean;
   searchParams: CatalogSearchParams;
@@ -17,7 +18,7 @@ interface CatalogProductsProps {
 }
 
 export default function CatalogProducts({
-  tier, items, categories, count, errored, searchParams, page, pages,
+  tier, items, categories, suppliers, count, errored, searchParams, page, pages,
 }: CatalogProductsProps) {
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -32,7 +33,7 @@ export default function CatalogProducts({
           </span>
         )}
       </div>
-      <CatalogFilters categories={categories} />
+      <CatalogFilters categories={categories} suppliers={suppliers} />
       {errored && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 mb-6">
           <p className="text-sm text-red-600">{t('list.loadError')}</p>

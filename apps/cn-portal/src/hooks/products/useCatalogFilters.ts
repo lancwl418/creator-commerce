@@ -14,6 +14,7 @@ export function useCatalogFilters() {
 
   return {
     activeCategory: params.get('category') ?? 'all',
+    activeSupplier: params.get('supplier') ?? 'all',
     sort: parseSort(params.get('sort')),
     priceMin: params.get('priceMin') ?? '',
     priceMax: params.get('priceMax') ?? '',

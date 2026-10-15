@@ -5,7 +5,7 @@ import {
   type ErpSku,
   type ErpPricingGroup,
 } from '@creator-commerce/shared/erp';
-import { buildCatalog, getCatalogItem, applyFilters, paginate, type CatalogItem, type PlatformData } from './catalog';
+import { buildCatalog, getCatalogItem, applyFilters, paginate, type CatalogItem, type PlatformData, uniqueSuppliers } from './catalog';
 
 function sku(overrides: Partial<ErpSku> & { sku: string }): ErpSku {
   return {
@@ -71,7 +71,7 @@ function product(overrides: Partial<ErpProduct> & { id: string }): ErpProduct {
 }
 
 function emptyData(): PlatformData {
-  return { hiddenSkusForTier: new Set(), stock: new Map(), moq: new Map() };
+  return { hiddenSkusForTier: new Set(), stock: new Map(), moq: new Map(), supplierNames: new Map() };
 }
 
 describe('resolveProductTierPrice · 分级取价（验收 #1）', () => {
@@ -146,9 +146,9 @@ describe('buildCatalog · 不做显示限制（审批通过范围内）', () => 
 
 describe('applyFilters', () => {
   const items = [
-    { id: 'a', itemNo: '', name: 'A', imagePath: null, category: 'Tee', fromPrice: 5, maxPrice: 5, inStock: true, moqQty: null },
-    { id: 'b', itemNo: '', name: 'B', imagePath: null, category: 'Hat', fromPrice: 10, maxPrice: 10, inStock: true, moqQty: null },
-    { id: 'c', itemNo: '', name: 'C', imagePath: null, category: 'Tee', fromPrice: 8, maxPrice: 8, inStock: true, moqQty: null },
+    { id: 'a', itemNo: '', name: 'A', imagePath: null, category: 'Tee', fromPrice: 5, maxPrice: 5, inStock: true, moqQty: null, supplierId: null, supplierName: null },
+    { id: 'b', itemNo: '', name: 'B', imagePath: null, category: 'Hat', fromPrice: 10, maxPrice: 10, inStock: true, moqQty: null, supplierId: null, supplierName: null },
+    { id: 'c', itemNo: '', name: 'C', imagePath: null, category: 'Tee', fromPrice: 8, maxPrice: 8, inStock: true, moqQty: null, supplierId: null, supplierName: null },
   ];
 
   it('按品类筛选', () => {
@@ -243,5 +243,31 @@ describe('分页', () => {
   it('页码超出范围时落到最后一页；空列表是 1 页', () => {
     expect(paginate(items, 9, 2)).toMatchObject({ items: [items[4]], page: 3 });
     expect(paginate([], 3, 2)).toEqual({ items: [], total: 0, pages: 1, page: 1 });
+  });
+});
+
+describe('默认供应商 · 目录字段与筛选', () => {
+  it('列表项带供应商 id 和显示名：自定义名优先，否则 ERP 原名', () => {
+    const p = product({
+      id: 'p1', mainSupplierId: 'sup-a', vendor: 'JJS',
+      suppliers: [{ id: 'q1', supplierId: 'sup-a', name: 'JJS 工厂' }],
+    });
+    expect(getCatalogItem(p, emptyData())).toMatchObject({ supplierId: 'sup-a', supplierName: 'JJS 工厂' });
+    const data = { ...emptyData(), supplierNames: new Map([['sup-a', '华南一厂']]) };
+    expect(getCatalogItem(p, data)).toMatchObject({ supplierId: 'sup-a', supplierName: '华南一厂' });
+    expect(getCatalogItem(product({ id: 'p2', mainSupplierId: null }), data)).toMatchObject({ supplierId: null, supplierName: null });
+  });
+
+  it('按供应商筛选，并汇总目录里的供应商选项', () => {
+    const data = emptyData();
+    const items = [
+      getCatalogItem(product({ id: '1', mainSupplierId: 'a', vendor: 'A' }), data),
+      getCatalogItem(product({ id: '2', mainSupplierId: 'b', vendor: 'B' }), data),
+      getCatalogItem(product({ id: '3', mainSupplierId: 'a', vendor: 'A' }), data),
+      getCatalogItem(product({ id: '4', mainSupplierId: null }), data),
+    ];
+    expect(applyFilters(items, { supplier: 'a' }).map((i) => i.id)).toEqual(['1', '3']);
+    expect(applyFilters(items, { supplier: 'all' })).toHaveLength(4);
+    expect(uniqueSuppliers(items)).toEqual([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }]);
   });
 });

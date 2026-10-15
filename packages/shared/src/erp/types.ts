@@ -72,6 +72,10 @@ export interface ErpSupplierSizeTier {
  */
 export interface ErpSupplierQuote {
   id: string;
+  /** 供应商 id，对应 product.mainSupplierId；ERP 里有少量报价此字段为空串 */
+  supplierId?: string | null;
+  /** 供应商名称；只在服务端使用，不展示给卖家 */
+  name?: string | null;
   sizeTiers?: ErpSupplierSizeTier[] | null;
 }
 
@@ -117,6 +121,11 @@ export interface ErpProduct {
   printPositions?: string | string[] | null;
   /** 支持的业务线 code 列表，ERP 以 JSON 字符串返回，如 '["ideamax","chinamerchant"]' */
   prodSupport?: string | string[] | null;
+  /**
+   * 默认（主）供应商 id，对应 suppliers[].supplierId / pricingGroups[].supplierId。
+   * 一个产品有多家供应商报价时，取价只用主供应商的定价组（见 pricing.ts）。
+   */
+  mainSupplierId?: string | null;
   /** 分级定价组（按客户等级），POD 产品的价格来源 */
   pricingGroups?: ErpPricingGroup[] | null;
   options?: ErpProductOption[] | null;
