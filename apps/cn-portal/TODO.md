@@ -78,12 +78,12 @@
       （不传 = 白板，传 N 面按 face_N 计价，`createDirectOrder`），没有白板价的产品必须上传设计；页内「加入批量单」
       按钮（白板专用，选了设计后隐藏，intent=cart 复用 addToCart）。旧路由 `/order/designed`、`/add-to-cart` 改为重定向。
       订单页新增「创建订单」→ `/orders/new` 搜索选产品后进统一下单页。
-- [ ] **批量单支持带设计的产品（migration 033 待执行）**（2026-10-15 代码已完成）：`cn_cart_items` 加
+- [x] **批量单支持带设计的产品（migration 033 已于 2026-10-15 在生产库执行，用 `node scripts/migrate.js 033` 单跑并验证了字段和部分唯一索引）**：`cn_cart_items` 加
       `design_files / faces`（033：白板行同 SKU 仍唯一累加，带设计的行各自独立，部分唯一索引）；「加入批量单」
       支持传了设计的行（文件加入时就传 R2，按面数计价），购物车按「产品 + 设计」分组展示；结算时设计文件
       下沉到采购单 items[]（单产品直接下单仍存单级 design_files），含设计条目的多产品单 order_type=designed；
       卖家采购单详情 / Admin cn-orders 都会汇总展示条目级设计文件。创建订单流程 = 选产品 → 加入批量单 →
-      继续添加 → 一次提交。**上线前要在生产库执行 migration 033**（注意 `_migrations` 历史，别直接 db:migrate）。
+      继续添加 → 一次提交。
       不同供应商分开展示：批量单页和创建订单的选品列表按默认供应商分组；下单时条目快照 `supplier_name`
       （管理员自定义显示名优先），采购单详情和 Admin 列表随条目展示。目前多供应商仍合成一张采购单，
       只是展示分组；要按供应商自动拆单的话在 checkoutCart 里按 supplier 分组插入即可。
