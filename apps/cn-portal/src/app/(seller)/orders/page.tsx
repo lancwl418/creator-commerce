@@ -22,7 +22,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           </div>
           <div className="flex gap-2 shrink-0">
             <Link href="/cart" className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{t('nav.cart')}</Link>
-            <Link href="/orders/import" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">{t('import.title')}</Link>
+            <Link href="/orders/import" className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">{t('import.title')}</Link>
+            <Link href="/orders/new" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">{t('orders.create')}</Link>
           </div>
         </div>
         {imported && <div role="status" className="mb-4 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">{t('import.done', 'zh', { n: imported })}</div>}

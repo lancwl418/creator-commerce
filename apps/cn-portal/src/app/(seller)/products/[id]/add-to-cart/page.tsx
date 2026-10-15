@@ -1,35 +1,8 @@
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { getCatalogItem, getListableSkus } from '@/lib/catalog';
-import { getProductDetail } from '@/lib/catalog.server';
-import { buildBlankVariants } from '@/lib/products/blank-product';
-import { requireSeller } from '@/lib/sellers/session';
+import { redirect } from 'next/navigation';
 import type { SyncPageProps } from '@/lib/types/product';
-import { t } from '@/lib/i18n';
-import AddToCartForm from '@/components/cart/AddToCartForm';
 
-export const dynamic = 'force-dynamic';
-
-/** 批量下单：把该产品的白板 variant 按数量加入购物车，多个产品一起结算 */
-export default async function AddToCartPage({ params }: SyncPageProps) {
+/** 旧「加入批量单」入口：已并入统一下单页（页内按钮加入批量单） */
+export default async function LegacyAddToCartPage({ params }: SyncPageProps) {
   const { id } = await params;
-  const seller = await requireSeller();
-  const { product, data } = await getProductDetail(id, seller.tier);
-  if (!product) notFound();
-  const item = getCatalogItem(product, data);
-  if (!item) notFound();
-  const variants = buildBlankVariants(product, getListableSkus(product, data));
-  const moqBySku = Object.fromEntries(variants.map((v) => [v.sku, data.moq.get(v.sku)?.minQty ?? null]));
-  return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
-      <Link href={`/products/${id}`} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">← {t('sync.back')}</Link>
-      <h1 className="text-xl font-bold text-gray-900 mt-3">{t('cart.addTitle')}</h1>
-      <p className="text-sm text-gray-500 mt-1 mb-6">{item.name}</p>
-      {variants.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-600">{t('actions.sync.blankUnavailable')}</div>
-      ) : (
-        <AddToCartForm erpProductId={product.id} variants={variants} moqBySku={moqBySku} />
-      )}
-    </div>
-  );
+  redirect(`/products/${id}/order`);
 }

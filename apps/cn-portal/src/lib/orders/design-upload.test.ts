@@ -18,6 +18,12 @@ describe('上传设计下单的文件', () => {
     expect(parseFaceUploads(form({}), faces)).toEqual({ ok: false, error: 'order.error.noDesign' });
   });
 
+  it('required: false 时不传设计 = 白板（返回空上传），但传了仍照常校验', () => {
+    expect(parseFaceUploads(form({}), faces, { required: false })).toEqual({ ok: true, uploads: [] });
+    expect(parseFaceUploads(form({ 'preview:back': file('p.jpg', 'image/jpeg') }), faces, { required: false }))
+      .toEqual({ ok: false, error: 'order.error.previewWithoutDesign' });
+  });
+
   it('只传预览不传设计、类型不对、超过大小都拒绝', () => {
     expect(parseFaceUploads(form({ 'preview:back': file('p.jpg', 'image/jpeg') }), faces)).toEqual({ ok: false, error: 'order.error.previewWithoutDesign' });
     expect(parseFaceUploads(form({ 'design:front': file('a.gif', 'image/gif') }), faces)).toEqual({ ok: false, error: 'order.error.designFile' });

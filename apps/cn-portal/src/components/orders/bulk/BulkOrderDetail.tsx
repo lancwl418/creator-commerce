@@ -1,7 +1,7 @@
 import type { BulkOrderRow } from '@/lib/types/bulk-order';
 import { orderQuantity, orderTitle } from '@/lib/orders/bulk-order';
 import { t, type MessageKey } from '@/lib/i18n';
-import { faceLabel } from './DesignUploadFields';
+import { faceLabel } from '@/lib/orders/face-label';
 
 export const BULK_STATUS_STYLES: Record<BulkOrderRow['status'], string> = {
   pending_confirmation: 'bg-amber-50 text-amber-700',
@@ -13,8 +13,16 @@ export function bulkStatusLabel(status: BulkOrderRow['status']): string {
   return t(`order.status.${status}` as MessageKey);
 }
 
+/** 单上的设计文件：单产品单在 design_files，批量单在各条目上；按文件地址去重后统一展示 */
+function designGroups(order: BulkOrderRow): BulkOrderRow['design_files'] {
+  const all = [...order.design_files, ...order.items.flatMap((item) => item.design_files ?? [])];
+  const seen = new Set<string>();
+  return all.filter((file) => !seen.has(file.design_url) && seen.add(file.design_url));
+}
+
 export default function BulkOrderDetail({ order }: { order: BulkOrderRow }) {
   const a = order.shipping_address;
+  const designs = designGroups(order);
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-white p-5">
@@ -22,6 +30,9 @@ export default function BulkOrderDetail({ order }: { order: BulkOrderRow }) {
           <div>
             <p className="text-xs text-gray-400">{t(order.order_type === 'blank' ? 'order.type.blank' : 'order.type.designed')} · {new Date(order.created_at).toLocaleString('zh-CN')}</p>
             <h2 className="text-lg font-semibold text-gray-900 mt-1">{orderTitle(order)}</h2>
+            {order.product_title && order.items[0]?.supplier_name && (
+              <p className="text-xs text-gray-400 mt-0.5">{t('detail.supplier')}：{order.items[0].supplier_name}</p>
+            )}
           </div>
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${BULK_STATUS_STYLES[order.status]}`}>{bulkStatusLabel(order.status)}</span>
         </div>
@@ -35,9 +46,15 @@ export default function BulkOrderDetail({ order }: { order: BulkOrderRow }) {
             </tr>
           </thead>
           <tbody>
-            {order.items.map((item) => (
-              <tr key={item.sku_id} className="border-b border-border last:border-0">
-                <td className="px-2 py-2 text-gray-800">{item.sku}{!order.product_title && item.product_title && <span className="block text-xs text-gray-400">{item.product_title}</span>}</td>
+            {order.items.map((item, index) => (
+              <tr key={`${item.sku_id}-${index}`} className="border-b border-border last:border-0">
+                <td className="px-2 py-2 text-gray-800">
+                  {item.sku}
+                  {(item.faces ?? 0) > 0 && <span className="ml-1.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">{t('cart.designed', 'zh', { n: item.faces! })}</span>}
+                  {!order.product_title && item.product_title && (
+                    <span className="block text-xs text-gray-400">{item.product_title}{item.supplier_name ? ` · ${item.supplier_name}` : ''}</span>
+                  )}
+                </td>
                 <td className="px-2 py-2 text-gray-800">{[item.option1, item.option2, item.option3].filter(Boolean).join(' / ')}</td>
                 <td className="px-2 py-2 text-gray-800">${Number(item.unit_cost).toFixed(2)}</td>
                 <td className="px-2 py-2 text-gray-800">{item.quantity}</td>
@@ -52,12 +69,12 @@ export default function BulkOrderDetail({ order }: { order: BulkOrderRow }) {
           </tfoot>
         </table>
       </div>
-      {order.design_files.length > 0 && (
+      {designs.length > 0 && (
         <div className="rounded-2xl border border-border bg-white p-5">
           <h3 className="text-sm font-semibold text-gray-800 mb-3">{t('order.section.design')}</h3>
           <div className="flex flex-wrap gap-4">
-            {order.design_files.map((file) => (
-              <div key={file.face} className="text-center">
+            {designs.map((file) => (
+              <div key={file.design_url} className="text-center">
                 {file.preview_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={file.preview_url} alt="" className="h-24 w-24 rounded-lg border border-border bg-surface-secondary object-contain p-1" />

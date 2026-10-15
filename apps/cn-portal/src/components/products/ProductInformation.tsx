@@ -9,10 +9,10 @@ import MoqHint from './MoqHint';
 interface ProductInformationProps {
   details: ProductDetailView;
   tier: SellerTier;
-  canSyncBlank: boolean;
+  canOrder: boolean;
 }
 
-export default function ProductInformation({ details, tier, canSyncBlank }: ProductInformationProps) {
+export default function ProductInformation({ details, tier, canOrder }: ProductInformationProps) {
   const { item } = details;
   const { fromPrice: minPrice, maxPrice, moqQty } = item;
   return (
@@ -60,7 +60,7 @@ export default function ProductInformation({ details, tier, canSyncBlank }: Prod
         </p>
       </div>
 
-      <ProductActions productId={item.id} canSyncBlank={canSyncBlank} />
+      <ProductActions productId={item.id} canOrder={canOrder} />
     </div>
   );
 }

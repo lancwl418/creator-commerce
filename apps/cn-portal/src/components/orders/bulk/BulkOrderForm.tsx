@@ -19,14 +19,18 @@ interface BulkOrderFormProps {
   variants: BlankVariant[];
   moqBySku: Record<string, number | null>;
   defaultAddress: Partial<ShippingAddress> | null;
-  /** 上传设计下单时可上传的印刷面 */
+  /** 可上传设计的印刷面；不传则不显示设计区（如设计器产品下单） */
   designFaces?: PrintFace[];
+  /** 设计是否可选（统一下单页：不传设计 = 白板）；false 时必须上传 */
+  designOptional?: boolean;
+  /** 显示「加入批量单」按钮（白板和带设计都可加入，多产品合成一张采购单） */
+  allowCart?: boolean;
 }
 
 const INITIAL_STATE: BulkOrderFormState = {};
 
-/** 采购单表单：白板下单与设计下单共用，差别只在单价来源和提交动作。 */
-export default function BulkOrderForm({ action, hiddenFields, variants, moqBySku, defaultAddress, designFaces }: BulkOrderFormProps) {
+/** 采购单表单：统一下单（设计可选）与设计器产品下单共用，差别只在设计区和提交动作。 */
+export default function BulkOrderForm({ action, hiddenFields, variants, moqBySku, defaultAddress, designFaces, designOptional, allowCart }: BulkOrderFormProps) {
   const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
   const address = state.address ?? defaultAddress ?? {};
   return (
@@ -35,8 +39,11 @@ export default function BulkOrderForm({ action, hiddenFields, variants, moqBySku
 
       {designFaces && (
         <section className="rounded-2xl border border-border bg-white p-5">
-          <h2 className="text-sm font-semibold text-gray-800 mb-1">{t('order.section.design')}</h2>
-          <p className="text-xs text-gray-400 mb-3">{t('order.section.designHint')}</p>
+          <h2 className="text-sm font-semibold text-gray-800 mb-1">
+            {t('order.section.design')}
+            {designOptional && <span className="ml-2 font-normal text-xs text-gray-400">{t('order.type.blank')} / {t('order.type.designed')}</span>}
+          </h2>
+          <p className="text-xs text-gray-400 mb-3">{t(designOptional ? 'order.section.designOptionalHint' : 'order.section.designHint')}</p>
           <DesignUploadFields faces={designFaces} />
         </section>
       )}
@@ -61,6 +68,13 @@ export default function BulkOrderForm({ action, hiddenFields, variants, moqBySku
       <p className="text-xs text-gray-500">{t('order.paymentNote')}</p>
       <AuthFormStatus state={state} />
       <AuthSubmitButton pending={pending} label={t('order.submit')} pendingLabel={t('order.pending')} />
+      {/* 加入批量单只收数量和设计，formNoValidate 跳过地址的浏览器校验 */}
+      {allowCart && (
+        <button type="submit" name="intent" value="cart" formNoValidate disabled={pending}
+          className="w-full rounded-xl border border-gray-900 px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+          {t('cart.add')}
+        </button>
+      )}
     </form>
   );
 }

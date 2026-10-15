@@ -10,8 +10,13 @@ export interface BulkOrderItem {
   option2: string | null;
   option3: string | null;
   quantity: number;
-  /** 下单时的单价快照（该等级的空白件价） */
+  /** 下单时的单价快照（白板 = 空白件价；带设计 = 空白件价 + faces 面印花价） */
   unit_cost: number;
+  /** 带设计的条目：该行的设计文件和面数（多产品采购单里按条目区分） */
+  design_files?: DesignFile[] | null;
+  faces?: number;
+  /** 下单时产品默认供应商的显示名快照（不同供应商分开展示 / 分单用） */
+  supplier_name?: string | null;
 }
 
 export interface ShippingAddress {
@@ -78,11 +83,18 @@ export interface CartItemRow {
   option2: string | null;
   option3: string | null;
   quantity: number;
+  /** 带设计的行：加入时已传 R2 的设计文件；白板行为 null */
+  design_files: DesignFile[] | null;
+  /** 设计的面数；白板行为 0 */
+  faces: number;
 }
 
 /** 购物车里一条带当前单价的行；unit_cost 为 null 表示该 SKU 现在没有可用报价或已下架 */
 export interface PricedCartItem extends CartItemRow {
   unit_cost: number | null;
+  /** 产品默认供应商（展示时按供应商分组） */
+  supplier_id: string | null;
+  supplier_name: string | null;
 }
 
 /** 表格下单解析后的一组（一张采购单） */

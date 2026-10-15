@@ -30,6 +30,7 @@ export default async function CartPage({ searchParams }: { searchParams: Promise
       ) : (
         <>
           <CartItems items={items} />
+          <Link href="/orders/new" className="inline-block text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900">{t('cart.continue')}</Link>
           {hasUnpriced && <p role="alert" className="text-sm text-red-600">{t('cart.unpricedHint')}</p>}
           <CheckoutForm defaultAddress={lastAddress} disabled={hasUnpriced} />
         </>

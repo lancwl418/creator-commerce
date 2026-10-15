@@ -23,6 +23,13 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+/** 单上的设计文件：单产品单在 design_files，批量单在各条目上；按文件地址去重 */
+function designGroups(order: CnOrderRow): CnOrderRow['design_files'] {
+  const all = [...order.design_files, ...order.items.flatMap((item) => item.design_files ?? [])];
+  const seen = new Set<string>();
+  return all.filter((file) => !seen.has(file.design_url) && seen.add(file.design_url));
+}
+
 export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
   if (orders.length === 0) {
     return (
@@ -48,6 +55,7 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
                 <p className="text-xs text-gray-400 mt-1">
                   {formatDate(order.created_at)} · {order.creators?.company_name || order.creators?.email || 'Unknown seller'}
                   {order.creators?.contact_name && ` · ${order.creators.contact_name} ${order.creators.phone}`}
+                  {order.product_title && order.items[0]?.supplier_name && ` · ${order.items[0].supplier_name}`}
                 </p>
               </div>
               <OrderStatusActions orderId={order.id} status={order.status} />
@@ -63,9 +71,15 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
                 </tr>
               </thead>
               <tbody>
-                {order.items.map((item) => (
-                  <tr key={item.sku_id} className="border-b border-border-light last:border-0">
-                    <td className="px-2 py-1.5 text-gray-800">{item.sku}{!order.product_title && item.product_title && <span className="block text-xs text-gray-400">{item.product_title}</span>}</td>
+                {order.items.map((item, index) => (
+                  <tr key={`${item.sku_id}-${index}`} className="border-b border-border-light last:border-0">
+                    <td className="px-2 py-1.5 text-gray-800">
+                      {item.sku}
+                      {(item.faces ?? 0) > 0 && <span className="ml-1.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">designed ×{item.faces}</span>}
+                      {!order.product_title && item.product_title && (
+                        <span className="block text-xs text-gray-400">{item.product_title}{item.supplier_name ? ` · ${item.supplier_name}` : ''}</span>
+                      )}
+                    </td>
                     <td className="px-2 py-1.5 text-gray-800">{[item.option1, item.option2, item.option3].filter(Boolean).join(' / ')}</td>
                     <td className="px-2 py-1.5 text-gray-800">${Number(item.unit_cost).toFixed(2)}</td>
                     <td className="px-2 py-1.5 text-gray-800">{item.quantity}</td>
@@ -84,10 +98,10 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
               <span className="text-gray-400">Ship to: </span>
               {a.name} · {a.phone} · {[a.address1, a.address2, a.city, a.province, a.zip, a.country].filter(Boolean).join(', ')}
             </div>
-            {order.design_files.length > 0 && (
+            {designGroups(order).length > 0 && (
               <div className="mt-3 flex flex-wrap gap-3">
-                {order.design_files.map((file) => (
-                  <div key={file.face} className="text-center">
+                {designGroups(order).map((file) => (
+                  <div key={file.design_url} className="text-center">
                     {file.preview_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={file.preview_url} alt="" className="h-20 w-20 rounded-lg border border-border-light object-contain p-1" />

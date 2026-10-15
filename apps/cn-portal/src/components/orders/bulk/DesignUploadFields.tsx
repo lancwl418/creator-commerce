@@ -2,17 +2,10 @@
 
 import { useState } from 'react';
 import type { PrintFace } from '@/lib/products/print-faces';
-import { t, type MessageKey } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
+import { faceLabel } from '@/lib/orders/face-label';
 
-const FACE_LABELS: Record<string, MessageKey> = {
-  front: 'face.front', back: 'face.back', left: 'face.left', right: 'face.right', full: 'face.full',
-};
-
-export function faceLabel(face: string): string {
-  return FACE_LABELS[face] ? t(FACE_LABELS[face]) : face;
-}
-
-/** 每个印刷面：设计图（必填其一）+ 预览图（可选），选中后本地预览。 */
+/** 每个印刷面：设计图 + 预览图（可选），选中后本地预览。 */
 export default function DesignUploadFields({ faces }: { faces: PrintFace[] }) {
   const [previews, setPreviews] = useState<Record<string, string>>({});
 

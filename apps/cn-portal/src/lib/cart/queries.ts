@@ -1,7 +1,7 @@
 import { createClient } from '../supabase/server';
 import type { CartItemRow } from '../types/bulk-order';
 
-export const CART_COLUMNS = 'id, erp_product_id, product_title, sku_id, sku, option1, option2, option3, quantity';
+export const CART_COLUMNS = 'id, erp_product_id, product_title, sku_id, sku, option1, option2, option3, quantity, design_files, faces';
 
 export async function getCartItems(creatorId: string): Promise<CartItemRow[]> {
   const supabase = await createClient();

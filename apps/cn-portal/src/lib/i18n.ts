@@ -31,9 +31,7 @@ const dict = {
 
   // 批量下单（购物车）
   'cart.title': { zh: '批量单', en: 'Bulk order' },
-  'cart.subtitle': { zh: '把多个产品的白板加入后一起提交为一张采购单', en: 'Add blanks from several products and submit them as one purchase order' },
-  'cart.addTitle': { zh: '加入批量单', en: 'Add to bulk order' },
-  'cart.addHint': { zh: '填写要加入的数量，加入后可继续选其他产品', en: 'Enter quantities to add; you can keep adding other products' },
+  'cart.subtitle': { zh: '把多个产品加入后一起提交为一张采购单；白板和带设计的都可以加入', en: 'Add several products (blank or designed) and submit them as one purchase order' },
   'cart.add': { zh: '加入批量单', en: 'Add to bulk order' },
   'cart.adding': { zh: '加入中…', en: 'Adding…' },
   'cart.added': { zh: '已加入批量单', en: 'Added to bulk order' },
@@ -98,8 +96,8 @@ const dict = {
   'actions.sync.design': { zh: '开始设计', en: 'Start designing' },
   'actions.sync.blankUnavailable': { zh: '该产品在当前等级没有空白件价格，暂不能按白板同步', en: 'No blank price for your level, cannot sync as blank' },
   'actions.order.title': { zh: '下单', en: 'Order' },
-  'actions.order.design': { zh: '上传设计', en: 'Upload design' },
-  'actions.order.blank': { zh: '白板下单', en: 'Order blanks' },
+  'actions.order.start': { zh: '下单', en: 'Place order' },
+  'actions.order.unavailable': { zh: '该产品在当前等级没有可下单的价格', en: 'No orderable price for your level' },
   'actions.comingSoon': { zh: '即将上线', en: 'Coming soon' },
 
   // 仅同步白板
@@ -144,7 +142,8 @@ const dict = {
   'design.hintOrder': { zh: '在设计器里保存后，会进入下单页面', en: 'After saving in the editor you will place the order' },
 
   // 采购单（直接下单）
-  'order.blankTitle': { zh: '白板下单', en: 'Order blanks' },
+  'order.unifiedTitle': { zh: '下单', en: 'Place order' },
+  'order.unifiedHint': { zh: '上传设计按设计的面数计价；不上传设计就是白板下单。', en: 'Upload designs to price by printed sides; no design means ordering blanks.' },
   'order.designedTitle': { zh: '设计下单', en: 'Order designed product' },
   'order.detailTitle': { zh: '采购单', en: 'Purchase order' },
   'order.created': { zh: '采购单已提交，运营确认后会与你联系安排付款和发货。', en: 'Order submitted. We will contact you about payment and shipping once confirmed.' },
@@ -178,9 +177,9 @@ const dict = {
   'order.error.noItems': { zh: '请至少填写一个规格的数量', en: 'Enter a quantity for at least one variant' },
   'order.error.address': { zh: '请填写完整的收货地址', en: 'Please complete the shipping address' },
   'order.error.generic': { zh: '提交失败，请稍后再试', en: 'Submission failed, please try again' },
-  'order.uploadTitle': { zh: '上传设计下单', en: 'Order with your design' },
   'order.section.design': { zh: '设计图', en: 'Design files' },
   'order.section.designHint': { zh: '每个印刷面上传一张设计图（印刷用）和一张预览图（效果示意）；不印的面留空。设计了几面就按几面的印花价计价。', en: 'Upload a print file and a preview per printed side; leave unused sides empty. Pricing follows the number of printed sides.' },
+  'order.section.designOptionalHint': { zh: '可选。每个印刷面上传一张设计图（印刷用）和一张预览图（效果示意）；设计了几面就按几面的印花价计价。不上传任何设计 = 白板下单。', en: 'Optional. Upload a print file and a preview per printed side; pricing follows the number of printed sides. No design means ordering blanks.' },
   'order.upload.design': { zh: '设计图（PNG / JPG / SVG / PDF，20MB 以内）', en: 'Design file (PNG / JPG / SVG / PDF, up to 20MB)' },
   'order.upload.preview': { zh: '预览图（可选）', en: 'Preview image (optional)' },
   'order.upload.hint': { zh: '上传后价格会按设计的面数重新计算，提交后以采购单上的单价为准。', en: 'Unit prices follow the number of printed sides; the submitted order shows the final price.' },
@@ -192,6 +191,13 @@ const dict = {
   'order.error.previewFile': { zh: '预览图需为 PNG / JPG / WebP，且不超过 20MB', en: 'Preview must be PNG / JPG / WebP under 20MB' },
   'order.error.noPriceForFaces': { zh: '该产品在当前等级没有对应面数的印花报价', en: 'No print price for that number of sides at your level' },
   'order.error.upload': { zh: '设计图上传失败，请重试', en: 'Design upload failed, please try again' },
+  'order.error.designRequired': { zh: '该产品在当前等级没有空白件价格，请上传设计后下单', en: 'No blank price for your level; upload a design to order' },
+  'cart.designed': { zh: '带设计 {n} 面', en: 'Designed, {n} side(s)' },
+  'cart.continue': { zh: '＋ 继续添加产品', en: '+ Add more products' },
+  'orders.create': { zh: '创建订单', en: 'Create order' },
+  'orders.create.subtitle': { zh: '选择产品进入下单页：上传设计按面数计价，不上传就是白板。', en: 'Pick a product to order: upload designs to price by sides, or order blanks.' },
+  'orders.create.search': { zh: '搜索产品名称 / 货号', en: 'Search by name / item no.' },
+  'orders.create.empty': { zh: '没有匹配的产品', en: 'No matching products' },
   'face.front': { zh: '正面', en: 'Front' },
   'face.back': { zh: '背面', en: 'Back' },
   'face.left': { zh: '左侧', en: 'Left' },

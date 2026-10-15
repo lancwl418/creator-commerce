@@ -20,8 +20,11 @@ function fileOrNull(value: FormDataEntryValue | null): File | null {
   return value instanceof File && value.size > 0 ? value : null;
 }
 
-/** 表单字段 design:<face> / preview:<face>；至少一面有设计图，有预览图的面必须也有设计图。 */
-export function parseFaceUploads(form: FormData, faces: PrintFace[]): ParsedFaceUploads {
+/**
+ * 表单字段 design:<face> / preview:<face>；有预览图的面必须也有设计图。
+ * required（默认）时至少一面要有设计图；统一下单页传 { required: false }，没传设计 = 白板。
+ */
+export function parseFaceUploads(form: FormData, faces: PrintFace[], { required = true } = {}): ParsedFaceUploads {
   const uploads: FaceUpload[] = [];
   for (const { face } of faces) {
     const design = fileOrNull(form.get(`design:${face}`));
@@ -34,7 +37,7 @@ export function parseFaceUploads(form: FormData, faces: PrintFace[]): ParsedFace
     if (preview && (!PREVIEW_FILE_TYPES.includes(preview.type) || preview.size > MAX_DESIGN_FILE_BYTES)) return { ok: false, error: 'order.error.previewFile' };
     uploads.push({ face, design, preview });
   }
-  if (uploads.length === 0) return { ok: false, error: 'order.error.noDesign' };
+  if (required && uploads.length === 0) return { ok: false, error: 'order.error.noDesign' };
   return { ok: true, uploads };
 }
 

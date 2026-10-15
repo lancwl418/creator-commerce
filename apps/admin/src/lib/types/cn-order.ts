@@ -10,6 +10,11 @@ export interface CnOrderItem {
   option3: string | null;
   quantity: number;
   unit_cost: number;
+  /** 批量单里带设计的条目：该行的设计文件和面数 */
+  design_files?: { face: string; design_url: string; preview_url: string | null }[] | null;
+  faces?: number;
+  /** 下单时产品默认供应商的显示名快照 */
+  supplier_name?: string | null;
 }
 
 export interface CnOrderAddress {
