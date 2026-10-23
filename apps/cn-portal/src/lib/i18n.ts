@@ -233,6 +233,10 @@ const dict = {
   'stores.error.saveFailed': { zh: '保存店铺信息失败，请稍后再试', en: 'Could not save the store, please try again later' },
   'stores.error.generic': { zh: '操作失败，请稍后再试', en: 'Something went wrong, please try again' },
   'image.empty': { zh: '暂无图片', en: 'No image' },
+  'gallery.zoom': { zh: '查看大图', en: 'View full size' },
+  'gallery.close': { zh: '关闭', en: 'Close' },
+  'gallery.prev': { zh: '上一张', en: 'Previous image' },
+  'gallery.next': { zh: '下一张', en: 'Next image' },
   'pagination.previous': { zh: '上一页', en: 'Previous' },
   'pagination.next': { zh: '下一页', en: 'Next' },
 
