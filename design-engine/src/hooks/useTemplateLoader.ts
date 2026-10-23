@@ -11,7 +11,7 @@ import { convertShopifyProducts } from '@/core/templates/converters/shopifyProdu
 import { convertErpProducts } from '@/core/templates/converters/erpProductConverter';
 import type { ProductTemplate } from '@/types/product';
 import type { ShopifyProduct } from '@/types/shopify-product';
-import type { ErpProductListResponse } from '@/types/erp-product';
+import type { ErpProduct, ErpProductListResponse } from '@/types/erp-product';
 import type { EditorConfig } from '@/types/editor-config';
 
 /**
@@ -137,15 +137,28 @@ async function handlePortalMode(
     // fetch ERP only — no Shopify call, so no Shopify token is required.
     const erpOnly = portalIds.length > 0 && portalIds.every((id) => id.startsWith('erp-'));
     if (erpOnly) {
-      // Fetch ERP, match by id, and append ONLY the matched product(s) — so the
-      // editor shows just the embedded product, not the whole ERP catalog.
-      const erpTemplates = await fetchErpTemplates();
-      for (const id of portalIds) {
-        const erpId = id.replace(/^erp-/, '');
-        const found = erpTemplates.find(
-          (t) => t.metadata?.erpProductId?.toString() === erpId || t.metadata?.itemNo === erpId,
+      // Fetch each product directly by id via the ERP detail endpoint — the
+      // full catalog is several MB, a single product is a few KB.
+      const direct = await Promise.all(
+        portalIds.map((id) => fetchErpTemplateById(id.replace(/^erp-/, ''))),
+      );
+      matched = direct.filter((t): t is ProductTemplate => t !== null);
+
+      // The detail endpoint only resolves real ERP ids; fall back to a catalog
+      // scan for the rest (e.g. itemNo-style ids).
+      if (matched.length < portalIds.length) {
+        const resolved = new Set(
+          matched.map((t) => t.metadata?.erpProductId?.toString()),
         );
-        if (found) matched.push(found);
+        const erpTemplates = await fetchErpTemplates();
+        for (const id of portalIds) {
+          const erpId = id.replace(/^erp-/, '');
+          if (resolved.has(erpId)) continue;
+          const found = erpTemplates.find(
+            (t) => t.metadata?.erpProductId?.toString() === erpId || t.metadata?.itemNo === erpId,
+          );
+          if (found) matched.push(found);
+        }
       }
       if (matched.length > 0) appendTemplates(matched);
     } else {
@@ -269,6 +282,26 @@ function addArtworkLayer(artworkUrl: string) {
     console.warn('[TemplateLoader] Failed to load artwork image:', artworkUrl);
   };
   img.src = proxiedUrl;
+}
+
+/**
+ * Fetches a single ERP product by id and returns it as a ProductTemplate.
+ * Returns null when the product doesn't exist or the request fails — the
+ * caller falls back to a catalog scan.
+ */
+async function fetchErpTemplateById(erpId: string): Promise<ProductTemplate | null> {
+  try {
+    const res = await fetch(`/api/erp-products/${erpId}`);
+    if (!res.ok) throw new Error(`ERP API ${res.status}`);
+    const data = (await res.json()) as { success: boolean; result?: ErpProduct };
+    if (data.success && data.result) {
+      const [template] = convertErpProducts([data.result]);
+      return template ?? null;
+    }
+  } catch (err) {
+    console.warn('[TemplateLoader] Failed to load ERP product by id:', erpId, err);
+  }
+  return null;
 }
 
 /**
