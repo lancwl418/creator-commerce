@@ -115,6 +115,7 @@ export async function getCnOrderPushPrep(orders: CnOrderRow[]): Promise<OrderPus
       if (options.length === 0) continue;
       entries.push({
         erpProductId: productId,
+        erpItemNo: product.itemNo ?? null,
         productTitle: group.title || product.itemEnName || product.title,
         options,
         selectedQuoteId: order.push_suppliers?.[productId]?.quote_id ?? null,

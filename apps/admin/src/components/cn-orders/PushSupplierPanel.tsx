@@ -52,7 +52,10 @@ export function PushSupplierPanel({ orderId, products }: { orderId: string; prod
           );
           return (
             <div key={product.erpProductId} className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-gray-700 min-w-40">{product.productTitle}</span>
+              <span className="text-gray-700 min-w-40">
+                {product.productTitle}
+                <span className="ml-1.5 font-mono text-xs text-gray-400 select-all">{product.erpItemNo ?? product.erpProductId}</span>
+              </span>
               <select
                 value={selected?.quoteId ?? ''}
                 onChange={(event) => select(product, event.target.value)}

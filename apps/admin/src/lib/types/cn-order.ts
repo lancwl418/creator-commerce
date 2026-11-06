@@ -81,6 +81,8 @@ export interface SupplierOptionView {
 /** 推送预处理：订单里一个产品的工厂比价 + 当前选择 */
 export interface ProductPushPrep {
   erpProductId: string;
+  /** ERP 货号（itemNo，如 OLA26070021），在 ERP 后台检索用 */
+  erpItemNo: string | null;
   productTitle: string;
   options: SupplierOptionView[];
   /** push_suppliers 里已保存的选择（quote_id） */

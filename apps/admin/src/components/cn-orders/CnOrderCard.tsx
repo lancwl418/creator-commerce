@@ -90,6 +90,12 @@ export function CnOrderCard({
           <p className="text-xs text-gray-400 mt-1">
             {formatDate(order.created_at)} · {order.creators?.company_name || order.creators?.email || 'Unknown seller'}
             {order.creators?.contact_name && ` · ${order.creators.contact_name} ${order.creators.phone}`}
+            {order.erp_product_id && (
+              <>
+                {' · ERP '}
+                <span className="font-mono select-all">{pushPrep?.[0]?.erpItemNo ?? order.erp_product_id}</span>
+              </>
+            )}
           </p>
         </div>
         <OrderStatusActions orderId={order.id} status={order.status} />
@@ -112,7 +118,17 @@ export function CnOrderCard({
                 {item.sku}
                 {(item.faces ?? 0) > 0 && <span className="ml-1.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">designed ×{item.faces}</span>}
                 {!order.product_title && item.product_title && (
-                  <span className="block text-xs text-gray-400">{item.product_title}</span>
+                  <span className="block text-xs text-gray-400">
+                    {item.product_title}
+                    {item.erp_product_id && (
+                      <>
+                        {' · ERP '}
+                        <span className="font-mono select-all">
+                          {pushPrep?.find((p) => p.erpProductId === item.erp_product_id)?.erpItemNo ?? item.erp_product_id}
+                        </span>
+                      </>
+                    )}
+                  </span>
                 )}
               </td>
               <td className="px-2 py-1.5 text-gray-800">{[item.option1, item.option2, item.option3].filter(Boolean).join(' / ')}</td>
