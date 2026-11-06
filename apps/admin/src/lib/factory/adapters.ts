@@ -1,6 +1,8 @@
 import { RiinClient, type RiinGoodsItem, type RiinImage, type RiinPlaceOrderParams } from './riin-client';
 import {
   createOrder as linmiaoCreateOrder,
+  queryOrderStatus as linmiaoQueryOrderStatus,
+  queryOrderInfo as linmiaoQueryOrderInfo,
   type LinmiaoCreateOrderParams,
   type LinmiaoGoodsItem,
   type LinmiaoImage,
@@ -179,4 +181,76 @@ export async function placeFactoryOrder(
   const params = buildLinmiaoCreateOrderParams(input, supplier.platform_type);
   const result = await linmiaoCreateOrder(params);
   return { platformOid: input.platformOid, traceId: result.traceId, pushed: false, raw: result.data, requestPayload: params };
+}
+
+export interface FactoryStatusRecord {
+  platformOid: string;
+  orderStatus: number | null;
+  orderStatusStr: string | null;
+}
+
+export interface FactoryDeliveryRecord {
+  platformOid: string;
+  trackingNumber: string | null;
+  carrier: string | null;
+  waybillUrl: string | null;
+  shippedAt: Date | null;
+}
+
+function riinClientFor(supplier: FactorySupplierRow): RiinClient {
+  const secretKey = process.env[supplier.secret_key_env];
+  if (!secretKey) {
+    throw new Error(`Env var ${supplier.secret_key_env} is not set — configure the secret key for factory ${supplier.key}`);
+  }
+  return new RiinClient({ secretKey, baseUrl: supplier.base_url });
+}
+
+/** 工厂侧订单状态（RIIN enum 1..15；Linmiao 同协议，响应字段宽松解析） */
+export async function queryFactoryStatuses(supplier: FactorySupplierRow, platformOids: string[]): Promise<FactoryStatusRecord[]> {
+  if (supplier.adapter_type === 'riin') {
+    const res = await riinClientFor(supplier).queryOrderStatus(platformOids);
+    return (res.data ?? []).map((r) => ({
+      platformOid: r.platformOid,
+      orderStatus: r.orderStatus ?? null,
+      orderStatusStr: r.orderStateStr ?? null,
+    }));
+  }
+  const res = await linmiaoQueryOrderStatus(platformOids);
+  if (!Array.isArray(res.data)) return [];
+  return (res.data as Record<string, unknown>[]).map((r) => ({
+    platformOid: String(r.platformOid ?? r.pfOrderId ?? r.orderId ?? ''),
+    orderStatus: typeof r.orderStatus === 'number' ? r.orderStatus : null,
+    orderStatusStr:
+      typeof r.orderStateStr === 'string' ? r.orderStateStr : typeof r.orderStatusStr === 'string' ? r.orderStatusStr : null,
+  }));
+}
+
+/** 工厂侧发货信息（运单号 / 面单 / 发货时间） */
+export async function queryFactoryDeliveries(supplier: FactorySupplierRow, platformOids: string[]): Promise<FactoryDeliveryRecord[]> {
+  if (supplier.adapter_type === 'riin') {
+    const res = await riinClientFor(supplier).queryOrderDelivery(platformOids);
+    return (res.data ?? []).map((r) => {
+      const shipping = r.shippingTime ? new Date(r.shippingTime) : null;
+      return {
+        platformOid: r.platformOid,
+        trackingNumber: r.trackingNumber || null,
+        carrier: null,
+        waybillUrl: r.waybillDataPath || null,
+        shippedAt: shipping && !isNaN(shipping.getTime()) ? shipping : null,
+      };
+    });
+  }
+  // Linmiao 没有独立 delivery 接口；query-order-info 每单带 courierNumber/deliveryCourier/shippingTime
+  const res = await linmiaoQueryOrderInfo(platformOids);
+  if (!Array.isArray(res.data)) return [];
+  return (res.data as Record<string, unknown>[]).map((r) => {
+    const shipping = typeof r.shippingTime === 'string' ? new Date(r.shippingTime) : null;
+    return {
+      platformOid: String(r.pfOrderId ?? r.platformOid ?? ''),
+      trackingNumber: typeof r.courierNumber === 'string' && r.courierNumber ? r.courierNumber : null,
+      carrier: typeof r.deliveryCourier === 'string' && r.deliveryCourier ? r.deliveryCourier : null,
+      waybillUrl: null,
+      shippedAt: shipping && !isNaN(shipping.getTime()) ? shipping : null,
+    };
+  });
 }

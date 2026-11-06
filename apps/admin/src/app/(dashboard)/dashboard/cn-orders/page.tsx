@@ -4,6 +4,7 @@ import { getCnOrderPushPrep } from '@/lib/queries/cn-order-suppliers';
 import { getFactoryPushes } from '@/lib/queries/cn-factory-pushes';
 import type { CnOrdersPageProps } from '@/lib/types/cn-order';
 import { CnOrdersTable } from '@/components/cn-orders/CnOrdersTable';
+import { SyncFactoryStatusButton } from '@/components/cn-orders/SyncFactoryStatusButton';
 
 const TABS = [
   { key: 'all', label: 'All' },
@@ -29,7 +30,7 @@ export default async function CnOrdersPage({ searchParams }: CnOrdersPageProps) 
           Blank / designed product orders placed by CN sellers. No online payment yet: confirm after arranging payment, then push to ERP.
         </p>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {TABS.map((tab) => {
           const active = (current ?? 'all') === tab.key;
           return (
@@ -39,6 +40,9 @@ export default async function CnOrdersPage({ searchParams }: CnOrdersPageProps) 
             </Link>
           );
         })}
+        <div className="ml-auto">
+          <SyncFactoryStatusButton />
+        </div>
       </div>
       <CnOrdersTable orders={orders} pushPrep={pushPrep} factoryPushes={factoryPushes} />
     </div>

@@ -57,7 +57,12 @@ export function FactoryPushPanel({ orderId, pushes, canPush }: { orderId: string
               <span className="text-xs text-gray-400">
                 {push.cn_factory_suppliers?.name ?? 'factory'} · placed {formatDate(push.placed_at)}
               </span>
-              {push.order_status_str && <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">{push.order_status_str}</span>}
+              {push.order_status_str && (
+                <span className={`rounded-md px-1.5 py-0.5 text-xs ${push.order_status === 3 ? 'bg-danger-50 text-danger-600 font-medium' : 'bg-gray-100 text-gray-600'}`}>
+                  {push.order_status_str}
+                  {push.order_status === 3 && ' — factory sent it back, needs attention'}
+                </span>
+              )}
               {push.tracking_number && <span className="text-xs text-gray-500">tracking {push.tracking_number}</span>}
               {push.cn_factory_suppliers?.console_url && (
                 <a href={push.cn_factory_suppliers.console_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-600 underline">

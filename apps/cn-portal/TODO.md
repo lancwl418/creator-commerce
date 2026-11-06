@@ -105,8 +105,12 @@
       （RIIN 不调 pushOrder，人工在工厂后台核对后推生产；Linmiao 要在其后台传面单）。失败不落库、界面可重试。
       **部署前：Admin 服务需配 RIIN_API_URL / RIIN_JJSPROMO_SECRET_KEY / RIIN_XINFEIYANG_SECRET_KEY /
       FACTORY_API_URL / FACTORY_API_SECRET_KEY（与 order-workbench 同账号）**。
-      待做：工厂状态/物流回查（RIIN queryOrderStatus/queryOrderDelivery 已移植未接线）、xinfeiyang 和 linmiao
-      的 ERP supplierId 映射、CSV 导入单（条目无产品 id）暂不能推。
+      **2026-11-06 补齐（migration 037 已执行）**：① 工厂状态/物流回查——cn-orders 页「Sync factory status」
+      手动刷新 + `POST /api/cron/sync-factory-status`（Bearer CRON_SECRET，service role）给外部调度器定时调；
+      状态 ≥4 自动记 pushed_at，4~12 之间回查运单号，反审（状态 3）红标提示人工处理；终态 12/13/15 不再查。
+      ② ERP 供应商映射补齐：鑫飞扬美履 → xinfeiyang、林淼独立站 → linmiao（ai定制 / 育创谷 / 休斯敦无工厂
+      系统，推送时报「无工厂映射」）。③ CSV 导入单条目本就带 erp_product_id，可正常推送。
+      待做：工厂反审的处理工单流（workbench 的 rejectionStatus 三态可参考）；cron 调度器在 Render 上配置。
 - [ ] **第 4 步 · 支付**：支付（Plaid 或 Stripe）待定。原「推 ERP 创建订单 `HyHUQiWD`」方案已被直推工厂取代，
       `erp_order_id / erp_sync_status` 字段保留备用。
 - [ ] **设计器下单**：目前从「我的产品」对设计器建的产品也能下单（按单面计价），产品页「上传设计」走上传文件，不走设计器。

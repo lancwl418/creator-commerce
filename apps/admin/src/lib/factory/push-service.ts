@@ -56,7 +56,7 @@ export async function pushCnOrderToFactories(orderId: string): Promise<{ outcome
     const productId = item.erp_product_id ?? order.erp_product_id;
     const product = productId ? products.get(productId) : null;
     if (!productId || !product) {
-      return { outcomes: [], error: `Item ${index + 1} (${item.sku}) has no ERP product — CSV-imported lines can't be pushed yet` };
+      return { outcomes: [], error: `Item ${index + 1} (${item.sku}) has no ERP product reference, so it can't be routed to a factory` };
     }
     const chosenSupplierId = order.push_suppliers?.[productId]?.supplier_id ?? product.mainSupplierId?.trim() ?? null;
     const factory = chosenSupplierId ? factoryByErpSupplier.get(chosenSupplierId) : undefined;

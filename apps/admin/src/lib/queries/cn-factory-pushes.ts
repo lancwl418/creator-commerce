@@ -10,6 +10,7 @@ export interface FactoryPushRow {
   order_status: number | null;
   order_status_str: string | null;
   tracking_number: string | null;
+  carrier: string | null;
   last_error: string | null;
   cn_factory_suppliers: { key: string; name: string; console_url: string | null } | null;
 }
@@ -22,7 +23,7 @@ export async function getFactoryPushes(orderIds: string[]): Promise<FactoryPushM
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('cn_factory_pushes')
-    .select('id, order_id, platform_oid, placed_at, pushed_at, order_status, order_status_str, tracking_number, last_error, cn_factory_suppliers (key, name, console_url)')
+    .select('id, order_id, platform_oid, placed_at, pushed_at, order_status, order_status_str, tracking_number, carrier, last_error, cn_factory_suppliers (key, name, console_url)')
     .in('order_id', orderIds)
     .order('created_at', { ascending: false })
     .returns<FactoryPushRow[]>();
