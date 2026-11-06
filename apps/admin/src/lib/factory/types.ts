@@ -79,6 +79,33 @@ export interface FactoryPushOutcome {
   error?: string;
 }
 
+/** 推送确认弹窗的报文摘要（预览即所发，和真实报文同一套组装） */
+export interface FactoryPushPlanItem {
+  factorySku: string;
+  title: string;
+  spec: string;
+  quantity: number;
+  price: number;
+  shouldPrint: boolean;
+  printPosition?: string;
+  printImages: number;
+}
+
+export interface FactoryPushPlanGroup {
+  factoryKey: string;
+  factoryName: string;
+  platformOid: string;
+  alreadyPushed: boolean;
+  items: FactoryPushPlanItem[];
+}
+
+export interface FactoryPushPlan {
+  orderNumber: number;
+  consignee: { name: string; phone: string; addressLine: string };
+  sellerRemark?: string;
+  groups: FactoryPushPlanGroup[];
+}
+
 /** RIIN 订单状态枚举（Linmiao 同协议） */
 export const FACTORY_ORDER_STATUS: Record<number, string> = {
   1: '店铺审核中',
