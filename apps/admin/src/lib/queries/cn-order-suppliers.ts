@@ -56,11 +56,14 @@ function buildOptions(
       }
     }
     const supplierId = quote.supplierId?.trim() || null;
-    const name = (supplierId && supplierNames.get(supplierId)?.trim()) || quote.name?.trim() || supplierId || quote.id;
+    // Admin 用真实工厂名（ERP 原名）；cn_supplier_settings 的自定义名是给卖家看的昵称，只作备注
+    const name = quote.name?.trim() || supplierId || quote.id;
+    const nickname = (supplierId && supplierNames.get(supplierId)?.trim()) || null;
     return {
       quoteId: quote.id,
       supplierId,
       name,
+      nickname: nickname && nickname !== name ? nickname : null,
       isMain: !!supplierId && supplierId === product.mainSupplierId?.trim(),
       total: total !== null ? Math.round(total * 100) / 100 : null,
       missingItems,

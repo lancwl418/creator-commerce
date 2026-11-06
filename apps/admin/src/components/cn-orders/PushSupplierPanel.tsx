@@ -7,7 +7,8 @@ import type { ProductPushPrep, SupplierOptionView } from '@/lib/types/cn-order';
 
 function optionLabel(option: SupplierOptionView): string {
   const cost = option.total !== null ? `$${option.total.toFixed(2)}` : `no quote for ${option.missingItems} item(s)`;
-  return `${option.name} — ${cost}${option.isMain ? ' · default' : ''}`;
+  const nickname = option.nickname ? `（卖家侧 ${option.nickname}）` : '';
+  return `${option.name}${nickname} — ${cost}${option.isMain ? ' · default' : ''}`;
 }
 
 /** 推送预处理：按产品展示各工厂做本单的成本，运营改选后立即保存到 push_suppliers。 */

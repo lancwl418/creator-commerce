@@ -66,8 +66,10 @@ export function formatCnOrderNumber(orderNumber: number): string {
 export interface SupplierOptionView {
   quoteId: string;
   supplierId: string | null;
-  /** 显示名：cn_supplier_settings 自定义名优先，否则 ERP 原名 */
+  /** 真实工厂名（ERP 原名）——Admin 内部用真名 */
   name: string;
+  /** 对卖家展示的昵称（cn_supplier_settings 自定义名），与真名不同时才有值 */
+  nickname: string | null;
   /** 是否产品默认（主）供应商 */
   isMain: boolean;
   /** 该工厂做本单此产品的总成本 Σ 单价 × 数量；报价覆盖不全时为 null */
