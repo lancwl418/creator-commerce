@@ -18,6 +18,14 @@ interface PushGroup {
   items: { item: CnOrderItem; index: number; product: ErpProduct; quote: ErpSupplierQuote | null }[];
 }
 
+/** RIIN 限制卖家备注 ≤20 字符；地址等信息已在收件人字段里，备注超长直接截断 */
+function truncateRemark(note: string | null): string | undefined {
+  const trimmed = note?.trim();
+  if (!trimmed) return undefined;
+  const chars = [...trimmed];
+  return chars.length <= 20 ? trimmed : chars.slice(0, 20).join('');
+}
+
 /**
  * 推送一张采购单到工厂（只下到「待推送」）。
  * 工厂选择：运营在 push_suppliers 的改选优先，否则产品的 ERP 默认供应商；
@@ -85,7 +93,7 @@ export async function pushCnOrderToFactories(orderId: string): Promise<{ outcome
       sourceOrderId: `CN${order.order_number}`,
       consignee: consignee.consignee,
       orderTime: new Date(order.created_at),
-      sellerRemark: order.note ?? undefined,
+      sellerRemark: truncateRemark(order.note),
       items: group.items.map((entry) => buildItemInput(order, entry)),
     };
 
