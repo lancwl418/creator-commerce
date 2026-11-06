@@ -99,11 +99,29 @@ export interface FactoryPushPlanGroup {
   items: FactoryPushPlanItem[];
 }
 
+/** 弹窗里可编辑的收货信息，字段与 cn_bulk_orders.shipping_address 一致 */
+export interface FactoryPushConsignee {
+  name: string;
+  phone: string;
+  country: string;
+  province: string;
+  city: string;
+  address1: string;
+  address2: string;
+  zip: string;
+}
+
 export interface FactoryPushPlan {
   orderNumber: number;
-  consignee: { name: string; phone: string; addressLine: string };
+  consignee: FactoryPushConsignee;
   sellerRemark?: string;
   groups: FactoryPushPlanGroup[];
+}
+
+/** 确认弹窗里的修改：推送用编辑后的地址（并回写订单），备注只进工厂报文 */
+export interface FactoryPushOverrides {
+  consignee: FactoryPushConsignee;
+  remark?: string;
 }
 
 /** RIIN 订单状态枚举（Linmiao 同协议） */

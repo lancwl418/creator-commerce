@@ -6,7 +6,14 @@ import { createClient } from '@/lib/supabase/server';
 import type { CnOrderRow } from '@/lib/types/cn-order';
 import { placeFactoryOrder } from './adapters';
 import { buildConsignee, buildItemInput } from './build-input';
-import type { FactoryConsignee, FactoryOrderInput, FactoryPushOutcome, FactoryPushPlan, FactorySupplierRow } from './types';
+import type {
+  FactoryConsignee,
+  FactoryOrderInput,
+  FactoryPushOutcome,
+  FactoryPushOverrides,
+  FactoryPushPlan,
+  FactorySupplierRow,
+} from './types';
 
 // 推送服务：把一张 CN 采购单按（运营选定的）工厂分组，组装 goodsList 下到工厂「待推送」。
 // 预览（弹窗确认）和执行共用同一套组装逻辑；成功一组落一条 cn_factory_pushes，
@@ -35,9 +42,13 @@ function truncateRemark(note: string | null): string | undefined {
 
 /**
  * 组装推送上下文：工厂选择用运营在 push_suppliers 的改选，否则产品的 ERP 默认供应商。
- * 预览和真实推送都从这里走，保证确认弹窗看到的就是发出去的。
+ * 预览和真实推送都从这里走，保证确认弹窗看到的就是发出去的；
+ * overrides 是确认弹窗里编辑过的收货信息/备注。
  */
-async function buildPushContext(orderId: string): Promise<{ context?: PushContext; error?: string }> {
+async function buildPushContext(
+  orderId: string,
+  overrides?: FactoryPushOverrides
+): Promise<{ context?: PushContext; error?: string }> {
   const supabase = await createClient();
   const { data: order, error: orderError } = await supabase
     .from('cn_bulk_orders')
@@ -47,6 +58,7 @@ async function buildPushContext(orderId: string): Promise<{ context?: PushContex
   if (orderError || !order) return { error: orderError?.message ?? 'Order not found' };
   if (order.status !== 'confirmed') return { error: 'Only confirmed orders can be pushed' };
 
+  if (overrides) order.shipping_address = overrides.consignee;
   const consignee = buildConsignee(order);
   if (!consignee.ok) return { error: consignee.error };
 
@@ -97,7 +109,7 @@ async function buildPushContext(orderId: string): Promise<{ context?: PushContex
         sourceOrderId: `CN${order.order_number}`,
         consignee: consignee.consignee,
         orderTime: new Date(order.created_at),
-        sellerRemark: truncateRemark(order.note),
+        sellerRemark: truncateRemark(overrides?.remark !== undefined ? overrides.remark : order.note),
         items: entries.map((entry) => buildItemInput(order, entry)),
       },
     })),
@@ -109,14 +121,19 @@ async function buildPushContext(orderId: string): Promise<{ context?: PushContex
 export async function previewCnOrderPush(orderId: string): Promise<{ plan?: FactoryPushPlan; error?: string }> {
   const { context, error } = await buildPushContext(orderId);
   if (!context) return { error };
-  const a = context.consignee;
+  const a = context.order.shipping_address;
   return {
     plan: {
       orderNumber: context.order.order_number,
       consignee: {
-        name: a.name,
-        phone: a.phone,
-        addressLine: [a.address, a.addressOptional, a.city, a.province, a.postCode, a.country].filter(Boolean).join(', '),
+        name: a.name ?? '',
+        phone: a.phone ?? '',
+        country: a.country ?? '',
+        province: a.province ?? '',
+        city: a.city ?? '',
+        address1: a.address1 ?? '',
+        address2: a.address2 ?? '',
+        zip: a.zip ?? '',
       },
       sellerRemark: context.groups[0]?.input.sellerRemark,
       groups: context.groups.map((group) => ({
@@ -141,12 +158,24 @@ export async function previewCnOrderPush(orderId: string): Promise<{ plan?: Fact
 
 /**
  * 推送一张采购单到工厂（只下到「待推送」）。
- * 已推过的工厂跳过（platform_oid 唯一兜底防重复）。
+ * 已推过的工厂跳过（platform_oid 唯一兜底防重复）；
+ * 弹窗里编辑过收货信息时先回写订单，再按编辑后的地址推送。
  */
-export async function pushCnOrderToFactories(orderId: string): Promise<{ outcomes: FactoryPushOutcome[]; error?: string }> {
-  const { context, error } = await buildPushContext(orderId);
+export async function pushCnOrderToFactories(
+  orderId: string,
+  overrides?: FactoryPushOverrides
+): Promise<{ outcomes: FactoryPushOutcome[]; error?: string }> {
+  const { context, error } = await buildPushContext(orderId, overrides);
   if (!context) return { outcomes: [], error };
   const supabase = await createClient();
+
+  if (overrides) {
+    const { error: addressError } = await supabase
+      .from('cn_bulk_orders')
+      .update({ shipping_address: overrides.consignee })
+      .eq('id', orderId);
+    if (addressError) return { outcomes: [], error: `Failed to save edited shipping address: ${addressError.message}` };
+  }
 
   const outcomes: FactoryPushOutcome[] = [];
   for (const group of context.groups) {

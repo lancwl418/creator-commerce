@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { previewCnOrderPush, pushCnOrderToFactories } from './push-service';
 import { syncFactoryPushStatuses, type FactorySyncResult } from './status-sync';
-import type { FactoryPushOutcome, FactoryPushPlan } from './types';
+import type { FactoryPushOutcome, FactoryPushOverrides, FactoryPushPlan } from './types';
 
 /** 推送前预览：组装报文摘要给确认弹窗，不发送任何请求到工厂 */
 export async function previewFactoryPushAction(orderId: string): Promise<{ plan?: FactoryPushPlan; error?: string }> {
@@ -18,10 +18,11 @@ export async function previewFactoryPushAction(orderId: string): Promise<{ plan?
 
 /** 推送采购单到工厂（Server Action：密钥只在服务端，RLS 用当前 admin 会话） */
 export async function pushOrderToFactoriesAction(
-  orderId: string
+  orderId: string,
+  overrides?: FactoryPushOverrides
 ): Promise<{ outcomes: FactoryPushOutcome[]; error?: string }> {
   try {
-    const result = await pushCnOrderToFactories(orderId);
+    const result = await pushCnOrderToFactories(orderId, overrides);
     if (result.outcomes.some((o) => o.ok)) revalidatePath('/dashboard/cn-orders');
     return result;
   } catch (cause) {

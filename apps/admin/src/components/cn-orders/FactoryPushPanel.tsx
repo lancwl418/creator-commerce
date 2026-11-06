@@ -3,14 +3,25 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { previewFactoryPushAction, pushOrderToFactoriesAction } from '@/lib/factory/actions';
-import type { FactoryPushOutcome, FactoryPushPlan } from '@/lib/factory/types';
+import type { FactoryPushConsignee, FactoryPushOutcome, FactoryPushPlan } from '@/lib/factory/types';
 import type { FactoryPushRow } from '@/lib/queries/cn-factory-pushes';
 
 function formatDate(value: string): string {
   return new Date(value).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-/** 推送确认弹窗：预览即所发（和真实报文同一套组装逻辑） */
+const CONSIGNEE_FIELDS: { key: keyof FactoryPushConsignee; label: string; required: boolean; span?: boolean }[] = [
+  { key: 'name', label: 'Name', required: true },
+  { key: 'phone', label: 'Phone', required: true },
+  { key: 'address1', label: 'Address', required: true, span: true },
+  { key: 'address2', label: 'Address 2 (optional)', required: false, span: true },
+  { key: 'city', label: 'City', required: true },
+  { key: 'province', label: 'Province / State', required: true },
+  { key: 'zip', label: 'ZIP / Post code', required: true },
+  { key: 'country', label: 'Country', required: true },
+];
+
+/** 推送确认弹窗：先收货信息（可编辑，确认时回写订单），再产品明细；预览即所发 */
 function ConfirmDialog({
   plan,
   isPending,
@@ -19,66 +30,103 @@ function ConfirmDialog({
 }: {
   plan: FactoryPushPlan;
   isPending: boolean;
-  onConfirm: () => void;
+  onConfirm: (consignee: FactoryPushConsignee, remark: string) => void;
   onCancel: () => void;
 }) {
+  const [consignee, setConsignee] = useState<FactoryPushConsignee>(plan.consignee);
+  const [remark, setRemark] = useState(plan.sellerRemark ?? '');
   const pushable = plan.groups.filter((g) => !g.alreadyPushed);
+  const missing = CONSIGNEE_FIELDS.filter((f) => f.required && !consignee[f.key].trim());
+
+  function set(key: keyof FactoryPushConsignee, value: string) {
+    setConsignee((prev) => ({ ...prev, [key]: value }));
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
         <h3 className="text-lg font-semibold text-gray-900">Confirm factory push — CN{plan.orderNumber}</h3>
         <p className="text-xs text-gray-500 mt-1">
-          This places a real order in the factory&apos;s pending-push queue. Review before confirming.
+          This places a real order in the factory&apos;s pending-push queue. Review the shipping info and items before confirming.
         </p>
 
-        {plan.groups.map((group) => (
-          <div key={group.platformOid} className="mt-4 rounded-xl border border-border-light p-3">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-900">{group.factoryName}</span>
-              <span className="font-mono text-xs text-gray-500">{group.platformOid}</span>
-              {group.alreadyPushed && (
-                <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">already pushed — will be skipped</span>
-              )}
-            </div>
-            <table className="w-full text-sm mt-2">
-              <thead>
-                <tr className="border-b border-border-light text-left text-xs text-gray-500">
-                  <th className="px-2 py-1 font-medium">Factory SKU</th>
-                  <th className="px-2 py-1 font-medium">Spec</th>
-                  <th className="px-2 py-1 font-medium">Print</th>
-                  <th className="px-2 py-1 font-medium">Unit</th>
-                  <th className="px-2 py-1 font-medium">Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.items.map((item, index) => (
-                  <tr key={index} className="border-b border-border-light last:border-0">
-                    <td className="px-2 py-1 font-mono text-xs text-gray-800">
-                      {item.factorySku}
-                      <span className="block font-sans text-xs text-gray-400">{item.title}</span>
-                    </td>
-                    <td className="px-2 py-1 text-gray-800">{item.spec}</td>
-                    <td className="px-2 py-1 text-gray-800">
-                      {item.shouldPrint ? `position ${item.printPosition} · ${item.printImages} file(s)` : 'blank'}
-                    </td>
-                    <td className="px-2 py-1 text-gray-800">${item.price.toFixed(2)}</td>
-                    <td className="px-2 py-1 text-gray-800">{item.quantity}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Shipping</p>
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+            {CONSIGNEE_FIELDS.map((field) => (
+              <label key={field.key} className={`block text-xs text-gray-500 ${field.span ? 'col-span-2' : ''}`}>
+                {field.label}
+                <input
+                  type="text"
+                  value={consignee[field.key]}
+                  onChange={(event) => set(field.key, event.target.value)}
+                  disabled={isPending}
+                  className={`mt-1 w-full rounded-lg border px-2.5 py-1.5 text-sm text-gray-800 disabled:opacity-50 ${
+                    field.required && !consignee[field.key].trim() ? 'border-danger-500 bg-danger-50' : 'border-border-light'
+                  }`}
+                />
+              </label>
+            ))}
+            <label className="col-span-2 block text-xs text-gray-500">
+              Remark to factory (max 20 chars)
+              <input
+                type="text"
+                value={remark}
+                maxLength={20}
+                onChange={(event) => setRemark(event.target.value)}
+                disabled={isPending}
+                className="mt-1 w-full rounded-lg border border-border-light px-2.5 py-1.5 text-sm text-gray-800 disabled:opacity-50"
+              />
+            </label>
           </div>
-        ))}
-
-        <div className="mt-4 text-sm text-gray-700">
-          <span className="text-gray-400">Ship to: </span>
-          {plan.consignee.name} · {plan.consignee.phone} · {plan.consignee.addressLine}
         </div>
-        {plan.sellerRemark && (
-          <p className="mt-1 text-sm text-gray-500">Remark to factory: {plan.sellerRemark}</p>
-        )}
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Items</p>
+          {plan.groups.map((group) => (
+            <div key={group.platformOid} className="mt-2 rounded-xl border border-border-light p-3">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900">{group.factoryName}</span>
+                <span className="font-mono text-xs text-gray-500">{group.platformOid}</span>
+                {group.alreadyPushed && (
+                  <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">already pushed — will be skipped</span>
+                )}
+              </div>
+              <table className="w-full text-sm mt-2">
+                <thead>
+                  <tr className="border-b border-border-light text-left text-xs text-gray-500">
+                    <th className="px-2 py-1 font-medium">Factory SKU</th>
+                    <th className="px-2 py-1 font-medium">Spec</th>
+                    <th className="px-2 py-1 font-medium">Print</th>
+                    <th className="px-2 py-1 font-medium">Unit</th>
+                    <th className="px-2 py-1 font-medium">Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.items.map((item, index) => (
+                    <tr key={index} className="border-b border-border-light last:border-0">
+                      <td className="px-2 py-1 font-mono text-xs text-gray-800">
+                        {item.factorySku}
+                        <span className="block font-sans text-xs text-gray-400">{item.title}</span>
+                      </td>
+                      <td className="px-2 py-1 text-gray-800">{item.spec}</td>
+                      <td className="px-2 py-1 text-gray-800">
+                        {item.shouldPrint ? `position ${item.printPosition} · ${item.printImages} file(s)` : 'blank'}
+                      </td>
+                      <td className="px-2 py-1 text-gray-800">${item.price.toFixed(2)}</td>
+                      <td className="px-2 py-1 text-gray-800">{item.quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          {missing.length > 0 && (
+            <span className="mr-auto text-xs text-danger-600">Missing: {missing.map((f) => f.label).join(', ')}</span>
+          )}
           <button
             type="button"
             onClick={onCancel}
@@ -89,8 +137,8 @@ function ConfirmDialog({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
-            disabled={isPending || pushable.length === 0}
+            onClick={() => onConfirm(consignee, remark)}
+            disabled={isPending || pushable.length === 0 || missing.length > 0}
             className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
           >
             {isPending ? 'Pushing…' : `Confirm push (${pushable.length})`}
@@ -122,9 +170,9 @@ export function FactoryPushPanel({ orderId, pushes, canPush }: { orderId: string
     });
   }
 
-  function confirm() {
+  function confirm(consignee: FactoryPushConsignee, remark: string) {
     startTransition(async () => {
-      const result = await pushOrderToFactoriesAction(orderId);
+      const result = await pushOrderToFactoriesAction(orderId, { consignee, remark });
       setPlan(null);
       setOutcomes(result.outcomes);
       setError(result.error ?? null);
