@@ -1,6 +1,8 @@
 import { formatCnOrderNumber, type CnOrderItem, type CnOrderRow, type OrderPushPrepMap } from '@/lib/types/cn-order';
+import type { FactoryPushMap } from '@/lib/queries/cn-factory-pushes';
 import { OrderStatusActions } from './OrderStatusActions';
 import { PushSupplierPanel } from './PushSupplierPanel';
+import { FactoryPushPanel } from './FactoryPushPanel';
 
 const STATUS_STYLES: Record<CnOrderRow['status'], string> = {
   pending_confirmation: 'bg-warning-50 text-warning-600',
@@ -37,7 +39,15 @@ function itemFactory(order: CnOrderRow, item: CnOrderItem): string | null {
   return (productId && order.push_suppliers?.[productId]?.supplier_name) || item.supplier_name || null;
 }
 
-export function CnOrdersTable({ orders, pushPrep = {} }: { orders: CnOrderRow[]; pushPrep?: OrderPushPrepMap }) {
+export function CnOrdersTable({
+  orders,
+  pushPrep = {},
+  factoryPushes = {},
+}: {
+  orders: CnOrderRow[];
+  pushPrep?: OrderPushPrepMap;
+  factoryPushes?: FactoryPushMap;
+}) {
   if (orders.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border-light bg-white p-12 text-center">
@@ -104,6 +114,7 @@ export function CnOrdersTable({ orders, pushPrep = {} }: { orders: CnOrderRow[];
             </table>
 
             {pushPrep[order.id] && <PushSupplierPanel orderId={order.id} products={pushPrep[order.id]} />}
+            <FactoryPushPanel orderId={order.id} pushes={factoryPushes[order.id] ?? []} canPush={order.status === 'confirmed'} />
 
             <div className="mt-3 text-sm text-gray-700">
               <span className="text-gray-400">Ship to: </span>

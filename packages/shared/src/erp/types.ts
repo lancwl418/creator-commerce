@@ -84,6 +84,16 @@ export interface ErpSupplierCraft {
   costByTier?: Record<string, Record<string, unknown>> | null;
 }
 
+/** 供应商报价里的 SKU 映射：我方 SKU ↔ 工厂编码（推单给工厂时用 factoryCode） */
+export interface ErpSupplierSkuMap {
+  id?: string;
+  /** "颜色|尺码"，如 "Black|S" */
+  skuKey: string;
+  mySkuCode?: string | null;
+  factoryCode?: string | null;
+  onSale?: number | null;
+}
+
 /**
  * 供应商报价。原始数据含供应商成本价（sizeTiers 的 price、crafts 的 costByTier），
  * 只能在服务端/内部后台使用，不要传给卖家浏览器。
@@ -96,6 +106,7 @@ export interface ErpSupplierQuote {
   name?: string | null;
   sizeTiers?: ErpSupplierSizeTier[] | null;
   crafts?: ErpSupplierCraft[] | null;
+  skuMaps?: ErpSupplierSkuMap[] | null;
 }
 
 export interface ErpProductImage {

@@ -95,9 +95,20 @@
       `sizeTiers[].colorTiers[].price` + 设计单的 `crafts[].costByTier` face_N），选最便宜之外的工厂会提示差价；
       选回主供应商 = 清除覆盖。成本解析在 `packages/shared/src/erp/supplier-cost.ts`（含单测），只在服务端/Admin 用，
       不下发卖家。**部署前：Admin 服务需配 ERP_API_BASE_URL / ERP_APP_KEY / ERP_SECRET_KEY**（没配时订单页正常、只是没有比价）。
-- [ ] **第 4 步 · 支付与 ERP 推单**：支付（Plaid 或 Stripe）待定；确认后推 ERP「创建订单」`HyHUQiWD`，
-      `erp_order_id / erp_sync_status` 已预留，需对 ERP 订单字段和 appKey 授权。推单时用 `push_suppliers`
-      的选择（没选的产品用默认供应商），`order_number`（CN 前缀）可作对外单号。
+- [x] **采购单直推工厂（2026-11-06，migration 036 已在生产库执行；推送方向改为直推工厂，不走 ERP 推单）**：
+      移植 order-workbench 的 RIIN / Linmiao 客户端（MD5(body+"::"+secretKey) 签名）到 `apps/admin/src/lib/factory/`。
+      `cn_factory_suppliers`（工厂接入 + ERP 供应商映射，密钥存环境变量名；已 seed jjspromo（对上 JJS 的
+      ERP supplierId）/ xinfeiyang / linmiao），`cn_factory_pushes`（成功一推一条，platform_oid =
+      `CN<order_number>-<factory key>` 唯一防重）。Admin cn-orders：已确认的单「Push to factory」——按
+      push_suppliers 改选（否则产品默认供应商）分组工厂 → ERP skuMaps 取 factoryCode（款号从中剥出）、
+      工厂报价作价、设计面 front/back → printPosition 1/2、白板用 "[不打印]" 标记 → **只下单到工厂「待推送」**
+      （RIIN 不调 pushOrder，人工在工厂后台核对后推生产；Linmiao 要在其后台传面单）。失败不落库、界面可重试。
+      **部署前：Admin 服务需配 RIIN_API_URL / RIIN_JJSPROMO_SECRET_KEY / RIIN_XINFEIYANG_SECRET_KEY /
+      FACTORY_API_URL / FACTORY_API_SECRET_KEY（与 order-workbench 同账号）**。
+      待做：工厂状态/物流回查（RIIN queryOrderStatus/queryOrderDelivery 已移植未接线）、xinfeiyang 和 linmiao
+      的 ERP supplierId 映射、CSV 导入单（条目无产品 id）暂不能推。
+- [ ] **第 4 步 · 支付**：支付（Plaid 或 Stripe）待定。原「推 ERP 创建订单 `HyHUQiWD`」方案已被直推工厂取代，
+      `erp_order_id / erp_sync_status` 字段保留备用。
 - [ ] **设计器下单**：目前从「我的产品」对设计器建的产品也能下单（按单面计价），产品页「上传设计」走上传文件，不走设计器。
 
 ## 二、待接入（工程）
