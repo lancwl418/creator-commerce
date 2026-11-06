@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getCnOrders, parseCnOrderStatus } from '@/lib/queries/cn-orders';
+import { getCnOrderPushPrep } from '@/lib/queries/cn-order-suppliers';
 import type { CnOrdersPageProps } from '@/lib/types/cn-order';
 import { CnOrdersTable } from '@/components/cn-orders/CnOrdersTable';
 
@@ -14,6 +15,7 @@ export default async function CnOrdersPage({ searchParams }: CnOrdersPageProps) 
   const { status } = await searchParams;
   const current = parseCnOrderStatus(status);
   const orders = await getCnOrders(current);
+  const pushPrep = await getCnOrderPushPrep(orders);
 
   return (
     <div className="space-y-6">
@@ -34,7 +36,7 @@ export default async function CnOrdersPage({ searchParams }: CnOrdersPageProps) 
           );
         })}
       </div>
-      <CnOrdersTable orders={orders} />
+      <CnOrdersTable orders={orders} pushPrep={pushPrep} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { createClient } from '../supabase/server';
 import type { BulkOrderRow, ShippingAddress } from '../types/bulk-order';
 
-const BULK_ORDER_COLUMNS = 'id, order_type, status, erp_product_id, product_title, items, subtotal, currency, shipping_address, note, design_files, faces, confirmed_at, created_at';
+const BULK_ORDER_COLUMNS = 'id, order_number, order_type, status, erp_product_id, product_title, items, subtotal, currency, shipping_address, note, design_files, faces, confirmed_at, created_at';
 
 export async function getBulkOrders(creatorId: string): Promise<BulkOrderRow[]> {
   const supabase = await createClient();

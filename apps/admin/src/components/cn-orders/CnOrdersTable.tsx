@@ -1,5 +1,6 @@
-import type { CnOrderRow } from '@/lib/types/cn-order';
+import { formatCnOrderNumber, type CnOrderItem, type CnOrderRow, type OrderPushPrepMap } from '@/lib/types/cn-order';
 import { OrderStatusActions } from './OrderStatusActions';
+import { PushSupplierPanel } from './PushSupplierPanel';
 
 const STATUS_STYLES: Record<CnOrderRow['status'], string> = {
   pending_confirmation: 'bg-warning-50 text-warning-600',
@@ -30,7 +31,13 @@ function designGroups(order: CnOrderRow): CnOrderRow['design_files'] {
   return all.filter((file) => !seen.has(file.design_url) && seen.add(file.design_url));
 }
 
-export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
+/** 条目的实际推送工厂：运营改选（push_suppliers）优先，否则下单快照的默认供应商 */
+function itemFactory(order: CnOrderRow, item: CnOrderItem): string | null {
+  const productId = item.erp_product_id ?? order.erp_product_id;
+  return (productId && order.push_suppliers?.[productId]?.supplier_name) || item.supplier_name || null;
+}
+
+export function CnOrdersTable({ orders, pushPrep = {} }: { orders: CnOrderRow[]; pushPrep?: OrderPushPrepMap }) {
   if (orders.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border-light bg-white p-12 text-center">
@@ -48,6 +55,7 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-semibold text-primary-700">{formatCnOrderNumber(order.order_number)}</span>
                   <h3 className="font-semibold text-gray-900">{orderTitle(order)}</h3>
                   <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status]}`}>{STATUS_LABELS[order.status]}</span>
                   <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{order.order_type === 'blank' ? 'Blank' : 'Designed'}</span>
@@ -55,7 +63,6 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
                 <p className="text-xs text-gray-400 mt-1">
                   {formatDate(order.created_at)} · {order.creators?.company_name || order.creators?.email || 'Unknown seller'}
                   {order.creators?.contact_name && ` · ${order.creators.contact_name} ${order.creators.phone}`}
-                  {order.product_title && order.items[0]?.supplier_name && ` · ${order.items[0].supplier_name}`}
                 </p>
               </div>
               <OrderStatusActions orderId={order.id} status={order.status} />
@@ -66,6 +73,7 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
                 <tr className="border-b border-border-light text-left text-xs text-gray-500">
                   <th className="px-2 py-1.5 font-medium">SKU</th>
                   <th className="px-2 py-1.5 font-medium">Options</th>
+                  <th className="px-2 py-1.5 font-medium">Factory</th>
                   <th className="px-2 py-1.5 font-medium">Unit</th>
                   <th className="px-2 py-1.5 font-medium">Qty</th>
                 </tr>
@@ -77,10 +85,11 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
                       {item.sku}
                       {(item.faces ?? 0) > 0 && <span className="ml-1.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">designed ×{item.faces}</span>}
                       {!order.product_title && item.product_title && (
-                        <span className="block text-xs text-gray-400">{item.product_title}{item.supplier_name ? ` · ${item.supplier_name}` : ''}</span>
+                        <span className="block text-xs text-gray-400">{item.product_title}</span>
                       )}
                     </td>
                     <td className="px-2 py-1.5 text-gray-800">{[item.option1, item.option2, item.option3].filter(Boolean).join(' / ')}</td>
+                    <td className="px-2 py-1.5 text-gray-800">{itemFactory(order, item) ?? '—'}</td>
                     <td className="px-2 py-1.5 text-gray-800">${Number(item.unit_cost).toFixed(2)}</td>
                     <td className="px-2 py-1.5 text-gray-800">{item.quantity}</td>
                   </tr>
@@ -88,11 +97,13 @@ export function CnOrdersTable({ orders }: { orders: CnOrderRow[] }) {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} className="px-2 py-2 text-right text-gray-500">{quantity} pcs</td>
+                  <td colSpan={4} className="px-2 py-2 text-right text-gray-500">{quantity} pcs</td>
                   <td className="px-2 py-2 font-semibold text-gray-900">${Number(order.subtotal).toFixed(2)} {order.currency}</td>
                 </tr>
               </tfoot>
             </table>
+
+            {pushPrep[order.id] && <PushSupplierPanel orderId={order.id} products={pushPrep[order.id]} />}
 
             <div className="mt-3 text-sm text-gray-700">
               <span className="text-gray-400">Ship to: </span>

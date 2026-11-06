@@ -13,7 +13,7 @@ export async function getCnOrders(status: CnOrderStatus | null): Promise<CnOrder
   const supabase = await createClient();
   let query = supabase
     .from('cn_bulk_orders')
-    .select('id, order_type, status, erp_product_id, product_title, items, subtotal, currency, shipping_address, note, design_files, faces, erp_order_id, confirmed_at, created_at, creators (id, email, company_name, contact_name, phone)')
+    .select('id, order_number, order_type, status, erp_product_id, product_title, items, subtotal, currency, shipping_address, note, design_files, faces, erp_order_id, push_suppliers, confirmed_at, created_at, creators (id, email, company_name, contact_name, phone)')
     .order('created_at', { ascending: false })
     .limit(PAGE_SIZE);
   if (status) query = query.eq('status', status);

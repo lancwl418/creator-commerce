@@ -58,17 +58,35 @@ export interface ErpSupplierColorTier {
   id: string;
   code: string;
   memberColors?: string[] | null;
+  /** 该色档的空白件工厂成本（供应商报价）。成本价，只能在服务端/内部后台使用 */
+  price?: number | null;
 }
 
 export interface ErpSupplierSizeTier {
+  /** 档位 id，crafts[].costByTier 以此为 key */
+  id?: string;
   code: string;
   memberSizes?: string[] | null;
   colorTiers?: ErpSupplierColorTier[] | null;
+  /** 整档统一的空白件工厂成本；色档有自己的 price 时以色档为准 */
+  price?: number | null;
 }
 
 /**
- * 供应商报价。原始数据含供应商成本价，只能在服务端使用，不要传给浏览器；
- * 这里只声明解析档位（哪些尺码、颜色属于哪一档）用到的字段。
+ * 供应商报价里的工艺成本。costByTier 以尺码档 id 为 key，值里 face_N 是 N 面印花成本，
+ * 色档 id 作 key 时是该色档的 face_N 明细（优先于档位级）。
+ * 例：{ "<sizeTierId>": { "face_1": 0.8, "<colorTierId>": { "face_1": 0.5 } } }
+ */
+export interface ErpSupplierCraft {
+  id?: string;
+  craftId?: string;
+  name?: string | null;
+  costByTier?: Record<string, Record<string, unknown>> | null;
+}
+
+/**
+ * 供应商报价。原始数据含供应商成本价（sizeTiers 的 price、crafts 的 costByTier），
+ * 只能在服务端/内部后台使用，不要传给卖家浏览器。
  */
 export interface ErpSupplierQuote {
   id: string;
@@ -77,6 +95,7 @@ export interface ErpSupplierQuote {
   /** 供应商名称；只在服务端使用，不展示给卖家 */
   name?: string | null;
   sizeTiers?: ErpSupplierSizeTier[] | null;
+  crafts?: ErpSupplierCraft[] | null;
 }
 
 export interface ErpProductImage {

@@ -87,8 +87,17 @@
       不同供应商分开展示：批量单页和创建订单的选品列表按默认供应商分组；下单时条目快照 `supplier_name`
       （管理员自定义显示名优先），采购单详情和 Admin 列表随条目展示。目前多供应商仍合成一张采购单，
       只是展示分组；要按供应商自动拆单的话在 checkoutCart 里按 supplier 分组插入即可。
+- [x] **订单号 + 推送工厂预处理（migration 035 已于 2026-11-06 在生产库执行并回填，现有订单从 CN1000 起编号）**：
+      `cn_bulk_orders` 加 `order_number`（序列 1000 起，界面显示 `CN<number>`，卖家列表/详情和 Admin 均展示）和
+      `push_suppliers`（运营按产品改选推送工厂的预选，JSONB，按 erp_product_id 记 supplier_id/name/quote_id）。
+      Admin cn-orders：条目表加 Factory 列（改选优先于下单快照）；待推送的单（未取消且无 erp_order_id）按产品
+      显示「Push factory」比价下拉 —— 从 ERP 产品 `suppliers[]` 原始报价算各工厂做本单的成本（空白件价
+      `sizeTiers[].colorTiers[].price` + 设计单的 `crafts[].costByTier` face_N），选最便宜之外的工厂会提示差价；
+      选回主供应商 = 清除覆盖。成本解析在 `packages/shared/src/erp/supplier-cost.ts`（含单测），只在服务端/Admin 用，
+      不下发卖家。**部署前：Admin 服务需配 ERP_API_BASE_URL / ERP_APP_KEY / ERP_SECRET_KEY**（没配时订单页正常、只是没有比价）。
 - [ ] **第 4 步 · 支付与 ERP 推单**：支付（Plaid 或 Stripe）待定；确认后推 ERP「创建订单」`HyHUQiWD`，
-      `erp_order_id / erp_sync_status` 已预留，需对 ERP 订单字段和 appKey 授权。
+      `erp_order_id / erp_sync_status` 已预留，需对 ERP 订单字段和 appKey 授权。推单时用 `push_suppliers`
+      的选择（没选的产品用默认供应商），`order_number`（CN 前缀）可作对外单号。
 - [ ] **设计器下单**：目前从「我的产品」对设计器建的产品也能下单（按单面计价），产品页「上传设计」走上传文件，不走设计器。
 
 ## 二、待接入（工程）

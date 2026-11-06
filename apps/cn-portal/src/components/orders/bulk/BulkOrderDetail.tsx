@@ -1,4 +1,4 @@
-import type { BulkOrderRow } from '@/lib/types/bulk-order';
+import { formatOrderNumber, type BulkOrderRow } from '@/lib/types/bulk-order';
 import { orderQuantity, orderTitle } from '@/lib/orders/bulk-order';
 import { t, type MessageKey } from '@/lib/i18n';
 import { faceLabel } from '@/lib/orders/face-label';
@@ -29,7 +29,10 @@ export default function BulkOrderDetail({ order }: { order: BulkOrderRow }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs text-gray-400">{t(order.order_type === 'blank' ? 'order.type.blank' : 'order.type.designed')} · {new Date(order.created_at).toLocaleString('zh-CN')}</p>
-            <h2 className="text-lg font-semibold text-gray-900 mt-1">{orderTitle(order)}</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mt-1">
+              <span className="font-mono mr-2">{formatOrderNumber(order.order_number)}</span>
+              {orderTitle(order)}
+            </h2>
             {order.product_title && order.items[0]?.supplier_name && (
               <p className="text-xs text-gray-400 mt-0.5">{t('detail.supplier')}：{order.items[0].supplier_name}</p>
             )}

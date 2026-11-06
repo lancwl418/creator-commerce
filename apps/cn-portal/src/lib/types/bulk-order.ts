@@ -37,9 +37,15 @@ export interface DesignFile {
   preview_url: string | null;
 }
 
+/** 格式化订单号：CN1000 */
+export function formatOrderNumber(orderNumber: number): string {
+  return `CN${orderNumber}`;
+}
+
 /** cn_bulk_orders 的一行（卖家视角） */
 export interface BulkOrderRow {
   id: string;
+  order_number: number;
   order_type: 'blank' | 'designed';
   status: BulkOrderStatus;
   /** 单产品采购单才有；多产品时为 null，产品信息看 items[] */
