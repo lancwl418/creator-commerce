@@ -5,18 +5,20 @@ import { getFactoryPushes } from '@/lib/queries/cn-factory-pushes';
 import type { CnOrdersPageProps } from '@/lib/types/cn-order';
 import { CnOrdersTable } from '@/components/cn-orders/CnOrdersTable';
 import { SyncFactoryStatusButton } from '@/components/cn-orders/SyncFactoryStatusButton';
+import { getTranslator } from '@/lib/i18n/server';
+import type { MessageKey } from '@/lib/i18n/messages';
 
-const TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'pending_confirmation', label: 'Pending' },
-  { key: 'confirmed', label: 'Confirmed' },
-  { key: 'cancelled', label: 'Cancelled' },
+const TABS: { key: string; labelKey: MessageKey }[] = [
+  { key: 'all', labelKey: 'cnOrders.tab.all' },
+  { key: 'pending_confirmation', labelKey: 'cnOrders.status.pending_confirmation' },
+  { key: 'confirmed', labelKey: 'cnOrders.status.confirmed' },
+  { key: 'cancelled', labelKey: 'cnOrders.status.cancelled' },
 ];
 
 export default async function CnOrdersPage({ searchParams }: CnOrdersPageProps) {
   const { status } = await searchParams;
   const current = parseCnOrderStatus(status);
-  const orders = await getCnOrders(current);
+  const [orders, { t }] = await Promise.all([getCnOrders(current), getTranslator()]);
   const [pushPrep, factoryPushes] = await Promise.all([
     getCnOrderPushPrep(orders),
     getFactoryPushes(orders.map((order) => order.id)),
@@ -25,10 +27,8 @@ export default async function CnOrdersPage({ searchParams }: CnOrdersPageProps) 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">CN Purchase Orders</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Blank / designed product orders placed by CN sellers. No online payment yet: confirm after arranging payment, then push to ERP.
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('cnOrders.title')}</h1>
+        <p className="text-sm text-gray-500 mt-1">{t('cnOrders.subtitle')}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {TABS.map((tab) => {
@@ -36,7 +36,7 @@ export default async function CnOrdersPage({ searchParams }: CnOrdersPageProps) 
           return (
             <Link key={tab.key} href={tab.key === 'all' ? '/dashboard/cn-orders' : `/dashboard/cn-orders?status=${tab.key}`}
               className={`rounded-xl px-4 py-2 text-sm font-medium ${active ? 'bg-primary-600 text-white' : 'bg-white border border-border-light text-gray-600 hover:bg-gray-50'}`}>
-              {tab.label}
+              {t(tab.labelKey)}
             </Link>
           );
         })}

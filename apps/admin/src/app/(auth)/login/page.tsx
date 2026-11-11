@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { useT } from '@/lib/i18n/client';
+import { LocaleSwitcher } from '@/components/layout/LocaleSwitcher';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -11,6 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+  const t = useT();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -33,6 +36,9 @@ export default function LoginPage() {
 
   return (
     <div className="rounded-2xl bg-white/[0.08] backdrop-blur-xl p-8 shadow-2xl border border-white/10">
+      <div className="flex justify-end -mt-2 -mr-2 mb-2">
+        <LocaleSwitcher tone="dark" />
+      </div>
       <div className="flex justify-center mb-6">
         <div className="w-12 h-12 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/25">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -40,13 +46,13 @@ export default function LoginPage() {
           </svg>
         </div>
       </div>
-      <h1 className="text-2xl font-bold text-center mb-1 text-white">Admin Console</h1>
-      <p className="text-white/50 text-center mb-8 text-sm">Sign in to the management dashboard</p>
+      <h1 className="text-2xl font-bold text-center mb-1 text-white">{t('login.title')}</h1>
+      <p className="text-white/50 text-center mb-8 text-sm">{t('login.subtitle')}</p>
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-white/70 mb-1.5">
-            Email
+            {t('login.email')}
           </label>
           <input
             id="email"
@@ -61,7 +67,7 @@ export default function LoginPage() {
 
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-white/70 mb-1.5">
-            Password
+            {t('login.password')}
           </label>
           <input
             id="password"
@@ -70,7 +76,7 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             className="w-full rounded-xl bg-white/[0.06] border border-white/10 px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all"
-            placeholder="Enter your password"
+            placeholder={t('login.passwordPlaceholder')}
           />
         </div>
 
@@ -85,7 +91,7 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary-600/25 hover:shadow-primary-500/30"
         >
-          {loading ? 'Signing in...' : 'Sign in'}
+          {loading ? t('login.submitting') : t('login.submit')}
         </button>
       </form>
     </div>

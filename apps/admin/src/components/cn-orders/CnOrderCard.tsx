@@ -4,6 +4,8 @@ import type { FactoryPushRow } from '@/lib/queries/cn-factory-pushes';
 import { OrderStatusActions } from './OrderStatusActions';
 import { PushSupplierPanel } from './PushSupplierPanel';
 import { FactoryPushPanel } from './FactoryPushPanel';
+import { getTranslator } from '@/lib/i18n/server';
+import { dateLocale, type Locale, type Translate } from '@/lib/i18n/messages';
 
 const STATUS_STYLES: Record<CnOrderRow['status'], string> = {
   pending_confirmation: 'bg-warning-50 text-warning-600',
@@ -11,20 +13,15 @@ const STATUS_STYLES: Record<CnOrderRow['status'], string> = {
   cancelled: 'bg-gray-100 text-gray-500',
 };
 
-const STATUS_LABELS: Record<CnOrderRow['status'], string> = {
-  pending_confirmation: 'Pending',
-  confirmed: 'Confirmed',
-  cancelled: 'Cancelled',
-};
-
-function orderTitle(order: CnOrderRow): string {
+function orderTitle(order: CnOrderRow, t: Translate): string {
   if (order.product_title) return order.product_title;
   const titles = [...new Set(order.items.map((item) => item.product_title).filter(Boolean))];
-  return titles.length <= 1 ? titles[0] ?? 'Order' : `${titles[0]} + ${titles.length - 1} more`;
+  if (titles.length <= 1) return titles[0] ?? t('cnOrders.fallbackTitle');
+  return t('cnOrders.moreProducts', { first: titles[0] ?? '', count: titles.length - 1, total: titles.length });
 }
 
-function formatDate(value: string): string {
-  return new Date(value).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+function formatDate(value: string, locale: Locale): string {
+  return new Date(value).toLocaleString(dateLocale(locale), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 /** 单上的设计文件：单产品单在 design_files，批量单在各条目上；按文件地址去重 */
@@ -53,7 +50,7 @@ function itemFactory(order: CnOrderRow, item: CnOrderItem, prep?: ProductPushPre
 }
 
 /** 一张采购单的完整卡片：列表和详情页共用；linkToDetail 时单号/标题链到详情 */
-export function CnOrderCard({
+export async function CnOrderCard({
   order,
   pushPrep,
   pushes = [],
@@ -64,12 +61,13 @@ export function CnOrderCard({
   pushes?: FactoryPushRow[];
   linkToDetail?: boolean;
 }) {
+  const { locale, t } = await getTranslator();
   const a = order.shipping_address;
   const quantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const heading = (
     <>
       <span className="font-mono text-sm font-semibold text-primary-700">{formatCnOrderNumber(order.order_number)}</span>
-      <h3 className="font-semibold text-gray-900">{orderTitle(order)}</h3>
+      <h3 className="font-semibold text-gray-900">{orderTitle(order, t)}</h3>
     </>
   );
   return (
@@ -84,11 +82,11 @@ export function CnOrderCard({
             ) : (
               heading
             )}
-            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status]}`}>{STATUS_LABELS[order.status]}</span>
-            <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{order.order_type === 'blank' ? 'Blank' : 'Designed'}</span>
+            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status]}`}>{t(`cnOrders.status.${order.status}`)}</span>
+            <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{order.order_type === 'blank' ? t('cnOrders.type.blank') : t('cnOrders.type.designed')}</span>
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            {formatDate(order.created_at)} · {order.creators?.company_name || order.creators?.email || 'Unknown seller'}
+            {formatDate(order.created_at, locale)} · {order.creators?.company_name || order.creators?.email || t('cnOrders.unknownSeller')}
             {order.creators?.contact_name && ` · ${order.creators.contact_name} ${order.creators.phone}`}
             {order.erp_product_id && (
               <>
@@ -104,11 +102,11 @@ export function CnOrderCard({
       <table className="w-full text-sm mt-4">
         <thead>
           <tr className="border-b border-border-light text-left text-xs text-gray-500">
-            <th className="px-2 py-1.5 font-medium">SKU</th>
-            <th className="px-2 py-1.5 font-medium">Options</th>
-            <th className="px-2 py-1.5 font-medium">Factory</th>
-            <th className="px-2 py-1.5 font-medium">Unit</th>
-            <th className="px-2 py-1.5 font-medium">Qty</th>
+            <th className="px-2 py-1.5 font-medium">{t('cnOrders.col.sku')}</th>
+            <th className="px-2 py-1.5 font-medium">{t('cnOrders.col.options')}</th>
+            <th className="px-2 py-1.5 font-medium">{t('cnOrders.col.factory')}</th>
+            <th className="px-2 py-1.5 font-medium">{t('cnOrders.col.unit')}</th>
+            <th className="px-2 py-1.5 font-medium">{t('cnOrders.col.qty')}</th>
           </tr>
         </thead>
         <tbody>
@@ -116,7 +114,7 @@ export function CnOrderCard({
             <tr key={`${item.sku_id}-${index}`} className="border-b border-border-light last:border-0">
               <td className="px-2 py-1.5 text-gray-800">
                 {item.sku}
-                {(item.faces ?? 0) > 0 && <span className="ml-1.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">designed ×{item.faces}</span>}
+                {(item.faces ?? 0) > 0 && <span className="ml-1.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">{t('cnOrders.designedFaces', { faces: item.faces ?? 0 })}</span>}
                 {!order.product_title && item.product_title && (
                   <span className="block text-xs text-gray-400">
                     {item.product_title}
@@ -140,7 +138,7 @@ export function CnOrderCard({
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={4} className="px-2 py-2 text-right text-gray-500">{quantity} pcs</td>
+            <td colSpan={4} className="px-2 py-2 text-right text-gray-500">{t('cnOrders.pieces', { count: quantity })}</td>
             <td className="px-2 py-2 font-semibold text-gray-900">${Number(order.subtotal).toFixed(2)} {order.currency}</td>
           </tr>
         </tfoot>
@@ -150,7 +148,7 @@ export function CnOrderCard({
       <FactoryPushPanel orderId={order.id} pushes={pushes} canPush={order.status === 'confirmed'} />
 
       <div className="mt-3 text-sm text-gray-700">
-        <span className="text-gray-400">Ship to: </span>
+        <span className="text-gray-400">{t('cnOrders.shipTo')}</span>
         {a.name} · {a.phone} · {[a.address1, a.address2, a.city, a.province, a.zip, a.country].filter(Boolean).join(', ')}
       </div>
       {designGroups(order).length > 0 && (
@@ -161,16 +159,16 @@ export function CnOrderCard({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={file.preview_url} alt="" className="h-20 w-20 rounded-lg border border-border-light object-contain p-1" />
               ) : (
-                <div className="h-20 w-20 rounded-lg border border-dashed border-border-light flex items-center justify-center text-[11px] text-gray-400">no preview</div>
+                <div className="h-20 w-20 rounded-lg border border-dashed border-border-light flex items-center justify-center text-[11px] text-gray-400">{t('cnOrders.noPreview')}</div>
               )}
               <p className="text-xs text-gray-600 mt-1">{file.face}</p>
-              <a href={file.design_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-600 underline">design file</a>
+              <a href={file.design_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-600 underline">{t('cnOrders.designFile')}</a>
             </div>
           ))}
         </div>
       )}
-      {order.note && <p className="mt-1 text-sm text-gray-500">Note: {order.note}</p>}
-      {order.erp_order_id && <p className="mt-1 text-xs text-gray-400">ERP order #{order.erp_order_id}</p>}
+      {order.note && <p className="mt-1 text-sm text-gray-500">{t('cnOrders.note', { note: order.note })}</p>}
+      {order.erp_order_id && <p className="mt-1 text-xs text-gray-400">{t('cnOrders.erpOrder', { id: order.erp_order_id })}</p>}
     </div>
   );
 }

@@ -4,11 +4,13 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { setPushSupplier } from '@/lib/cn-orders/mutations';
 import type { ProductPushPrep, SupplierOptionView } from '@/lib/types/cn-order';
+import { useT } from '@/lib/i18n/client';
+import type { Translate } from '@/lib/i18n/messages';
 
-function optionLabel(option: SupplierOptionView): string {
-  const cost = option.total !== null ? `$${option.total.toFixed(2)}` : `no quote for ${option.missingItems} item(s)`;
-  const nickname = option.nickname ? `（卖家侧 ${option.nickname}）` : '';
-  return `${option.name}${nickname} — ${cost}${option.isMain ? ' · default' : ''}`;
+function optionLabel(option: SupplierOptionView, t: Translate): string {
+  const cost = option.total !== null ? `$${option.total.toFixed(2)}` : t('pushSupplier.noQuote', { count: option.missingItems });
+  const nickname = option.nickname ? t('pushSupplier.sellerNickname', { name: option.nickname }) : '';
+  return `${option.name}${nickname} — ${cost}${option.isMain ? t('pushSupplier.default') : ''}`;
 }
 
 /** 推送预处理：按产品展示各工厂做本单的成本，运营改选后立即保存到 push_suppliers。 */
@@ -16,6 +18,7 @@ export function PushSupplierPanel({ orderId, products }: { orderId: string; prod
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   function select(product: ProductPushPrep, quoteId: string) {
     const option = product.options.find((o) => o.quoteId === quoteId);
@@ -32,14 +35,14 @@ export function PushSupplierPanel({ orderId, products }: { orderId: string; prod
         );
         router.refresh();
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'Save failed');
+        setError(cause instanceof Error ? cause.message : t('common.saveFailed'));
       }
     });
   }
 
   return (
     <div className="mt-3 rounded-xl bg-gray-50 border border-border-light p-3">
-      <p className="text-xs font-medium text-gray-500 mb-2">Push factory (cost for this order&apos;s quantities)</p>
+      <p className="text-xs font-medium text-gray-500 mb-2">{t('pushSupplier.title')}</p>
       <div className="space-y-2">
         {products.map((product) => {
           const selected =
@@ -64,16 +67,16 @@ export function PushSupplierPanel({ orderId, products }: { orderId: string; prod
               >
                 {product.options.map((option) => (
                   <option key={option.quoteId} value={option.quoteId} disabled={option.total === null}>
-                    {optionLabel(option)}
+                    {optionLabel(option, t)}
                   </option>
                 ))}
               </select>
               {cheapest && selected && cheapest.quoteId !== selected.quoteId && selected.total !== null && cheapest.total !== null && (
                 <span className="text-xs text-warning-600">
-                  {cheapest.name} is cheaper by ${(selected.total - cheapest.total).toFixed(2)}
+                  {t('pushSupplier.cheaper', { name: cheapest.name, amount: (selected.total - cheapest.total).toFixed(2) })}
                 </span>
               )}
-              {product.selectedQuoteId && <span className="text-xs text-primary-600">custom</span>}
+              {product.selectedQuoteId && <span className="text-xs text-primary-600">{t('pushSupplier.custom')}</span>}
             </div>
           );
         })}

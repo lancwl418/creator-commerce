@@ -3,48 +3,51 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useT } from '@/lib/i18n/client';
+import type { MessageKey } from '@/lib/i18n/messages';
 
-const navSections = [
+const navSections: { labelKey: MessageKey; items: { href: string; labelKey: MessageKey; icon: (props: { className?: string }) => React.ReactNode }[] }[] = [
   {
-    label: 'Overview',
+    labelKey: 'nav.section.overview',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
+      { href: '/dashboard', labelKey: 'nav.dashboard', icon: DashboardIcon },
     ],
   },
   {
-    label: 'Creators',
+    labelKey: 'nav.section.creators',
     items: [
-      { href: '/dashboard/creators', label: 'Creator Management', icon: UsersIcon },
-      { href: '/dashboard/recruitment', label: 'Recruitment', icon: MegaphoneIcon },
-      { href: '/dashboard/cn-sellers', label: 'CN Sellers', icon: UsersIcon },
+      { href: '/dashboard/creators', labelKey: 'nav.creators', icon: UsersIcon },
+      { href: '/dashboard/recruitment', labelKey: 'nav.recruitment', icon: MegaphoneIcon },
+      { href: '/dashboard/cn-sellers', labelKey: 'nav.cnSellers', icon: UsersIcon },
     ],
   },
   {
-    label: 'Content',
+    labelKey: 'nav.section.content',
     items: [
-      { href: '/dashboard/designs', label: 'Design Review', icon: PaletteIcon },
-      { href: '/dashboard/products', label: 'Products', icon: PackageIcon },
+      { href: '/dashboard/designs', labelKey: 'nav.designs', icon: PaletteIcon },
+      { href: '/dashboard/products', labelKey: 'nav.products', icon: PackageIcon },
     ],
   },
   {
-    label: 'Operations',
+    labelKey: 'nav.section.operations',
     items: [
-      { href: '/dashboard/channels', label: 'Channels', icon: GlobeIcon },
-      { href: '/dashboard/orders', label: 'Orders', icon: ShoppingCartIcon },
-      { href: '/dashboard/cn-orders', label: 'CN Orders', icon: ShoppingCartIcon },
-      { href: '/dashboard/settlements', label: 'Settlements', icon: BankIcon },
+      { href: '/dashboard/channels', labelKey: 'nav.channels', icon: GlobeIcon },
+      { href: '/dashboard/orders', labelKey: 'nav.orders', icon: ShoppingCartIcon },
+      { href: '/dashboard/cn-orders', labelKey: 'nav.cnOrders', icon: ShoppingCartIcon },
+      { href: '/dashboard/settlements', labelKey: 'nav.settlements', icon: BankIcon },
     ],
   },
   {
-    label: 'System',
+    labelKey: 'nav.section.system',
     items: [
-      { href: '/dashboard/settings', label: 'Settings', icon: SettingsIcon },
+      { href: '/dashboard/settings', labelKey: 'nav.settings', icon: SettingsIcon },
     ],
   },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   // Close the mobile menu when the route changes.
@@ -77,12 +80,12 @@ export function Sidebar() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
             </svg>
           </div>
-          <span className="text-[15px] font-semibold text-white tracking-tight">Admin</span>
+          <span className="text-[15px] font-semibold text-white tracking-tight">{t('nav.brand')}</span>
         </Link>
         <button
           onClick={() => setOpen(false)}
           className="md:hidden p-1 text-white/60 hover:text-white"
-          aria-label="Close menu"
+          aria-label={t('nav.closeMenu')}
         >
           <CloseIcon className="w-5 h-5" />
         </button>
@@ -90,9 +93,9 @@ export function Sidebar() {
 
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
         {navSections.map((section) => (
-          <div key={section.label}>
+          <div key={section.labelKey}>
             <p className="px-3 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-white/30">
-              {section.label}
+              {t(section.labelKey)}
             </p>
             <div className="space-y-0.5">
               {section.items.map((item) => (
@@ -106,7 +109,7 @@ export function Sidebar() {
                   }`}
                 >
                   <item.icon className="w-[18px] h-[18px]" />
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               ))}
             </div>
@@ -116,7 +119,7 @@ export function Sidebar() {
 
       <div className="p-3 mt-auto">
         <div className="rounded-lg bg-white/8 px-3.5 py-3">
-          <p className="text-[11px] font-medium text-white/40 uppercase tracking-wider">Admin Console</p>
+          <p className="text-[11px] font-medium text-white/40 uppercase tracking-wider">{t('nav.console')}</p>
           <p className="text-[12px] text-white/70 mt-0.5">Creator Commerce</p>
         </div>
       </div>
@@ -128,7 +131,7 @@ export function Sidebar() {
       <button
         onClick={() => setOpen(true)}
         className="md:hidden fixed top-4 left-4 z-40 p-2 bg-white rounded-xl shadow-md border border-border-light"
-        aria-label="Open menu"
+        aria-label={t('nav.openMenu')}
       >
         <MenuIcon className="w-5 h-5 text-gray-700" />
       </button>
