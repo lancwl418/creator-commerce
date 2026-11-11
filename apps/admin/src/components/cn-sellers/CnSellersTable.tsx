@@ -1,6 +1,7 @@
 import type { CnSellerRow, SupplierOptionLite } from '@/lib/types/cn-seller';
 import { SellerSupplierAccess } from './SellerSupplierAccess';
 import { SellerTierSelect } from './SellerTierSelect';
+import { RetryErpSyncButton } from './RetryErpSyncButton';
 import { getTranslator } from '@/lib/i18n/server';
 import { dateLocale, type Locale } from '@/lib/i18n/messages';
 
@@ -82,6 +83,7 @@ export async function CnSellersTable({ sellers, supplierAccess, supplierOptions 
                     {seller.erp_sync_error}
                   </p>
                 )}
+                {seller.erp_sync_status === 'failed' && <RetryErpSyncButton sellerId={seller.id} />}
               </td>
               <td className="px-5 py-3 text-gray-500 whitespace-nowrap">{formatDate(seller.created_at, locale)}</td>
             </tr>
