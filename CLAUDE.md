@@ -36,6 +36,8 @@ ERP Core 是整个业务的数据底座，向上支撑三个面向不同用户�
 
 **2026-11-11 更新：按账号限定可见供应商。** 每个 cn_seller 可有一份供应商白名单（`cn_seller_supplier_access`，migration 038），按 ERP 主供应商 `mainSupplierId` 过滤目录 / 详情 / 建品 / 下单 / 表格导入；白名单为空 = 看全部。注册后由 Admin 在 CN Sellers 页分配，可随时修改；收回权限不影响已建产品和已下订单。
 
+**2026-11-11 更新：Admin 中英双语（第一批）。** 文案字典在 `apps/admin/src/lib/i18n`，账号语言存 `admin_users.locale`（migration 039，默认 en），顶栏 / 登录页可切换。目前覆盖侧边栏、顶栏、登录页、CN Sellers、CN Orders（含工厂推送）；其余页面仍为英文。
+
 ### 项目结构：Monorepo
 
 ```

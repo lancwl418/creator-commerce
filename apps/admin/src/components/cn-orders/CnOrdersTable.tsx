@@ -1,8 +1,9 @@
 import type { CnOrderRow, OrderPushPrepMap } from '@/lib/types/cn-order';
 import type { FactoryPushMap } from '@/lib/queries/cn-factory-pushes';
 import { CnOrderCard } from './CnOrderCard';
+import { getTranslator } from '@/lib/i18n/server';
 
-export function CnOrdersTable({
+export async function CnOrdersTable({
   orders,
   pushPrep = {},
   factoryPushes = {},
@@ -11,10 +12,11 @@ export function CnOrdersTable({
   pushPrep?: OrderPushPrepMap;
   factoryPushes?: FactoryPushMap;
 }) {
+  const { t } = await getTranslator();
   if (orders.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border-light bg-white p-12 text-center">
-        <p className="text-sm text-gray-400">No purchase orders</p>
+        <p className="text-sm text-gray-400">{t('cnOrders.empty')}</p>
       </div>
     );
   }

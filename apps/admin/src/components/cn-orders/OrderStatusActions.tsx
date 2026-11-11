@@ -4,11 +4,13 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateCnOrderStatus } from '@/lib/cn-orders/mutations';
 import type { CnOrderStatus } from '@/lib/types/cn-order';
+import { useT } from '@/lib/i18n/client';
 
 export function OrderStatusActions({ orderId, status }: { orderId: string; status: CnOrderStatus }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   function change(next: 'confirmed' | 'cancelled') {
     setError(null);
@@ -17,7 +19,7 @@ export function OrderStatusActions({ orderId, status }: { orderId: string; statu
         await updateCnOrderStatus(orderId, next);
         router.refresh();
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'Update failed');
+        setError(cause instanceof Error ? cause.message : t('common.updateFailed'));
       }
     });
   }
@@ -28,11 +30,11 @@ export function OrderStatusActions({ orderId, status }: { orderId: string; statu
       <div className="flex gap-2">
         <button type="button" onClick={() => change('confirmed')} disabled={isPending}
           className="rounded-lg bg-success-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-success-600 disabled:opacity-50">
-          Confirm
+          {t('cnOrders.confirm')}
         </button>
         <button type="button" onClick={() => change('cancelled')} disabled={isPending}
           className="rounded-lg border border-danger-200 px-3 py-1.5 text-xs font-medium text-danger-600 hover:bg-danger-50 disabled:opacity-50">
-          Cancel
+          {t('cnOrders.cancel')}
         </button>
       </div>
       {error && <p className="text-xs text-danger-600">{error}</p>}
