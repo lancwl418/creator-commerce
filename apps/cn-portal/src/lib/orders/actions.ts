@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { t } from '../i18n';
 import { addToCart } from '../cart/actions';
 import { getListableSkus } from '../catalog';
-import { getProductDetail } from '../catalog.server';
+import { getCreatedProductDetail, getProductDetail } from '../catalog.server';
 import { ERP_TEMPLATE_PREFIX, buildBlankVariants } from '../products/blank-product';
 import { buildSyncVariants } from '../products/product-sync';
 import { getMyProduct } from '../queries/my-products';
@@ -34,7 +34,7 @@ function withSupplier(items: BulkOrderItem[], product: Parameters<typeof getMain
 export async function createDirectOrder(_state: BulkOrderFormState, form: FormData): Promise<BulkOrderFormState> {
   const seller = await requireSeller();
   const erpProductId = String(form.get('erpProductId') ?? '');
-  const { product, data } = await getProductDetail(erpProductId, seller.tier);
+  const { product, data } = await getProductDetail(erpProductId, seller);
   if (!product) return { error: t('detail.notFound') };
 
   if (form.get('intent') === 'cart') return addToCart(_state, form);
@@ -92,7 +92,7 @@ export async function createDesignedOrder(_state: BulkOrderFormState, form: Form
   const productId = String(form.get('productId') ?? '');
   const row = await getMyProduct(seller.id, productId);
   if (!row) return { error: t('detail.notFound') };
-  const { product, data } = await getProductDetail((row.product_template_id ?? '').replace(ERP_TEMPLATE_PREFIX, ''), seller.tier);
+  const { product, data } = await getCreatedProductDetail((row.product_template_id ?? '').replace(ERP_TEMPLATE_PREFIX, ''));
   if (!product) return { error: t('detail.notFound') };
 
   const variants = buildSyncVariants(product, getListableSkus(product, data), 1);
@@ -133,7 +133,7 @@ export async function importOrders(_state: ImportFormState, form: FormData): Pro
   if (!parsed.ok) {
     return { error: parsed.error === 'empty' ? t('import.error.empty') : t('import.error.missingColumns', 'zh', { columns: (parsed.missing ?? []).join(', ') }), address: defaultAddress };
   }
-  const [skuIndex, platformData] = await Promise.all([getSkuIndex(seller.tier), loadPlatformData()]);
+  const [skuIndex, platformData] = await Promise.all([getSkuIndex(seller), loadPlatformData()]);
   const groups = resolveImportGroups(parsed.lines, { tier: seller.tier, skuIndex, platformData, defaultAddress });
   const hasErrors = groups.some((g) => g.errors.length > 0);
   if (form.get('confirm') !== '1' || hasErrors) return { groups, csv, address: defaultAddress, error: hasErrors ? t('import.error.fixRows') : undefined };

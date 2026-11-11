@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 /** 创建订单：从目录选产品后进入该产品的统一下单页（上传设计可选） */
 export default async function CreateOrderPage() {
   const seller = await requireSeller();
-  const { items } = await getCatalog(seller.tier);
+  const { items } = await getCatalog(seller);
   const products = items.map(({ id, name, itemNo, fromPrice, maxPrice, supplierId, supplierName }) => ({ id, name, itemNo, fromPrice, maxPrice, supplierId, supplierName }));
 
   return (

@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export default async function BlankSyncPage({ params }: SyncPageProps) {
   const { id } = await params;
   const seller = await requireSeller();
-  const [{ product, data }, store] = await Promise.all([getProductDetail(id, seller.tier), getConnectedShopifyStore(seller.id)]);
+  const [{ product, data }, store] = await Promise.all([getProductDetail(id, seller), getConnectedShopifyStore(seller.id)]);
   if (!product) notFound();
   const item = getCatalogItem(product, data);
   if (!item) notFound();

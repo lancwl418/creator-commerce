@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export default async function DesignPage({ params, searchParams }: SyncPageProps & { searchParams: Promise<{ intent?: string }> }) {
   const [{ id }, { intent }] = await Promise.all([params, searchParams]);
   const seller = await requireSeller();
-  const { product, data } = await getProductDetail(id, seller.tier);
+  const { product, data } = await getProductDetail(id, seller);
   if (!product || !getCatalogItem(product, data)) notFound();
 
   const origin = await getRequestOrigin();

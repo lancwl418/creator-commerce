@@ -11,6 +11,7 @@
     "./erp/pricing": "./src/erp/pricing.ts",
     "./erp/options": "./src/erp/options.ts",
     "./erp/business-lines": "./src/erp/business-lines.ts",
+    "./erp/suppliers": "./src/erp/suppliers.ts",
     "./shopify": "./src/shopify/index.ts",
     "./shopify/domain": "./src/shopify/domain.ts",
     "./shopify/listing-prices": "./src/shopify/listing-prices.ts",

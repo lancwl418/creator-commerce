@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getListableSkus } from '@/lib/catalog';
-import { getProductDetail } from '@/lib/catalog.server';
+import { getCreatedProductDetail } from '@/lib/catalog.server';
 import { syncExistingProduct } from '@/lib/products/actions';
 import { ERP_TEMPLATE_PREFIX, buildBlankProductImages } from '@/lib/products/blank-product';
 import { buildSyncVariants } from '@/lib/products/product-sync';
@@ -19,7 +19,7 @@ export default async function MyProductSyncPage({ params }: SyncPageProps) {
   const seller = await requireSeller();
   const [row, store] = await Promise.all([getMyProduct(seller.id, id), getConnectedShopifyStore(seller.id)]);
   if (!row) notFound();
-  const { product, data } = await getProductDetail((row.product_template_id ?? '').replace(ERP_TEMPLATE_PREFIX, ''), seller.tier);
+  const { product, data } = await getCreatedProductDetail((row.product_template_id ?? '').replace(ERP_TEMPLATE_PREFIX, ''));
   if (!product) notFound();
 
   const designed = (row.design_artwork_urls?.length ?? 0) > 0 || (row.preview_urls?.length ?? 0) > 0;

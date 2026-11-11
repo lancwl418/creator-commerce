@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ErpProduct } from '@creator-commerce/shared/erp/types';
-import { collectSuppliers, displaySupplierName, getMainSupplier, parseSupplierNameForm } from './suppliers';
+import {
+  collectSuppliers, displaySupplierName, getMainSupplier, isProductInSupplierScope, parseSupplierNameForm, toSupplierScope,
+} from './suppliers';
 
 function product(overrides: Partial<ErpProduct>): ErpProduct {
   return { id: 'p', vendor: '', prodSkuList: [], prodImageList: [], ...overrides } as ErpProduct;
@@ -46,5 +48,28 @@ describe('默认供应商', () => {
     });
     form.set('name:a', 'x'.repeat(101));
     expect(parseSupplierNameForm(form, ['a', 'b'])).toEqual({ ok: false, error: 'tooLong' });
+  });
+});
+
+describe('账号可见供应商白名单', () => {
+  it('白名单为空时看全部', () => {
+    const scope = toSupplierScope([]);
+    expect(scope).toBeNull();
+    expect(isProductInSupplierScope(product({ mainSupplierId: 'a' }), scope)).toBe(true);
+    expect(isProductInSupplierScope(product({ mainSupplierId: null }), scope)).toBe(true);
+  });
+
+  it('有白名单时只看主供应商在名单里的产品，没标主供应商的不可见', () => {
+    const scope = toSupplierScope(['a', ' b ', '']);
+    expect(isProductInSupplierScope(product({ mainSupplierId: 'a' }), scope)).toBe(true);
+    expect(isProductInSupplierScope(product({ mainSupplierId: ' b' }), scope)).toBe(true);
+    expect(isProductInSupplierScope(product({ mainSupplierId: 'c' }), scope)).toBe(false);
+    expect(isProductInSupplierScope(product({ mainSupplierId: null }), scope)).toBe(false);
+  });
+
+  it('只按主供应商判断，不看其它供应商报价', () => {
+    const scope = toSupplierScope(['b']);
+    const p = product({ mainSupplierId: 'a', suppliers: [{ id: 'q1', supplierId: 'a' }, { id: 'q2', supplierId: 'b' }] });
+    expect(isProductInSupplierScope(p, scope)).toBe(false);
   });
 });

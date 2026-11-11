@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export default async function CartPage({ searchParams }: { searchParams: Promise<{ added?: string }> }) {
   const seller = await requireSeller();
   const [{ added }, rows, lastAddress] = await Promise.all([searchParams, getCartItems(seller.id), getLastShippingAddress(seller.id)]);
-  const items = await priceCartItems(rows, seller.tier);
+  const items = await priceCartItems(rows, seller);
   const hasUnpriced = items.some((item) => item.unit_cost == null);
 
   return (

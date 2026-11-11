@@ -34,6 +34,8 @@ ERP Core 是整个业务的数据底座，向上支撑三个面向不同用户�
 
 **2026-10-11 更新：中国卖家与 Creator 共用数据模型和后链路。** 中国卖家是 `creators` 的一种 `user_type = cn_seller`（等级、公司、ERP 客户 id 等字段加在 `creators` 上，migration 029），店铺连接、已建产品、渠道 listing、订单全部按 `creator_id` 复用 Creator Portal 的表和服务端逻辑，不在 cn-portal 另搭一套。cn-portal 产品页两个入口：「同步店铺」（开始设计 → 走 Creator Portal 同款流程；或仅同步白板）和「下单」（上传设计 / 白板 bulk order，待支付方案确定后做）。Shopify 用同一个 App，仅需把 cn-portal 域名加入回调白名单；订单 webhook 统一指向 Creator Portal。
 
+**2026-11-11 更新：按账号限定可见供应商。** 每个 cn_seller 可有一份供应商白名单（`cn_seller_supplier_access`，migration 038），按 ERP 主供应商 `mainSupplierId` 过滤目录 / 详情 / 建品 / 下单 / 表格导入；白名单为空 = 看全部。注册后由 Admin 在 CN Sellers 页分配，可随时修改；收回权限不影响已建产品和已下订单。
+
 ### 项目结构：Monorepo
 
 ```

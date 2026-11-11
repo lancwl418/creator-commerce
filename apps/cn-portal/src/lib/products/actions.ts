@@ -9,7 +9,7 @@ import {
 } from '@creator-commerce/shared/shopify';
 import { t } from '../i18n';
 import { getListableSkus } from '../catalog';
-import { getProductDetail } from '../catalog.server';
+import { getCreatedProductDetail, getProductDetail } from '../catalog.server';
 import { getRequestOrigin } from '../request-origin';
 import { requireSeller } from '../sellers/session';
 import { createClient } from '../supabase/server';
@@ -29,7 +29,7 @@ import type { SyncableProduct } from '@creator-commerce/shared/shopify';
 export async function syncBlankProduct(_state: BlankSyncFormState, form: FormData): Promise<BlankSyncFormState> {
   const seller = await requireSeller();
   const erpProductId = String(form.get('erpProductId') ?? '');
-  const { product, data } = await getProductDetail(erpProductId, seller.tier);
+  const { product, data } = await getProductDetail(erpProductId, seller);
   if (!product) return { error: t('detail.notFound') };
 
   const variants = buildBlankVariants(product, getListableSkus(product, data));
@@ -90,7 +90,7 @@ export async function syncExistingProduct(_state: BlankSyncFormState, form: Form
   if (!row) return { error: t('detail.notFound') };
 
   const erpProductId = (row.product_template_id ?? '').replace(ERP_TEMPLATE_PREFIX, '');
-  const { product, data } = await getProductDetail(erpProductId, seller.tier);
+  const { product, data } = await getCreatedProductDetail(erpProductId);
   if (!product) return { error: t('detail.notFound') };
 
   const designed = (row.design_artwork_urls?.length ?? 0) > 0 || (row.preview_urls?.length ?? 0) > 0;
