@@ -38,6 +38,8 @@ ERP Core 是整个业务的数据底座，向上支撑三个面向不同用户�
 
 **2026-11-11 更新：Admin 中英双语（第一批）。** 文案字典在 `apps/admin/src/lib/i18n`，账号语言存 `admin_users.locale`（migration 039，默认 en），顶栏 / 登录页可切换。目前覆盖侧边栏、顶栏、登录页、CN Sellers、CN Orders（含工厂推送）；其余页面仍为英文。
 
+**2026-11-11 更新：Admin 新建中国卖家。** CN Sellers 页「新建卖家」：账号可填邮箱或用户名（用户名存为 `xxx@cn-portal.local`），走 Supabase 注册（`signup_app = cn_portal` 触发器建 cn_seller），同时设等级、可见供应商，并用管理员会话在 ERP 建客户档案（`packages/shared/src/erp/customers.ts`，与 cn-portal 注册共用）；ERP 失败的卖家可在列表里「重新同步」。
+
 ### 项目结构：Monorepo
 
 ```

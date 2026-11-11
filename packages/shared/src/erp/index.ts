@@ -5,4 +5,5 @@ export * from './supplier-cost';
 export * from './options';
 export * from './business-lines';
 export * from './suppliers';
+export * from './customers';
 export * from './image.server';

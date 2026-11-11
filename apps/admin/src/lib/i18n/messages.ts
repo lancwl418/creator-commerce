@@ -87,6 +87,59 @@ const messages = {
     zh: '只显示勾选的供应商的产品；都不勾 = 全部。',
   },
   'cnSellers.suppliers.none': { en: 'No suppliers in the ERP catalog', zh: 'ERP 目录里没有供应商' },
+  'cnSellers.erp.retry': { en: 'Retry sync', zh: '重新同步' },
+  'cnSellers.erp.retrying': { en: 'Syncing…', zh: '同步中…' },
+
+  // 新建中国卖家
+  'cnSellers.create.button': { en: 'New seller', zh: '新建卖家' },
+  'cnSellers.create.title': { en: 'New CN seller', zh: '新建中国卖家' },
+  'cnSellers.create.subtitle': {
+    en: 'Creates a CN portal login and the ERP customer record. The seller can sign in to the CN portal right away.',
+    zh: '创建中国卖家平台的登录账号，并在 ERP 建客户档案。建好后卖家即可登录中国卖家平台。',
+  },
+  'cnSellers.create.account': { en: 'Login (email or username)', zh: '登录账号（邮箱或用户名）' },
+  'cnSellers.create.accountHint': {
+    en: 'A username without @ becomes username@cn-portal.local; the seller can sign in to the CN portal with just the username.',
+    zh: '不带 @ 的用户名会存为 用户名@cn-portal.local，卖家在中国卖家平台直接输入用户名即可登录。',
+  },
+  'cnSellers.create.password': { en: 'Password (at least 6 characters)', zh: '密码（至少 6 位）' },
+  'cnSellers.create.companyName': { en: 'Company', zh: '公司名称' },
+  'cnSellers.create.contactName': { en: 'Contact name', zh: '联系人' },
+  'cnSellers.create.phone': { en: 'Phone', zh: '电话' },
+  'cnSellers.create.tier': { en: 'Tier', zh: '等级' },
+  'cnSellers.create.suppliers': { en: 'Visible suppliers (none selected = all)', zh: '可见供应商（不选 = 全部）' },
+  'cnSellers.create.suppliersUnavailable': {
+    en: 'Suppliers could not be loaded from ERP; you can set them later from the list.',
+    zh: '暂时无法从 ERP 加载供应商，可以建好后在列表里再设置。',
+  },
+  'cnSellers.create.submit': { en: 'Create seller', zh: '创建卖家' },
+  'cnSellers.create.submitting': { en: 'Creating…', zh: '创建中…' },
+  'cnSellers.create.created': { en: 'Created {email}.', zh: '已创建 {email}。' },
+  'cnSellers.create.erpSynced': { en: 'ERP customer created.', zh: 'ERP 客户档案已建好。' },
+  'cnSellers.create.erpFailed': {
+    en: 'ERP sync failed ({error}); retry from the list.',
+    zh: 'ERP 同步失败（{error}），可在列表里重新同步。',
+  },
+  'cnSellers.create.confirmEmail': {
+    en: 'Email confirmation is on in Supabase: the seller must confirm the email before signing in.',
+    zh: 'Supabase 开启了邮箱验证：卖家需要先点验证邮件才能登录。',
+  },
+  'cnSellers.create.setupFailed': { en: 'Some settings were not saved: {error}', zh: '部分设置未保存：{error}' },
+  'cnSellers.create.error.required': { en: 'Company and contact name are required', zh: '请填写公司名称和联系人' },
+  'cnSellers.create.error.account': {
+    en: 'Enter a valid email, or a username of 2–40 letters, digits, dots, dashes or underscores',
+    zh: '请输入有效邮箱，或 2–40 位的用户名（字母、数字、点、横线、下划线）',
+  },
+  'cnSellers.create.error.password': { en: 'Password must be at least 6 characters', zh: '密码至少 6 位' },
+  'cnSellers.create.error.phone': { en: 'Enter a valid phone number', zh: '请输入有效的电话号码' },
+  'cnSellers.create.error.tier': { en: 'Unknown tier', zh: '未知等级' },
+  'cnSellers.create.error.taken': { en: 'This login is already registered', zh: '这个账号已经注册过了' },
+  'cnSellers.create.error.forbidden': { en: 'Only active admins can do this', zh: '只有启用中的管理员可以操作' },
+  'cnSellers.create.error.notFound': { en: 'Seller not found', zh: '找不到这个卖家' },
+  'cnSellers.create.error.noSellerRow': {
+    en: 'The login was created but its seller record was not found ({message}). Check the sign-up trigger.',
+    zh: '登录账号已建，但没找到对应的卖家记录（{message}），请检查注册触发器。',
+  },
 
   // 中国卖家订单
   'cnOrders.title': { en: 'CN Purchase Orders', zh: '中国卖家采购单' },
