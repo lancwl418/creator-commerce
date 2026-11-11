@@ -1,15 +1,15 @@
-import type { SellerTier } from '@creator-commerce/shared/erp/pricing';
 import { getListableSkus } from '../catalog';
 import { getProductDetail } from '../catalog.server';
 import { buildSyncVariants } from '../products/product-sync';
 import { displaySupplierName, getMainSupplier } from '../suppliers/suppliers';
+import type { Seller } from '../types/seller';
 import type { BulkOrderItem, CartItemRow, PricedCartItem } from '../types/bulk-order';
 
 /**
- * 按当前等级给购物车的每一行算单价；产品下架或没价时为 null。
+ * 给购物车的每一行算单价；产品下架、没价或供应商已不在卖家可见范围时为 null。
  * 白板行（faces=0）用空白件价，带设计的行用「空白件价 + faces 面印花价」。
  */
-export async function priceCartItems(items: CartItemRow[], tier: SellerTier): Promise<PricedCartItem[]> {
+export async function priceCartItems(items: CartItemRow[], seller: Pick<Seller, 'id'>): Promise<PricedCartItem[]> {
   // 同一产品可能同时有白板行和不同面数的设计行，按 (产品, 面数) 分别取价
   const groups = [...new Set(items.map((item) => `${item.erp_product_id}:${item.faces}`))];
   const costBySkuFaces = new Map<string, number>();
@@ -18,7 +18,7 @@ export async function priceCartItems(items: CartItemRow[], tier: SellerTier): Pr
     const splitAt = group.lastIndexOf(':');
     const erpProductId = group.slice(0, splitAt);
     const faces = Number(group.slice(splitAt + 1));
-    const { product, data } = await getProductDetail(erpProductId, tier);
+    const { product, data } = await getProductDetail(erpProductId, seller);
     if (!product) return;
     const supplier = getMainSupplier(product);
     supplierByProduct.set(erpProductId, {

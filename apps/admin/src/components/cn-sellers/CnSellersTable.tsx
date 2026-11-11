@@ -1,4 +1,5 @@
-import type { CnSellerRow } from '@/lib/types/cn-seller';
+import type { CnSellerRow, SupplierOptionLite } from '@/lib/types/cn-seller';
+import { SellerSupplierAccess } from './SellerSupplierAccess';
 import { SellerTierSelect } from './SellerTierSelect';
 
 const SYNC_STYLES: Record<CnSellerRow['erp_sync_status'], string> = {
@@ -11,7 +12,17 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-export function CnSellersTable({ sellers }: { sellers: CnSellerRow[] }) {
+interface CnSellersTableProps {
+  sellers: CnSellerRow[];
+  /** sellerId → 可见供应商白名单；不在 Map 里 = 看全部 */
+  supplierAccess: Map<string, string[]>;
+  /** ERP 目录的全部主供应商；加载失败为 null */
+  supplierOptions: SupplierOptionLite[] | null;
+}
+
+const NO_SUPPLIERS: string[] = [];
+
+export function CnSellersTable({ sellers, supplierAccess, supplierOptions }: CnSellersTableProps) {
   if (sellers.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border-light bg-white p-12 text-center">
@@ -28,6 +39,7 @@ export function CnSellersTable({ sellers }: { sellers: CnSellerRow[] }) {
             <th className="px-5 py-3 font-medium">Company</th>
             <th className="px-5 py-3 font-medium">Contact</th>
             <th className="px-5 py-3 font-medium">Tier</th>
+            <th className="px-5 py-3 font-medium">Visible suppliers</th>
             <th className="px-5 py-3 font-medium">ERP</th>
             <th className="px-5 py-3 font-medium">Registered</th>
           </tr>
@@ -45,6 +57,15 @@ export function CnSellersTable({ sellers }: { sellers: CnSellerRow[] }) {
               </td>
               <td className="px-5 py-3">
                 <SellerTierSelect sellerId={seller.id} tier={seller.seller_tier} />
+              </td>
+              <td className="px-5 py-3">
+                <SellerSupplierAccess
+                  // 白名单变了（保存后 refresh）就重置编辑态
+                  key={(supplierAccess.get(seller.id) ?? NO_SUPPLIERS).join(',')}
+                  sellerId={seller.id}
+                  supplierIds={supplierAccess.get(seller.id) ?? NO_SUPPLIERS}
+                  options={supplierOptions}
+                />
               </td>
               <td className="px-5 py-3">
                 <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${SYNC_STYLES[seller.erp_sync_status]}`}>

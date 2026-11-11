@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getListableSkus } from '@/lib/catalog';
-import { getProductDetail } from '@/lib/catalog.server';
+import { getCreatedProductDetail } from '@/lib/catalog.server';
 import { createDesignedOrder } from '@/lib/orders/actions';
 import { ERP_TEMPLATE_PREFIX } from '@/lib/products/blank-product';
 import { buildSyncVariants } from '@/lib/products/product-sync';
@@ -20,7 +20,7 @@ export default async function DesignedOrderPage({ params }: SyncPageProps) {
   const seller = await requireSeller();
   const [row, lastAddress] = await Promise.all([getMyProduct(seller.id, id), getLastShippingAddress(seller.id)]);
   if (!row) notFound();
-  const { product, data } = await getProductDetail((row.product_template_id ?? '').replace(ERP_TEMPLATE_PREFIX, ''), seller.tier);
+  const { product, data } = await getCreatedProductDetail((row.product_template_id ?? '').replace(ERP_TEMPLATE_PREFIX, ''));
   if (!product) notFound();
   const variants = buildSyncVariants(product, getListableSkus(product, data), 1);
   const moqBySku = Object.fromEntries(variants.map((v) => [v.sku, data.moq.get(v.sku)?.minQty ?? null]));

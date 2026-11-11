@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export default async function DirectOrderPage({ params }: SyncPageProps) {
   const { id } = await params;
   const seller = await requireSeller();
-  const [{ product, data }, lastAddress] = await Promise.all([getProductDetail(id, seller.tier), getLastShippingAddress(seller.id)]);
+  const [{ product, data }, lastAddress] = await Promise.all([getProductDetail(id, seller), getLastShippingAddress(seller.id)]);
   if (!product) notFound();
   const item = getCatalogItem(product, data);
   if (!item) notFound();

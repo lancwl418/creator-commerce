@@ -23,7 +23,7 @@ import { getCartItems } from './queries';
 export async function addToCart(_state: BulkOrderFormState, form: FormData): Promise<BulkOrderFormState> {
   const seller = await requireSeller();
   const erpProductId = String(form.get('erpProductId') ?? '');
-  const { product, data } = await getProductDetail(erpProductId, seller.tier);
+  const { product, data } = await getProductDetail(erpProductId, seller);
   if (!product) return { error: t('detail.notFound') };
 
   const uploads = parseFaceUploads(form, getUploadableFaces(product), { required: false });
@@ -99,7 +99,7 @@ export async function removeCartItem(form: FormData): Promise<void> {
 /** 购物车结算：所有有价的行合成一张多产品采购单（待确认），清空购物车。 */
 export async function checkoutCart(_state: BulkOrderFormState, form: FormData): Promise<BulkOrderFormState> {
   const seller = await requireSeller();
-  const priced = await priceCartItems(await getCartItems(seller.id), seller.tier);
+  const priced = await priceCartItems(await getCartItems(seller.id), seller);
   const unpriced = priced.filter((item) => item.unit_cost == null);
   if (unpriced.length > 0) return { error: t('cart.error.unpriced', 'zh', { skus: unpriced.map((i) => i.sku).join(', ') }), address: readAddress(form) };
   const items = cartToOrderItems(priced);

@@ -11,13 +11,14 @@ const CATALOG_PAGE_SIZE = 40;
 
 export default async function ProductsPage({ searchParams }: CatalogPageProps) {
   const params = await searchParams;
-  const { tier } = await requireSeller();
+  const seller = await requireSeller();
+  const { tier } = seller;
   const filters = parseCatalogQuery(params);
   let items: CatalogItem[] = [];
   let errored = false;
 
   try {
-    items = (await getCatalog(tier)).items;
+    items = (await getCatalog(seller)).items;
   } catch (error) {
     console.error('Failed to load CN catalog', error);
     errored = true;
