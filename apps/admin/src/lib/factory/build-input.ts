@@ -1,4 +1,5 @@
 import {
+  erpBaseUrlFromEnv,
   resolveOptionDimensions,
   resolveSupplierSkuCost,
   type ErpProduct,
@@ -22,6 +23,20 @@ export function designFilesOf(order: CnOrderRow, item: CnOrderItem): { face: str
   if (item.design_files?.length) return item.design_files;
   const productId = item.erp_product_id ?? order.erp_product_id;
   return productId && productId === order.erp_product_id ? order.design_files : [];
+}
+
+/**
+ * 产品主图的公网 URL（ERP 静态目录），工厂报文效果图为空时兜底。
+ * RIIN 对没有 type-2 效果图的条目报「效果图为空」HTTP 500。
+ */
+export function productMainImageUrl(product: ErpProduct): string | null {
+  const path =
+    product.mainPic ||
+    product.prodImageList?.find((i) => i.isMain === 1)?.picSrc ||
+    product.prodImageList?.[0]?.picSrc;
+  if (!path) return null;
+  if (/^https?:\/\//.test(path)) return path;
+  return `${erpBaseUrlFromEnv()}/sys/common/static/${path.replace(/^\//, '')}`;
 }
 
 /** 从选定供应商报价的 skuMaps 找工厂编码（skuKey = "颜色|尺码"），找不到用我方 SKU */
@@ -66,6 +81,11 @@ export function buildItemInput(
 
   const designFiles = designFilesOf(order, item);
   const shouldPrint = designFiles.length > 0;
+  const effectImageUrls = designFiles.map((f) => f.preview_url).filter((url): url is string => !!url);
+  if (effectImageUrls.length === 0) {
+    const mainImage = productMainImageUrl(product);
+    if (mainImage) effectImageUrls.push(mainImage);
+  }
   const faces = item.faces ?? order.faces ?? (shouldPrint ? designFiles.length : 0);
   const factorySku = factorySkuOf(quote, item, color, size);
   // 工厂价：选定供应商的报价成本；取不到时退回下单单价快照
@@ -89,6 +109,6 @@ export function buildItemInput(
     shouldPrint,
     printPosition: shouldPrint ? printPositionOf(designFiles.map((f) => f.face)) : undefined,
     printImageUrls: designFiles.map((f) => f.design_url),
-    effectImageUrls: designFiles.map((f) => f.preview_url).filter((url): url is string => !!url),
+    effectImageUrls,
   };
 }
